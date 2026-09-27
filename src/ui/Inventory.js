@@ -1,3 +1,4 @@
+import { itemIcon } from './ItemIcons.js';
 import { keyLabel } from '../core/Input.js';
 import { RARITIES } from '../weapons/WeaponDefs.js';
 import { AMMO, MATS } from '../weapons/Items.js';
@@ -83,7 +84,8 @@ export class Inventory {
     this.el.querySelector('#inv-key').textContent = keyName(this.game.input.keyFor('inventory'));
     this.slotsEl.innerHTML = p.items.map((it, i) => {
       const col = !it ? 'rgba(255,255,255,0.15)' : it.isGun ? RARITIES[it.rarity].color : it.isConsumable ? it.def.color : '#e8d7b0';
-      const icon = !it ? '' : it.isGun ? it.def.icon : it.isConsumable ? it.def.icon : '⛏';
+      const url = itemIcon(it);
+      const icon = url ? `<img src="${url}" alt="">` : !it ? '' : it.isGun ? it.def.icon : it.isConsumable ? it.def.icon : '⛏';
       const sub = !it ? 'Empty' : it.isGun ? `${it.ammo}/${it.def.mag}` : it.isConsumable ? `×${it.count}` : '';
       const drag = i > 0 && it ? 'draggable="true"' : '';
       return `<div class="inv-slot${i === this.sel ? ' sel' : ''}${i === 0 ? ' fixed' : ''}" data-slot="${i}" data-act="sel" data-arg="${i}" ${drag} style="--rar:${col}">

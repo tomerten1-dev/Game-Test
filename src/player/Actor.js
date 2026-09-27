@@ -3,6 +3,7 @@ import { Character } from './Character.js';
 import { makeGlider } from './Glider.js';
 import { damp, dampAngle } from '../core/noise.js';
 import { makeWeaponMesh, makePickaxeMesh, makeThrowableMesh } from '../weapons/WeaponModels.js';
+import { makeConsumableMesh } from '../world/ItemMeshes.js';
 import { Pickaxe, Consumable, CONSUMABLES, MAT_CAP } from '../weapons/Items.js';
 
 export const RUN_SPEED = 6.4;
@@ -654,6 +655,12 @@ export class Actor {
     else if (h && h.isGun) this.character.setWeapon(applyWrap(makeWeaponMesh(h.type, h.rarity), this.wrap));
     else if (h && h.isPickaxe) this.character.setWeapon(makePickaxeMesh(), true);
     else if (h?.def?.throw) this.character.setWeapon(makeThrowableMesh(h.type, 1.2));
+    else if (h?.isConsumable && !h.def.key) {
+      // heals / placeables: hold the actual item
+      const m = makeConsumableMesh(h.type);
+      if (m) { m.scale.multiplyScalar(0.55); m.userData.muzzle = new THREE.Vector3(); m.userData.foregrip = 0; }
+      this.character.setWeapon(m);
+    }
     else this.character.setWeapon(null);
   }
 

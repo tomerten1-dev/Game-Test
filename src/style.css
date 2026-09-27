@@ -493,3 +493,8 @@ body.touch .kbd { display: none; }
 .inv-help { font-size: 13px; opacity: 0.7; }
 #inv-close { align-self: flex-start; font-size: 17px; padding: 7px 18px; }
 @media (max-width: 700px) { .inv-slots { grid-template-columns: repeat(3, 1fr); } .inv-cols { grid-template-columns: 1fr; } }
+
+/* item icons rendered from the 3D models */
+.slot .icon img { width: 54px; height: 44px; object-fit: contain; transform: skewX(6deg); filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5)); pointer-events: none; }
+.slot.has-img .icon { line-height: 0; }
+.inv-slot .ic img { width: 72px; height: 54px; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5)); pointer-events: none; }

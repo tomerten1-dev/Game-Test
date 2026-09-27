@@ -1,3 +1,4 @@
+import { itemIcon } from './ItemIcons.js';
 import { keyLabel } from '../core/Input.js';
 import { RARITIES } from '../weapons/WeaponDefs.js';
 import { Minimap } from './Minimap.js';
@@ -450,7 +451,11 @@ export class HUD {
       s.classList.toggle('active', i === p.slot);
       const col = !it ? 'rgba(255,255,255,0.15)' : it.isGun ? RARITIES[it.rarity].color : it.isConsumable ? it.def.color : '#e8d7b0';
       s.style.setProperty('--rar', col);
-      s.querySelector('.icon').textContent = !it ? '' : it.isGun ? it.def.icon : it.isConsumable ? it.def.icon : '⛏';
+      const url = itemIcon(it);
+      const ic = s.querySelector('.icon');
+      if (url) ic.innerHTML = `<img src="${url}" alt="">`;
+      else ic.textContent = !it ? '' : it.isGun ? it.def.icon : it.isConsumable ? it.def.icon : '⛏';
+      s.classList.toggle('has-img', !!url);
       s.querySelector('.count').textContent = it?.isConsumable ? String(it.count) : '';
     });
     for (const k of ['wood', 'stone', 'metal']) this.set('mat' + k, this.el.mats[k], String(p.mats[k]));

@@ -6,6 +6,7 @@ import { RARITIES, rollRarity, rollWeaponType } from '../weapons/WeaponDefs.js';
 import { itemGeometry } from '../weapons/WeaponModels.js';
 import { makeWeaponMesh, makeAmmoBoxMesh, makeAmmoPickupMesh, makeThrowableMesh } from '../weapons/WeaponModels.js';
 import { mulberry32 } from '../core/noise.js';
+import { makeConsumableMesh } from './ItemMeshes.js';
 import { AMMO, MATS, CONSUMABLES } from '../weapons/Items.js';
 
 // Loadout roles smart bots try to fill: one close-range gun, one rifle, one long-range, one explosive.
@@ -338,9 +339,10 @@ export class Loot {
       mesh = makeAmmoPickupMesh(item.ammoType) || new THREE.Mesh(this.itemGeo.ammo, this.itemMat);
       mesh.position.y = 0.3;
       color = AMMO[item.ammoType].color;
-    } else if (makeThrowableMesh(item.ctype)) {
-      mesh = makeThrowableMesh(item.ctype, 2.6);
-      mesh.position.y = 0.4;
+    } else if (makeConsumableMesh(item.ctype)) {
+      mesh = makeConsumableMesh(item.ctype);
+      mesh.scale.multiplyScalar(1.25);
+      mesh.position.y = 0.3;
       color = CONSUMABLES[item.ctype].color;
     } else {
       const geo = { bandage: this.itemGeo.bandage, medkit: this.itemGeo.med, smallshield: this.itemGeo.small, bigshield: this.itemGeo.shield, grenade: itemGeometry('grenade'), launchpad: itemGeometry('launchpad'), shockwave: itemGeometry('shockwave'), grappler: itemGeometry('grappler'), rift: itemGeometry('rift') }[item.ctype] || this.itemGeo[item.ctype] || this.itemGeo.small;
