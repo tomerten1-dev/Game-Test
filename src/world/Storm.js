@@ -1,14 +1,22 @@
 import * as THREE from 'three';
 
+// 12 zones like Fortnite: 1 damage a second for the early circles, 12 a second by circle 6 and 20 by circle 8;
+// the last four circles move instead of just shrinking.
 export const STORM_PHASES = [
-  { wait: 75, shrink: 60, radius: 215, dmg: 1 },
-  { wait: 55, shrink: 45, radius: 135, dmg: 2 },
-  { wait: 45, shrink: 40, radius: 80, dmg: 4 },
-  { wait: 38, shrink: 32, radius: 44, dmg: 6 },
-  { wait: 30, shrink: 25, radius: 20, dmg: 8 },
-  { wait: 25, shrink: 22, radius: 8, dmg: 9 },
-  { wait: 20, shrink: 25, radius: 0, dmg: 10 },
+  { wait: 60, shrink: 45, radius: 220, dmg: 1 },
+  { wait: 45, shrink: 38, radius: 165, dmg: 1 },
+  { wait: 40, shrink: 34, radius: 120, dmg: 1 },
+  { wait: 35, shrink: 30, radius: 88, dmg: 1 },
+  { wait: 30, shrink: 25, radius: 62, dmg: 5 },
+  { wait: 25, shrink: 22, radius: 44, dmg: 12 },
+  { wait: 22, shrink: 20, radius: 30, dmg: 15 },
+  { wait: 20, shrink: 18, radius: 20, dmg: 20 },
+  { wait: 18, shrink: 16, radius: 13, dmg: 20 },
+  { wait: 16, shrink: 15, radius: 8, dmg: 20 },
+  { wait: 14, shrink: 14, radius: 4, dmg: 20 },
+  { wait: 12, shrink: 20, radius: 0, dmg: 20 },
 ];
+export const MOVING_FROM = STORM_PHASES.length - 4;
 const START_RADIUS = 440;
 
 const vert = /* glsl */ `
@@ -83,7 +91,7 @@ export class Storm {
     this.fromRadius = this.radius;
     this.nextRadius = ph.radius;
     // the last two circles can drift out of the current one ("moving zones")
-    this.moving = this.phase >= STORM_PHASES.length - 2;
+    this.moving = this.phase >= MOVING_FROM;
     // a circle already revealed early (Storm Scout) is the one that comes
     if (this._future?.phase === this.phase) this.nextCenter.copy(this._future.center);
     else this._pickCenter(this.center, this.radius, this.phase, this.nextCenter);
@@ -92,7 +100,7 @@ export class Storm {
 
   _pickCenter(center, radius, phase, out) {
     const ph = STORM_PHASES[phase];
-    const moving = phase >= STORM_PHASES.length - 2;
+    const moving = phase >= MOVING_FROM;
     const maxOff = moving ? radius * 0.9 + ph.radius + 6 : Math.max(0, radius - ph.radius) * (phase === 0 ? 0.35 : 0.9);
     for (let i = 0; i < 40; i++) {
       const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * maxOff;

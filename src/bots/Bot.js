@@ -702,7 +702,8 @@ export class Bot extends Actor {
     if (this.target && (!this.target.alive || far(this.target))) this.target = null;
     let best = null, bd = 55;
     for (const a of g.actors) {
-      if (a === this || !a.alive || a.npc || a.state !== 'ground') continue;
+      // bosses and guards fight players; a hired NPC fights anyone but whoever hired it
+      if (a === this || !a.alive || a.state !== 'ground' || (this.hiredBy ? a === this.hiredBy || a.hiredBy === this.hiredBy : a.npc)) continue;
       const d = a.pos.distanceTo(this.pos);
       if (d < bd && !far(a) && g.world.lineOfSight(eye, a.chest(_tp))) { best = a; bd = d; }
     }

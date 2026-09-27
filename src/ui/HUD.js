@@ -557,6 +557,13 @@ export class HUD {
   }
 
   // Purple flash on each storm damage tick.
+  // Lightning inside the storm: a quick white-violet flash over the screen.
+  lightning() {
+    let f = this._bolt;
+    if (!f) { f = this._bolt = document.createElement('div'); f.id = 'storm-bolt'; this.root?.appendChild?.(f) || document.body.appendChild(f); }
+    f.classList.remove('on'); void f.offsetWidth; f.classList.add('on');
+  }
+
   stormFlash() {
     const f = this.el.sflash || (this.el.sflash = document.getElementById('storm-flash'));
     f.classList.remove('on'); void f.offsetWidth; f.classList.add('on');

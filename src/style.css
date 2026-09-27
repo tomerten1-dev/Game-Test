@@ -808,3 +808,19 @@ body.hud-editing #top-right, body.hud-editing #bottom-left, body.hud-editing #bo
 #sprite-chip.hidden { display: none; }
 #sprite-chip i { width: 14px; height: 14px; border-radius: 50%; background: var(--sp); box-shadow: 0 0 10px var(--sp); }
 #sprite-chip b { font-size: 12px; background: rgba(0,0,0,0.45); border-radius: 5px; padding: 1px 6px; font-weight: 700; }
+
+#storm-bolt { position: fixed; inset: 0; pointer-events: none; z-index: 4; background: radial-gradient(ellipse at 50% 20%, rgba(235,220,255,0.55), rgba(190,150,255,0.18) 60%, transparent); opacity: 0; }
+#storm-bolt.on { animation: stormBolt 0.45s ease-out; }
+@keyframes stormBolt { 0% { opacity: 0.9; } 12% { opacity: 0.15; } 22% { opacity: 0.7; } 100% { opacity: 0; } }
+
+/* match override picker */
+#ovr-pick { position: absolute; inset: 0; z-index: 32; display: flex; align-items: center; justify-content: center; background: rgba(20,6,30,0.55); pointer-events: auto; }
+#ovr-pick.hidden { display: none; }
+#ovr-pick .ovr-panel { background: var(--glass); border: 1px solid #ff3df0; border-radius: 14px; padding: 18px 20px; width: min(760px, 94vw); color: #fff; text-align: center; box-shadow: 0 0 40px rgba(255,61,240,0.35); }
+#ovr-pick .ovr-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+@media (max-width: 640px) { #ovr-pick .ovr-opts { grid-template-columns: 1fr; } }
+#ovr-pick button { background: rgba(255,61,240,0.12); border: 1px solid rgba(255,61,240,0.5); border-radius: 10px; color: #fff; padding: 12px; cursor: pointer; display: flex; flex-direction: column; gap: 5px; align-items: center; }
+#ovr-pick button:hover { background: rgba(255,61,240,0.3); }
+#ovr-pick button b { font-family: var(--title); font-size: 19px; }
+#ovr-pick button span { font-size: 12px; opacity: 0.8; }
+#ovr-pick kbd { background: #fff; color: #111; border-radius: 4px; padding: 0 6px; font-size: 12px; }

@@ -431,7 +431,10 @@ export class Houses {
         h.handles.push(...this._piece(h, P(type), ix, y, iz));
       }
     };
+    const keep = h.handles;
+    h.handles = h.groundHandles = [];
     tile('Floor_WoodDark', 0.005);
+    h.handles = keep;
     if (h.stairs) {
       const s = h.stairs;
       tile('Floor_WoodDark', STORY + 0.005, (ix, iz) => ix < s.x1 && iz > s.z0 && iz < s.z1 - 0.35);
@@ -593,6 +596,30 @@ export class Houses {
     if (p.door && !p.door.broken) { p.door.broken = true; this._doorCollider(p.door, false); p.door.pivot.visible = false; }
     this._debris(p.house, this._panelCenter(p), p.mat === 'stone' ? '#a39a8c' : '#e8dcc4', 30);
     this.game?.sound.play('break', this._panelCenter(p));
+    // knock out most of the outer walls and the whole house comes down (Fortnite: buildings flatten)
+    const h = p.house, outer = h.panels.filter((q) => q.side !== 'part');
+    if (!h.collapsed && outer.filter((q) => q.broken).length >= outer.length * 0.7) this.collapse(h);
+  }
+
+  // Flatten a house: every wall, the upper floor, stairs, roof and chimney go; the ground floor stays.
+  collapse(h) {
+    h.collapsed = true;
+    for (const q of h.panels) if (!q.broken) { q.broken = true; for (const c of q.cols) this.colliders.remove(c); q.cols = []; this.kit.set(q.handles, false); }
+    for (const gl of h.glass) if (!gl.broken) { gl.broken = true; if (gl.col) this.colliders.remove(gl.col); gl.col = null; this.kit.set(gl.handles, false); }
+    for (const d of h.doors) if (!d.broken) { d.broken = true; this._doorCollider(d, false); d.pivot.visible = false; }
+    h.upperCols = h.cols.filter((c) => c.y1 > h.y + 0.3);
+    for (const c of h.upperCols) this.colliders.remove(c);
+    this.kit.set(h.handles, false);
+    if (h.mesh) h.mesh.visible = false;
+    const fx = this.game?.effects;
+    for (let i = 0; i < 6; i++) {
+      const [x, z] = this.w(h, (Math.random() - 0.5) * h.W, (Math.random() - 0.5) * h.D);
+      this._debris(h, new THREE.Vector3(x, h.y + 1 + Math.random() * h.top, z), i % 2 ? '#e8dcc4' : '#8a5a3a', 30, 0.3);
+    }
+    if (fx) this.game.rig.shake = Math.min(1, this.game.rig.shake + (this.game.camera.position.distanceTo(new THREE.Vector3(h.x, h.y, h.z)) < 40 ? 0.5 : 0));
+    this.game?.sound.play('explosion', new THREE.Vector3(h.x, h.y + 3, h.z), { range: 120 });
+    // anyone upstairs drops down
+    for (const a of this.game?.actors || []) if (Math.abs(a.pos.x - h.x) < h.W && Math.abs(a.pos.z - h.z) < h.D && a.pos.y > h.y + 1) a.onGround = false;
   }
 
   breakGlass(gl) {
@@ -843,6 +870,13 @@ export class Houses {
   // New match: every wall, window and door back in place, doors shut.
   reset() {
     for (const h of this.list) {
+      if (h.collapsed) {
+        h.collapsed = false;
+        for (const c of h.upperCols || []) this.colliders.add(c);
+        h.upperCols = null;
+        this.kit.set(h.handles, true);
+        if (h.mesh) h.mesh.visible = true;
+      }
       for (const p of h.panels) {
         if (p.broken) { p.broken = false; this._panelColliders(p); this.kit.set(p.handles, true); }
         p.hp = p.maxHp;

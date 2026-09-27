@@ -95,6 +95,11 @@ export class Traversal {
         const a = new THREE.Vector3(x, top + 2.4, z), b = new THREE.Vector3(best.x, best.h + 4.2, best.z);
         this._zip(a, b, true);
       }
+      // storm forecast console on the deck: reveals where the circle after next will be
+      const fx = x - S + 0.7, fz = z + 0.6;
+      this._mesh(new THREE.BoxGeometry(0.5, 1.0, 0.4), new THREE.MeshStandardMaterial({ color: '#2c3140', roughness: 0.5, metalness: 0.4 }), fx, top + 0.5, fz);
+      this._mesh(new THREE.BoxGeometry(0.44, 0.3, 0.05), new THREE.MeshStandardMaterial({ color: '#c05cff', emissive: '#8a2be2', emissiveIntensity: 1.2 }), fx + 0.24, top + 0.95, fz).rotation.y = Math.PI / 2;
+      (this.forecasts ||= []).push({ x: fx, z: fz, y: top });
       this.towns.houses.push({ minX: x - S, maxX: x + S, minZ: z - S, maxZ: z + S, x, z, y: h, h: H + 3.5, rot: 0 });
       (this.towns.landmarks ||= []).push({ name: 'Lookout Tower', x, z });
     }
@@ -190,6 +195,9 @@ export class Traversal {
     const p = actor.pos;
     for (const a of this.ascenders) {
       if (Math.hypot(p.x - a.x, p.z - a.z) < 1.6 && p.y < a.y1 - 2 && p.y > a.y0 - 1.5) return { kind: 'ascender', asc: a, text: 'Ride Ascender' };
+    }
+    for (const f of this.forecasts || []) {
+      if (Math.hypot(p.x - f.x, p.z - f.z) < 1.8 && Math.abs(p.y - f.y) < 1.5) return { kind: 'forecast', forecast: f, text: 'Use Storm Forecast' };
     }
     let best = null, bd = 2.4;
     for (const z of this.zips) {

@@ -143,6 +143,7 @@ export class Meta {
       arena = { ...res, from, to: A.points, division: d1, promoted: d1.index > d0.index };
       if (arena.promoted) { rewards.xp.push([`Promoted to ${d1.name}`, 500]); rewards.coins.push([`Promoted to ${d1.name}`, 150]); rewards.totalXp += 500; rewards.totalCoins += 150; }
     }
+    if (this.game?.overrides?.has('morexp')) { const bonus = Math.round(rewards.totalXp * 0.5); rewards.xp.push(['Override: More XP', bonus]); rewards.totalXp += bonus; }
     const before = { level: this.p.d.level, xp: this.p.d.xp };
     this.p.d.coins += rewards.totalCoins;
     const levelUps = applyXp(this.p, rewards.totalXp);

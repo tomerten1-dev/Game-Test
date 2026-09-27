@@ -92,6 +92,7 @@ export class Combat {
     const moving = hs > 1.5;
     const spread = w.spread(moving, !shooter.onGround, { crouched: shooter.crouched, still: hs < 0.4, now: g.time, scoped: shooter.aiming && w.def.scope, aiming: shooter.aiming }) * (shooter.accuracyMult ?? 1);
     w.onFire(g.time);
+    if (g.overrides?.has('speedshot')) w.cooldown *= 0.8;
     shooter.lastFireTime = g.time;
     if (shooter.isPlayer) g.meta?.track('shot');
     if (shooter.character) shooter.character.kick = Math.min(1, 0.35 + w.def.shake * 1.5);
@@ -128,13 +129,14 @@ export class Combat {
         _dir.normalize();
         r = this.trace(origin, _dir, def.range, shooter);
       }
+      if (i === 0 && g.events.supplies.length) g.events.shootBalloon(origin, _dir, r.t);
       _end.copy(origin).addScaledVector(_dir, r.t);
       if (i % 2 === 0 || def.pellets === 1) g.effects.tracer(muzzle, _end, shooter.isPlayer ? '#fff2b0' : '#ffd08a', def.pellets > 1 ? 0.03 : 0.045);
       if (r.actor) {
         const fall = def.pellets > 1 ? w.shotgunFalloff(r.t) : 1 - 0.4 * Math.min(1, Math.max(0, (r.t - def.falloffStart) / (def.range - def.falloffStart)));
         // bots trade damage a bit slower with each other so matches last longer
         const botVsBot = !shooter.isPlayer && !r.actor.isPlayer ? 0.45 : 1;
-        const dmg = w.damage * fall * (r.head ? def.headMult || 1.5 : 1) * botVsBot * (def.exotic === 'sixshooter' && shooter.aiming ? 1.5 : 1);
+        const dmg = w.damage * fall * (r.head ? (def.headMult || 1.5) * (g.overrides?.has('headshot') ? 1.25 : 1) : 1) * botVsBot * (def.exotic === 'sixshooter' && shooter.aiming ? 1.5 : 1);
         let e = perTarget.get(r.actor);
         if (!e) { e = { dmg: 0, head: false, heads: 0, bodyDmg: 0, point: _end.clone() }; perTarget.set(r.actor, e); }
         e.dmg += dmg;

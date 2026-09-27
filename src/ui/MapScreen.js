@@ -218,6 +218,7 @@ export class MapScreen {
     // world events: supply drops, vending machines, jump pads
     for (const ic of game.events?.mapIcons() || []) {
       const [ix, iy] = this.toScreen(ic.x, ic.z);
+      if (ic.ring) { ctx.save(); ctx.setLineDash([6, 5]); ctx.strokeStyle = ic.color; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ix, iy, ic.ring * this.scale, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
       const r = W * 0.009;
       ctx.fillStyle = ic.color; ctx.strokeStyle = '#0b1a33'; ctx.lineWidth = 2;
       ctx.beginPath();

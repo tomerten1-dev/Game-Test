@@ -30,8 +30,11 @@ export class BossEvent {
     const g = this.game, v = this.vault;
     this.bosses = [];
     this.npcs = [];
+    // like Fortnite, bosses turn up at a different place each match (the Foreman stays by his vault)
+    const pool = TOWNS.filter((x) => x.name !== 'Rusty Works').sort(() => Math.random() - 0.5);
     for (const cfg of BOSSES) {
-      const t = TOWNS.find((x) => x.name === cfg.town);
+      const t = cfg.keycard ? TOWNS.find((x) => x.name === cfg.town) : pool.pop();
+      cfg.at = t?.name;
       if (!t) continue;
       if (cfg.keycard && !v) continue;
       const home = cfg.keycard ? { x: v.front.x - 6, z: v.front.z + 4, r: 32 } : { x: t.x + 5, z: t.z + 3, r: t.r };
@@ -52,7 +55,7 @@ export class BossEvent {
       if (cfg.keycard) this.boss = boss;
       this.npcs.push(boss);
       cfg.guards.forEach((wt, i) => {
-        const gd = new Bot(g, `${cfg.town.split(' ')[0]} Guard ${i + 1}`, '#8a96a3', 0.55, i % 2 ? 'Male_Ranger' : 'Male_Peasant');
+        const gd = new Bot(g, `${(cfg.at || cfg.town).split(' ')[0]} Guard ${i + 1}`, '#8a96a3', 0.55, i % 2 ? 'Male_Ranger' : 'Male_Peasant');
         gd.npc = 'guard';
         gd.health = 150; gd.maxHealth = 150;
         gd.items[1] = new Weapon(wt, 2);

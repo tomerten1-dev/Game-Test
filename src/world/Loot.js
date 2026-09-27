@@ -157,7 +157,7 @@ export class Loot {
       const y = s.y ?? this.world.groundAt(s.x, s.z, 200, 0.6); // spots inside houses know their floor
       if (y < 1) continue;
       const group = new THREE.Group();
-      const rare = r() < 0.12; // rare chests: purple, better loot
+      const rare = r() < 0.12; // rare chests: shinier gold, better rarity (same number of items)
       let lidPivot;
       const kk = this.game.models?.get('kk/chest_gold');
       if (kk) {
@@ -182,9 +182,9 @@ export class Loot {
         group.add(base, lidPivot);
         lidPivot.userData.baseRot = 0;
       }
-      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTex, color: rare ? '#c77dff' : '#ffd76a', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.7 }));
+      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTex, color: rare ? '#fff1a8' : '#ffd76a', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.7 }));
       glow.material.color.multiplyScalar(1.6);
-      glow.scale.set(2.6, 2.6, 1);
+      glow.scale.setScalar(rare ? 3.6 : 2.6);
       glow.position.y = 0.5;
       group.add(glow);
       group.position.set(s.x, y, s.z);
@@ -256,11 +256,11 @@ export class Loot {
   kkRareMat(src) {
     if (!this._kkRare) {
       const m = src.clone();
-      m.color.set('#b784ff');
-      m.emissive = new THREE.Color('#5a1fa8');
-      m.emissiveIntensity = 0.55;
-      m.roughness = 0.3;
-      m.metalness = 0.4;
+      m.color.set('#ffe680');
+      m.emissive = new THREE.Color('#c07a00');
+      m.emissiveIntensity = 0.95;
+      m.roughness = 0.18;
+      m.metalness = 0.85;
       this._kkRare = m;
     }
     return this._kkRare;
@@ -448,11 +448,6 @@ export class Loot {
     const w = new Weapon(rollWeaponType(c.rare ? 'rare' : 'chest'), Math.max(1, rollRarity(Math.random, c.rare ? 2.2 : 1))).withRandomMods();
     out.push({ type: 'weapon', weapon: w });
     out.push(Loot.ammoFor(w));
-    if (c.rare) {
-      const w2 = new Weapon(rollWeaponType('chest'), rollRarity(Math.random, 1.5)).withRandomMods();
-      out.push({ type: 'weapon', weapon: w2 }, Loot.ammoFor(w2));
-      if (Math.random() < 0.5) out.push({ type: 'consumable', ctype: 'grenade', count: 2 });
-    }
     // like Fortnite: a weapon + ammo + materials, and sometimes a heal / utility item
     if (c.rare || Math.random() < 0.6) out.push(Loot.randomConsumable());
     // Earth Sprite: sometimes an extra rare item

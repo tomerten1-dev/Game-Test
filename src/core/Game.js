@@ -34,7 +34,7 @@ import { applyMood, DayCycle } from '../world/TimeOfDay.js';
 import { Meta } from '../meta/Meta.js';
 import { LobbyStage } from '../ui/LobbyStage.js';
 import { applySettings, setting } from '../ui/Settings.js';
-import { Pickaxe, Consumable } from '../weapons/Items.js';
+import { Pickaxe, Consumable, CONSUMABLES } from '../weapons/Items.js';
 import { Weapon } from '../weapons/Weapon.js';
 import { COSMETICS } from '../meta/Cosmetics.js';
 import { arenaDivision } from '../meta/Progression.js';
@@ -46,6 +46,8 @@ import { WeatherSystem } from '../effects/WeatherFX.js';
 import { BossEvent } from '../world/Boss.js';
 import { Fire } from '../world/Fire.js';
 import { Gadgets } from '../world/Gadgets.js';
+import { Overrides, OVERRIDES } from '../world/Overrides.js';
+import { RiftZones } from '../world/RiftZones.js';
 import { SPRITES, SpriteCompanion, spriteLevel } from '../player/Sprites.js';
 import { ModBench } from '../ui/ModBench.js';
 import { WEAPONS } from '../weapons/WeaponDefs.js';
@@ -54,7 +56,7 @@ const WARMUP_TIME = 20;
 import { isTouch } from './device.js';
 
 // seconds of holding interact to search containers
-const HOLD_TIME = { chest: 0.45, ammobox: 0.3, supply: 1.0, llama: 0.8, vault: 1.0 };
+const HOLD_TIME = { chest: 0.45, ammobox: 0.3, supply: 1.0, llama: 0.8, vault: 1.0, forecast: 1.0 };
 
 export class Game {
   constructor(container) {
@@ -108,6 +110,8 @@ export class Game {
     this.projectiles = new Projectiles(this);
     this.fire = new Fire(this);
     this.gadgets = new Gadgets(this);
+    this.overrides = new Overrides(this);
+    this.rifts = new RiftZones(this);
     this.events = new Events(this);
     this.traps = new Traps(this);
     this.homes = this.world.towns.homes;
@@ -201,6 +205,7 @@ export class Game {
     this.projectiles.reset();
     this.fire.reset();
     this.gadgets.reset();
+    this.overrides.reset();
     this.pings.reset();
     this.storm.reset();
     this.hud.show(false);
@@ -268,6 +273,58 @@ export class Game {
     const after = spriteLevel(d.spriteXp[sp.kind]);
     if (after > before) { p.spriteLevel = after; this.hud.banner?.(`${SPRITES[sp.kind].name} reached level ${after}!`, 3); }
     this.meta.profile.save();
+  }
+
+  // Override console: pick one of three rule changes for the whole lobby (keys 1-3 or click).
+  openOverridePick(c) {
+    let el = document.getElementById('ovr-pick');
+    if (!el) { el = document.createElement('div'); el.id = 'ovr-pick'; document.getElementById('ui')?.appendChild(el) || document.body.appendChild(el); }
+    el.innerHTML = `<div class="ovr-panel"><div class="inv-title">MATCH OVERRIDE</div><small>Pick a rule for everyone, for the rest of the match</small><div class="ovr-opts">${c.opts.map((k, i) => `<button data-k="${k}"><kbd>${i + 1}</kbd><b>${OVERRIDES[k].name}</b><span>${OVERRIDES[k].desc}</span></button>`).join('')}</div></div>`;
+    el.classList.remove('hidden');
+    this._ovrPick = c;
+    if (!isTouch && document.pointerLockElement) { this._mapUnlock = true; document.exitPointerLock(); }
+    el.onpointerdown = (e) => e.stopPropagation();
+    el.onclick = (e) => { const b = e.target.closest('[data-k]'); if (b) { e.stopPropagation(); this.pickOverride(b.dataset.k); } };
+  }
+
+  // Talking to a friendly NPC: trade, bounty or hire (keys 1-3 or click).
+  openNpcDialog(n) {
+    const [ctype, count, price] = n.sells;
+    const opts = [['buy', `Buy ${CONSUMABLES[ctype].name}${count > 1 ? ` ×${count}` : ''}`, `${price} gold`], ['bounty', 'Take a bounty', 'Eliminate a marked player · 300 gold'], ['hire', 'Hire', '200 gold · fights beside you']];
+    let el = document.getElementById('ovr-pick');
+    if (!el) { el = document.createElement('div'); el.id = 'ovr-pick'; document.getElementById('ui')?.appendChild(el) || document.body.appendChild(el); }
+    el.innerHTML = `<div class="ovr-panel npc"><div class="inv-title">${n.name.toUpperCase()}</div><small>You have ${this.player.gold} gold</small><div class="ovr-opts">${opts.map(([k, a, b], i) => `<button data-k="${k}"><kbd>${i + 1}</kbd><b>${a}</b><span>${b}</span></button>`).join('')}</div></div>`;
+    el.classList.remove('hidden');
+    this._ovrPick = { npc: n, opts: opts.map((o) => o[0]), x: n.x, y: n.y, z: n.z };
+    if (!isTouch && document.pointerLockElement) { this._mapUnlock = true; document.exitPointerLock(); }
+    el.onpointerdown = (e) => e.stopPropagation();
+    el.onclick = (e) => { const b = e.target.closest('[data-k]'); if (b) { e.stopPropagation(); this.pickOverride(b.dataset.k); } };
+  }
+
+  // A hired NPC: a bot on your side that follows you and fights whoever comes close.
+  hireNpc(n, owner) {
+    const b = new Bot(this, n.name, n.color, 0.8, n.char);
+    b.npc = 'hired';
+    b.hiredBy = owner;
+    b.health = 150; b.maxHealth = 150;
+    b.items[1] = new Weapon('ar', 3);
+    b.items[2] = new Weapon('pump', 2);
+    b.infiniteAmmo = true;
+    b.leash = { x: owner.pos.x, z: owner.pos.z, r: 10 };
+    b.spawnGround(n.x, n.z);
+    b.landTime = -999;
+    b.switchSlot(1);
+    this.actors.push(b); this.bots.push(b);
+  }
+
+  pickOverride(k) {
+    const c = this._ovrPick;
+    document.getElementById('ovr-pick')?.classList.add('hidden');
+    this._ovrPick = null;
+    if (c?.npc) { if (k) { const msg = this.events.npcService(c.npc, k, this.player); if (msg) this.hud.toast?.(msg); } }
+    else if (c && !c.claimed) this.overrides.apply(c, k, this.player);
+    this.input.reset();
+    if (!isTouch && this.state === 'playing') this.input.requestLock();
   }
 
   // Mod bench screen: frees the mouse like the inventory; closes when you walk away.
@@ -378,6 +435,7 @@ export class Game {
     this.projectiles.reset();
     this.fire.reset();
     this.gadgets.reset();
+    this.overrides.reset();
     this.events.reset();
     this.homes.reset();
     this.world.destructibles.reset();
@@ -444,6 +502,7 @@ export class Game {
     this.projectiles.reset();
     this.fire.reset();
     this.gadgets.reset();
+    this.overrides.reset();
     this.effects.clear();
     this.hud.reset();
     this.time = 0;
@@ -467,7 +526,7 @@ export class Game {
       for (const k of Object.keys(a.mats)) a.mats[k] = 0;
       a.gold = 0; a.medallions?.clear(); a.setCrown?.(false);
       a.health = 100; a.shield = 0; a.kills = 0; a.emote = null; a.crouched = false; a.dmgDealt = 0;
-      a.scanPhase = -1; a.speedT = 0; a.slapT = 0; a.lowGravT = 0; a.markedUntil = 0;
+      a.scanPhase = -1; a.extraLife = false; a.speedT = 0; a.slapT = 0; a.lowGravT = 0; a.markedUntil = 0;
       // Zero Build start kit: a pistol, small shields and one extra item
       if (this.zeroBuild && !a.npc) {
         a.items[1] = new Weapon('pistol', 0);
@@ -488,6 +547,8 @@ export class Game {
     cb?.setCrown(true);
     this.boss.reset();
     this.boss.spawn();
+    this.rifts.spawn();
+    this.bounty = null;
     const wx = this.weather.roll({ snow: VARIANT.weather === 'snow', desert: VARIANT_KEY === 'desert' });
     this.dayCycle.start(this.weather.night);
     if (wx) setTimeout(() => this.state === 'playing' && this.hud.banner(wx, 3), 6500);
@@ -578,6 +639,11 @@ export class Game {
     if (this.input.pressed('inventory')) this.toggleInventory();
     else if (this.inv.open && (this.input.pressed('pause') || !p.alive)) this.toggleInventory(false);
     if (this.inv.open) this.inv.tick(dt);
+    if (this._ovrPick) {
+      const c = this._ovrPick;
+      for (let i = 0; i < 3; i++) if (this.input.pressed('slot' + (i + 1)) && c.opts[i]) { this.pickOverride(c.opts[i]); break; }
+      if (this._ovrPick && (c.claimed || !p.alive || p.pos.distanceTo(new THREE.Vector3(c.x, c.y, c.z)) > 5 || this.input.pressed('pause'))) this.pickOverride(null);
+    }
     if (this.modBench.open) {
       if (this.input.pressed('pause') || this.input.pressed('interact') || !p.alive || p.pos.distanceTo(this._modAt) > 4) this.toggleModBench(false);
       else this.modBench.tick(dt);
@@ -647,6 +713,21 @@ export class Game {
     this.projectiles.update(dt);
     this.fire.update(dt);
     this.gadgets.update(dt);
+    this.overrides.update(dt);
+    // hired NPCs stay near whoever hired them
+    for (const b of this.bots) if (b.hiredBy && b.alive) { b.leash.x = b.hiredBy.pos.x; b.leash.z = b.hiredBy.pos.z; if (!b.hiredBy.alive) b.hiredBy = null; }
+    // bounty: eliminate the marked player before time runs out
+    if (this.bounty && (this.time > this.bounty.until || !this.bounty.target.alive)) {
+      const bt = this.bounty; this.bounty = null;
+      if (!bt.target.alive && bt.target.killer === this.player) { this.player.gold += bt.reward; this.hud.banner?.(`Bounty complete! +${bt.reward} gold`, 3); this.sound.play('buy'); }
+      else if (this.player.alive) this.hud.toast?.(bt.target.alive ? 'Bounty expired' : 'Someone else got your bounty');
+    }
+    if (this.warmup <= 0) this.rifts.update(dt);
+    // Constant Heal override: out of combat, health then shield tick back up
+    if (this.overrides.has('heal') && (this._healT = (this._healT || 0) + dt) >= 1) {
+      this._healT = 0;
+      for (const a of this.actors) if (a.alive && !a.npc && this.time - (a.lastHurtTime || 0) > 5 && this.time - (a.lastFireTime || 0) > 5) { if (a.health < 100) a.health = Math.min(100, a.health + 3); else a.shield = Math.min(100, a.shield + 3); }
+    }
     for (const a of this.actors) {
       if (!a.sprite) continue;
       if (a.distToCam === undefined || a.distToCam < 80 || a.isPlayer) a.sprite.update(dt); else a.sprite.mesh.visible = false;
@@ -663,7 +744,7 @@ export class Game {
     for (const a of this.actors) {
       a.updateMovement(dt);
       for (const w of a.items) {
-        const ev = w && w.update(dt, a.medallions?.has('reload') ? 1.6 : 1);
+        const ev = w && w.update(dt, (a.medallions?.has('reload') ? 1.6 : 1) * (this.overrides.has('speedshot') ? 1.25 : 1));
         if (ev === 'reloaded') { a.finishReload(w); if (a.isPlayer) this.sound.play('reloaded'); }
         else if (ev === 'shell') {
           a.finishReload(w, 1);
@@ -695,6 +776,18 @@ export class Game {
     this.snow?.update(dt, this.camera);
     const cam = this.camera.position;
     this.stormFX.update(dt, this.camera, this.state === 'playing' && view.state !== 'bus' && !this.storm.isInside(cam.x, cam.z) ? 1 : 0);
+    // inside the storm: lightning, a rumbling screen shake that grows the deeper you are, and thunder
+    const inStorm = this.state === 'playing' && view.state !== 'bus' && view.alive && !this.storm.isInside(view.pos.x, view.pos.z) && this.gadgets.stormAt(view.pos) !== 'safe';
+    if (inStorm) {
+      const depth = Math.min(1, (Math.hypot(view.pos.x - this.storm.center.x, view.pos.z - this.storm.center.y) - this.storm.radius) / 60);
+      this.rig.shake = Math.max(this.rig.shake, 0.04 + 0.1 * depth);
+      this._boltT = (this._boltT ?? 3) - dt;
+      if (this._boltT <= 0) {
+        this._boltT = 3 + Math.random() * 5 * (1 - depth * 0.5);
+        this.hud.lightning?.();
+        this.sound.play(depth > 0.4 ? 'thunderNear' : 'thunder', null, { vol: 0.35 + 0.4 * depth });
+      }
+    }
     this.map.draw();
     this._humVizT = (this._humVizT || 0) - dt;
     if (this._humVizT <= 0 && p.alive && p.state === 'ground') {
@@ -744,7 +837,7 @@ export class Game {
     if (this.updateBuild(dt)) return;
     if (p.state === 'ground') {
       const door = this.homes.nearestDoor(p.pos, 1.7);
-      const near = (door && { kind: 'door', door, text: door.open ? 'Close Door' : 'Open Door' }) || this.world.traversal.nearestInteractable(p) || this.events.nearestInteractable(p.pos) || this.boss.nearestInteractable(p) || this.loot.nearestInteractable(p.pos);
+      const near = (door && { kind: 'door', door, text: door.open ? 'Close Door' : 'Open Door' }) || this.world.traversal.nearestInteractable(p) || this.overrides.nearest(p.pos) || this.events.nearestInteractable(p.pos) || this.boss.nearestInteractable(p) || this.loot.nearestInteractable(p.pos);
       const text = !near ? null : near.text || (near.kind === 'chest' ? (near.chest.rare ? 'Open Rare Chest' : 'Open Chest') : near.kind === 'ammobox' ? 'Open Ammo Box' : `Pick up ${this.loot.label(near.pickup)}`);
       this.hud.prompt?.(text || (p.canRedeploy() ? `Deploy glider · ${keyLabel(this.input.keyFor('jump'))}` : null), near?.pickup?.weapon?.rarity ?? near?.rarity, near?.pickup?.weapon || null, near?.pickup || null);
       // containers are searched by holding interact (Fortnite-style), unless "tap to search" is on;
@@ -772,6 +865,9 @@ export class Game {
         else if (near.kind === 'vending') { const msg = this.events.buy(near.vending, p); if (msg) this.hud.toast?.(msg); }
         else if (near.kind === 'door') this.homes.setDoor(near.door, !near.door.open);
         else if (near.kind === 'zip' || near.kind === 'ascender') this.world.traversal.grab(p, near);
+        else if (near.kind === 'override') this.openOverridePick(near.console);
+        else if (near.kind === 'npc') this.openNpcDialog(near.npc);
+        else if (near.kind === 'forecast') { p.scanPhase = this.storm.phase; this.sound.play('stormChime'); this.hud.banner?.('Storm forecast · the circle after next is on your map', 3); }
         else if (near.kind === 'llama') this.events.openLlama(near.llama, p);
         else if (near.kind === 'forage') { const msg = this.events.eat(near.forage, p); if (msg) this.hud.toast?.(msg); }
         else if (near.kind === 'hide') { const msg = this.events.hide(near.hide, p); if (msg) this.hud.toast?.(msg); }
@@ -1207,11 +1303,11 @@ export class Game {
   // Storm surge: from the third circle on, while more players are alive than the circle allows,
   // whoever has dealt the least damage takes 25 every 5 s. Deal damage to stay safe.
   _updateSurge(dt) {
-    const st = this.storm, limits = [0, 0, 60, 40, 26, 15, 8];
+    const st = this.storm, limits = [0, 0, 0, 60, 45, 32, 22, 14, 9, 6, 4, 3];
     const scale = (this.actors.filter((a) => !a.npc).length) / 100;
     const limit = Math.max(3, Math.round((limits[st.phase] || 0) * scale));
     const alive = this.actors.filter((a) => a.alive && !a.npc && a.state !== 'bus');
-    this.surge = st.phase >= 2 && limit > 3 && alive.length > limit ? { limit, over: alive.length - limit } : null;
+    this.surge = st.phase >= 3 && limit > 3 && alive.length > limit ? { limit, over: alive.length - limit } : null;
     if (!this.surge) { this._surgeT = 5; return; }
     const sorted = alive.sort((a, b) => (a.dmgDealt || 0) - (b.dmgDealt || 0));
     this.surge.need = Math.round((sorted[this.surge.over]?.dmgDealt || 0) + 1);
@@ -1272,8 +1368,9 @@ export class Game {
         killer.shield = Math.min(100, killer.shield + give);
         if (killer.isPlayer) this.hud.pickupNote?.('+50 Siphon', '#7dff8a');
       } else {
-        killer.regen = { rate: 15, left: 75 + (killer.regen?.left || 0), acc: 0 };
-        if (killer.isPlayer) this.hud.pickupNote?.('+75 Siphon', '#7dff8a');
+        const sip = this.overrides.has('siphon') ? 150 : 75;
+        killer.regen = { rate: 15, left: sip + (killer.regen?.left || 0), acc: 0 };
+        if (killer.isPlayer) this.hud.pickupNote?.(`+${sip} Siphon`, '#7dff8a');
       }
     }
     if (killer && killer !== actor) killer.kills++;

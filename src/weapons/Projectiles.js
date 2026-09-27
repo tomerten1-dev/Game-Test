@@ -254,6 +254,7 @@ export class Projectiles {
       if (len < 1e-4) return;
       _dir.copy(p.vel).normalize();
       const r = g.combat.trace(_prev, _dir, len, p.owner, p.kind === 'bullet' ? p.weapon?.def.projectile?.pad || 0 : 0);
+      if (p.kind === 'bullet' && g.events.supplies.length && g.events.shootBalloon(_prev, _dir, r.hit ? r.t : len)) { this._remove(p); return; }
       if (!r.hit) {
         p.pos.addScaledVector(_dir, len);
         if (p.kind === 'bullet' && !p.arrow) g.effects.tracer(_prev, p.pos, '#fff2b0', 0.05);
@@ -304,7 +305,7 @@ export class Projectiles {
       const target = r.actor;
       const botVsBot = !owner.isPlayer && !target.isPlayer ? 0.45 : 1;
       const shieldBefore = target.shield;
-      const dealt = target.takeDamage(p.damage * (r.head ? p.headMult : 1) * botVsBot, owner, r.head);
+      const dealt = target.takeDamage(p.damage * (r.head ? p.headMult * (g.overrides?.has('headshot') ? 1.25 : 1) : 1) * botVsBot, owner, r.head);
       g.effects.hitSparks(pt, r.head ? '#ffd23f' : shieldBefore > 0 ? '#6cc4ff' : '#ffffff');
       if (owner.isPlayer) {
         g.meta?.track('hit', 1, r.head);

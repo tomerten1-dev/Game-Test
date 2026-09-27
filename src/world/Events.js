@@ -65,6 +65,8 @@ export class Events {
     this._createModBenches();
     this.dealers = [];
     this._createDealers();
+    this.npcs = [];
+    this._createNpcs();
     this._createHides();
     this._createForage();
     this.llamas = [];
@@ -377,6 +379,76 @@ export class Events {
     }
   }
 
+  // ---------- friendly NPCs: buy an item, take a bounty, or hire them to fight with you ----------
+  _createNpcs() {
+    if (!this.game.assets) return;
+    const people = [
+      { name: 'Scout Rika', char: 'Female_Ranger', color: '#6fd0ff', sells: ['bigshield', 1, 120] },
+      { name: 'Chef Bo', char: 'Male_Peasant', color: '#ffb347', sells: ['spicytaco', 2, 60] },
+      { name: 'Warden Tomas', char: 'Male_Ranger', color: '#b86bff', sells: ['chugsplash', 2, 90] },
+    ];
+    const used = new Set(this.dealers.map((d) => d.town));
+    const towns = [...TOWNS].filter((t) => !used.has(t.name)).sort((a, b) => b.name.localeCompare(a.name));
+    for (const t of towns) {
+      if (this.npcs.length >= people.length) break;
+      let spot = null;
+      for (let i = 0; i < 240 && !spot; i++) {
+        const a = i * 2.39 + 1.1, d = t.r * (0.12 + (i % 12) * 0.07);
+        const x = t.x + Math.cos(a) * d, z = t.z + Math.sin(a) * d;
+        if (this._clearSpot(x, z, 1.0, 0.8) && !this.benches.some((b) => Math.hypot(b.x - x, b.z - z) < 6) && !this.vending.some((v) => Math.hypot(v.x - x, v.z - z) < 6)) spot = { x, z };
+      }
+      if (!spot) continue;
+      const who = people[this.npcs.length];
+      const y = this.world.heightAt(spot.x, spot.z);
+      const ch = new Character(this.game.assets, who.color, who.char, 0.2);
+      ch.root.position.set(spot.x, y, spot.z);
+      ch.root.rotation.y = Math.atan2(t.x - spot.x, t.z - spot.z);
+      ch.setPose('Idle', null, 0);
+      this.scene.add(ch.root);
+      const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture([who.name.toUpperCase(), 'Trade · Bounty · Hire'], [who.color, '#ffffff']), transparent: true, depthWrite: false }));
+      label.scale.set(2.6, 0.95, 1); label.position.set(spot.x, y + 2.8, spot.z);
+      this.scene.add(label);
+      const col = { kind: 'circle', x: spot.x, z: spot.z, r: 0.45, y0: y, y1: y + 1.9, npc: true };
+      this.world.colliders.add(col);
+      this.npcs.push({ ...who, x: spot.x, z: spot.z, y, ch, label, col, town: t.name, hired: false, bounty: false, sold: 0 });
+    }
+  }
+
+  // One of the NPC's three services; returns a message for the player.
+  npcService(n, kind, actor) {
+    const g = this.game;
+    if (g.warmup > 0) return 'Come back when the match starts';
+    if (kind === 'buy') {
+      const [ctype, count, price] = n.sells;
+      if (n.sold >= 3) return `${n.name} is out of stock`;
+      if (actor.gold < price) return `Need ${price} gold (you have ${actor.gold})`;
+      actor.gold -= price; n.sold++;
+      g.loot.spawnPickup({ type: 'consumable', ctype, count }, _v.set(n.x, n.y + 1, n.z), new THREE.Vector3((actor.pos.x - n.x) * 0.5, 3.5, (actor.pos.z - n.z) * 0.5));
+      g.sound.play('buy');
+      return `Bought ${CONSUMABLES[ctype].name}`;
+    }
+    if (kind === 'bounty') {
+      if (n.bounty) return 'You already took this bounty';
+      const cands = g.bots.filter((b) => b.alive && !b.npc && b.state !== 'bus');
+      if (!cands.length) return 'No bounty targets right now';
+      const tgt = cands.sort((a, b) => a.pos.distanceTo(actor.pos) - b.pos.distanceTo(actor.pos))[Math.min(cands.length - 1, Math.floor(Math.random() * 4))];
+      n.bounty = true;
+      tgt.markedUntil = g.time + 150; tgt.markedBy = actor;
+      g.bounty = { target: tgt, until: g.time + 150, reward: 300, from: n.name };
+      return `Bounty: eliminate ${tgt.name} within 2:30 for 300 gold (marked on your map)`;
+    }
+    if (kind === 'hire') {
+      if (n.hired) return `${n.name} is already with someone`;
+      if (actor.gold < 200) return `Need 200 gold to hire (you have ${actor.gold})`;
+      actor.gold -= 200;
+      n.hired = true;
+      n.ch.root.visible = false; n.label.visible = false; this.world.colliders.remove(n.col);
+      g.hireNpc(n, actor);
+      return `${n.name} joined you!`;
+    }
+    return null;
+  }
+
   buyExotic(d, actor) {
     if (this.game.warmup > 0) return 'Dealers open when the match starts';
     if (actor.gold < d.price) return `Need ${d.price} gold (you have ${actor.gold})`;
@@ -473,6 +545,79 @@ export class Events {
       this.world.colliders.add(col);
       this.llamas.push({ x, y, z, group, col, opened: false });
     }
+  }
+
+  // Llamas are skittish (Fortnite): run from anyone who comes close without crouching, and teleport
+  // away in a puff when someone gets right up to them. Sneak up crouched to open one.
+  _updateLlamas(dt) {
+    const g = this.game;
+    if (g.state !== 'playing' || g.warmup > 0) return;
+    for (const l of this.llamas) {
+      if (l.opened) continue;
+      l.tpCd = Math.max(0, (l.tpCd || 0) - dt);
+      let near = null, nd = 14;
+      for (const a of g.actors) {
+        if (!a.alive || a.state !== 'ground' || a.npc) continue;
+        const d = Math.hypot(a.pos.x - l.x, a.pos.z - l.z);
+        if (d < nd && Math.abs(a.pos.y - l.y) < 6) { nd = d; near = a; }
+      }
+      const loud = near && !near.crouched && Math.hypot(near.vel.x, near.vel.z) > 2;
+      if (near && loud && nd < 3.2 && l.tpCd <= 0) { this._llamaTeleport(l); continue; }
+      if (near && loud) l.fleeT = 2.5;
+      if (!(l.fleeT > 0)) continue;
+      l.fleeT -= dt;
+      const ax = near ? l.x - near.pos.x : Math.sin(l.group.rotation.y), az = near ? l.z - near.pos.z : Math.cos(l.group.rotation.y);
+      const al = Math.hypot(ax, az) || 1;
+      const nx = l.x + (ax / al) * 6.5 * dt, nz = l.z + (az / al) * 6.5 * dt;
+      const ny = this.world.heightAt(nx, nz);
+      if (ny < 1 || Math.abs(ny - l.y) > 1.2) { l.fleeT = 0; continue; } // cliff or water: stop
+      l.x = nx; l.z = nz; l.y = ny;
+      l.group.position.set(nx, ny + Math.abs(Math.sin(g.time * 12)) * 0.12, nz);
+      l.group.rotation.y = Math.atan2(ax, az);
+      this.world.colliders.remove(l.col);
+      Object.assign(l.col, { x: nx, z: nz, y0: ny - 0.5, y1: ny + 2.3 });
+      this.world.colliders.add(l.col);
+    }
+  }
+
+  _llamaTeleport(l) {
+    const g = this.game;
+    const puff = (x, y, z) => { for (let i = 0; i < 26; i++) { _c.set(i % 2 ? '#c77dff' : '#7ee8fa'); g.effects.sparks.emit(x, y + 1.2, z, (Math.random() - 0.5) * 5, Math.random() * 4, (Math.random() - 0.5) * 5, _c, 0.5, 0.2, 2); } };
+    puff(l.x, l.y, l.z);
+    for (let i = 0; i < 30; i++) {
+      const a = Math.random() * Math.PI * 2, d = 25 + Math.random() * 20;
+      const x = l.x + Math.cos(a) * d, z = l.z + Math.sin(a) * d;
+      if (!this._clearSpot(x, z, 1.5, 0.8)) continue;
+      l.x = x; l.z = z; l.y = this.world.heightAt(x, z);
+      l.group.position.set(x, l.y, z);
+      this.world.colliders.remove(l.col);
+      Object.assign(l.col, { x, z, y0: l.y - 0.5, y1: l.y + 2.3 });
+      this.world.colliders.add(l.col);
+      break;
+    }
+    puff(l.x, l.y, l.z);
+    l.tpCd = 8; l.fleeT = 0;
+    g.sound.play('launch', _v.set(l.x, l.y, l.z), { range: 60 });
+  }
+
+  // Shooting a supply drop's balloon pops it and the crate drops fast. Returns true on a hit.
+  shootBalloon(o, d, maxT) {
+    for (const s of this.supplies) {
+      if (s.landed || s.popped || !s.balloon.parent) continue;
+      const cx = s.x, cy = s.y + 6.2, cz = s.z;
+      const ox = o.x - cx, oy = o.y - cy, oz = o.z - cz;
+      const b = ox * d.x + oy * d.y + oz * d.z, c = ox * ox + oy * oy + oz * oz - 2.2 * 2.2;
+      const disc = b * b - c;
+      if (disc < 0) continue;
+      const t = -b - Math.sqrt(disc);
+      if (t < 0 || t > maxT) continue;
+      s.popped = true;
+      s.group.remove(s.balloon);
+      for (let i = 0; i < 30; i++) { _c.set('#58a6ff'); this.game.effects.sparks.emit(cx, cy, cz, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8, _c, 0.5, 0.25, 4); }
+      this.game.sound.play('break', _v.set(cx, cy, cz), { range: 120 });
+      return true;
+    }
+    return false;
   }
 
   openLlama(l, actor) {
@@ -725,7 +870,7 @@ export class Events {
     for (const s of this.supplies) {
       if (s.opened) continue;
       if (!s.landed) {
-        s.y -= FALL_SPEED * dt;
+        s.y -= (s.popped ? FALL_SPEED * 5 : FALL_SPEED) * dt; // a popped balloon drops the crate fast
         s.group.rotation.y += dt * 0.3;
         if (s.y <= s.ground) {
           s.y = s.ground;
@@ -783,6 +928,11 @@ export class Events {
       const d = Math.hypot(b.x - pos.x, b.z - pos.z);
       if (d < bd + 0.8 && Math.abs(b.y - pos.y) < 2.5) { bd = d; best = { kind: 'modbench', bench: b, text: 'Use Mod Bench', rarity: 2 }; }
     }
+    for (const n of this.npcs || []) {
+      if (n.hired) continue;
+      const d = Math.hypot(n.x - pos.x, n.z - pos.z);
+      if (d < bd + 1 && Math.abs(n.y - pos.y) < 2.5) { bd = d; best = { kind: 'npc', npc: n, text: `Talk to ${n.name}`, rarity: 2 }; }
+    }
     for (const dl of this.dealers || []) {
       const d = Math.hypot(dl.x - pos.x, dl.z - pos.z);
       if (d < bd + 1 && Math.abs(dl.y - pos.y) < 2.5) { bd = d; best = { kind: 'dealer', dealer: dl, text: `Buy ${WEAPONS[dl.type].name} · ${dl.price} gold`, rarity: EXOTIC }; }
@@ -820,6 +970,7 @@ export class Events {
     for (const b of this.benches) out.push({ x: b.x, z: b.z, color: '#ffb52b', shape: 'vending', label: 'Upgrade bench' });
     for (const b of this.modBenches || []) out.push({ x: b.x, z: b.z, color: '#4fc3ff', shape: 'vending', label: 'Mod bench' });
     for (const d of this.dealers || []) out.push({ x: d.x, z: d.z, color: '#4ff4ff', shape: 'dot', label: `Exotic: ${WEAPONS[d.type].name}` });
+    for (const n of this.npcs || []) if (!n.hired) out.push({ x: n.x, z: n.z, color: n.color, shape: 'dot', label: n.name });
     // Shadow Tracker hits: the target shows up for a few seconds
     const now = this.game.time;
     for (const a of this.game.actors) if (a.alive && !a.isPlayer && a.markedUntil > now && a.markedBy === this.game.player) out.push({ x: a.pos.x, z: a.pos.z, color: '#ff3b6b', shape: 'medal', label: 'Tracked' });
@@ -828,12 +979,18 @@ export class Events {
     for (const b of boss?.bosses || []) if (b.alive) out.push({ x: b.pos.x, z: b.pos.z, color: b.bossCfg.color, shape: 'square', label: 'Boss' });
     // medallion carriers are revealed to everyone
     for (const a of this.game.actors) if (a.alive && !a.npc && !a.isPlayer && a.medallions?.size) out.push({ x: a.pos.x, z: a.pos.z, color: '#ffd23f', shape: 'medal', label: 'Medallion carrier' });
+    out.push(...(this.game.overrides?.mapIcons() || []));
+    out.push(...(this.game.rifts?.mapIcons() || []));
     const v = boss?.vault;
     if (v && !v.opened) out.push({ x: v.x, z: v.z, color: '#ffe94d', shape: 'vending', label: 'Vault' });
     return out;
   }
 
   reset() {
+    for (const n of this.npcs || []) {
+      if (n.hired) { n.ch.root.visible = true; n.label.visible = true; this.world.colliders.add(n.col); }
+      n.hired = false; n.bounty = false; n.sold = 0;
+    }
     for (const s of this.supplies) this.scene.remove(s.group);
     this.supplies = [];
     for (const p of this.pads.filter((q) => q.kind !== 'jump')) this.scene.remove(p.group);
@@ -855,9 +1012,10 @@ export class Events {
     this._updateSupplies(dt);
     this._updatePads(dt);
     this._updateZones(dt);
+    this._updateLlamas(dt);
     const cam = this.game.camera.position;
-    for (const d of this.dealers || []) {
-      if (Math.abs(d.x - cam.x) + Math.abs(d.z - cam.z) > 90) continue; // only animate nearby dealers
+    for (const d of [...(this.dealers || []), ...(this.npcs || [])]) {
+      if (d.hired || Math.abs(d.x - cam.x) + Math.abs(d.z - cam.z) > 90) continue; // only animate nearby characters
       if (d.poseT > 0 && (d.poseT -= dt) <= 0) d.ch.setPose('Idle', null, 0.3);
       d.ch.update(dt, 0, false, 0);
     }

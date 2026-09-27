@@ -565,9 +565,9 @@ export class Actor {
       this.sprinting = !!it.sprint && !this.crouched && this.useT <= 0 && mlen > 0.3 && (fwdDot > 0.3 || !this.aiming) && !this.aiming;
       // tactical sprint burns stamina; it refills after a short breather
       this.tacSprint = this.sprinting && this.stamina > 0 && this.onGround;
-      if (this.tacSprint) { if (!this.medallions.has('surge') && !(this.slapT > 0)) this.stamina = Math.max(0, this.stamina - STAMINA_DRAIN * dt); this.staminaIdle = 0; }
+      if (this.tacSprint) { if (!this.medallions.has('surge') && !(this.slapT > 0) && !this.game.overrides?.has('stamina')) this.stamina = Math.max(0, this.stamina - STAMINA_DRAIN * dt); this.staminaIdle = 0; }
       else if ((this.staminaIdle += dt) > 0.8) this.stamina = Math.min(100, this.stamina + STAMINA_REGEN * dt);
-      let speed = this.sprinting ? (this.tacSprint ? TAC_SPRINT_SPEED : SPRINT_SPEED) : this.crouched ? CROUCH_SPEED : RUN_SPEED;
+      let speed = this.sprinting ? (this.tacSprint ? TAC_SPRINT_SPEED : SPRINT_SPEED) * (this.game.overrides?.has('sonic') ? 1.2 : 1) : this.crouched ? CROUCH_SPEED : RUN_SPEED;
       if (this.useT > 0 && !this.useItem?.def.mobile) speed = Math.min(speed, 3.2);
       if (this.aiming && this.weapon && !this.swimming) speed *= this.weapon.def.scope ? 0.55 : 0.7; // ADS walks slower
       if (this.speedT > 0) { this.speedT -= dt; speed *= 1.2; } // peppers, spicy food
@@ -975,6 +975,8 @@ export class Actor {
   // --- combat state ---
   takeDamage(amount, attacker, headshot = false) {
     if (!this.alive) return 0;
+    // hired NPCs and the player who hired them can't hurt each other
+    if (attacker && (attacker.hiredBy === this || this.hiredBy === attacker)) return 0;
     this._shieldWas = this.shield;
     let dmg = amount;
     // Zero Build overshield soaks damage first and regenerates on its own
@@ -1044,10 +1046,10 @@ export class Actor {
     if (this.hiddenIn) this.game.events?.unhide(this);
     // 1-Up Token: the elimination counts, but you redeploy from the sky with everything you carried
     const g = this.game;
-    const tok = g.warmup <= 0 && g.mode !== 'arena' && !this.npc ? this.items.findIndex((it) => it?.def?.oneup) : -1;
+    const tok = g.warmup <= 0 && g.mode !== 'arena' && !this.npc ? (this.extraLife ? 99 : this.items.findIndex((it) => it?.def?.oneup)) : -1;
     if (tok > 0) {
-      this.items[tok] = null;
-      if (tok === this.slot) this.switchSlot(0);
+      if (tok === 99) this.extraLife = false; // Extra Life override
+      else { this.items[tok] = null; if (tok === this.slot) this.switchSlot(0); }
       if (killer && killer !== this) { killer.kills++; g.hud?.killFeed?.(killer, this); }
       this.health = 100; this.shield = 0; this.regen = null; this.useT = 0;
       this.setBuildMode?.(null);

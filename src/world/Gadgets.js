@@ -208,7 +208,7 @@ export class Gadgets {
     this.casts.delete(a);
     if (silent) return;
     if (c.bite <= 0) { if (a.isPlayer) g.hud?.toast?.(c.wait > 0 ? 'Too early' : 'It got away'); return; }
-    const item = this._catch(!!c.spot);
+    const item = this._catch(!!c.spot || !!g.overrides?.has('bigfish'));
     if (c.spot && --c.spot.left <= 0) c.spot.ring.visible = false;
     g.loot.spawnPickup(item, c.at.clone().setY(WATER_LEVEL + 0.3), new THREE.Vector3((a.pos.x - c.at.x) * 0.6, 7, (a.pos.z - c.at.z) * 0.6));
     g.sound.play('pickup', a.isPlayer ? null : a.pos);
