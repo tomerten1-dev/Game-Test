@@ -30,7 +30,9 @@ export class WeatherSystem {
   roll(opts = {}) {
     const snowy = opts.snow, desert = opts.desert;
     const r = Math.random();
-    this.kind = snowy ? 'clear' : r < (desert ? 0.1 : 0.22) ? 'storm' : r < (desert ? 0.15 : 0.45) ? 'rain' : 'clear';
+    // rain and thunderstorms are switched off: every match is clear (night matches still happen)
+    void r; void snowy; void desert;
+    this.kind = 'clear';
     this.night = Math.random() < 0.2;
     this.start();
     const w = this.kind === 'storm' ? 'Thunderstorm' : this.kind === 'rain' ? 'Rain' : null;

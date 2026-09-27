@@ -40,7 +40,7 @@ export class StormFX {
       fog.near = this.baseFog.near + (12 - this.baseFog.near) * k;
       fog.far = this.baseFog.far + (150 - this.baseFog.far) * k;
     }
-    this.rain.visible = k > 0.02;
+    this.rain.visible = false; // rain inside the storm is switched off (the purple fog stays)
     if (!this.rain.visible) return;
     this.t += dt;
     this.rain.material.opacity = 0.55 * k;
