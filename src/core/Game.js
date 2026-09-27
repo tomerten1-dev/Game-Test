@@ -24,6 +24,7 @@ import { Ambient } from '../effects/Ambient.js';
 import { Menus } from '../ui/Menus.js';
 import { TouchControls } from '../ui/TouchControls.js';
 import { MapScreen } from '../ui/MapScreen.js';
+import { Inventory } from '../ui/Inventory.js';
 import { Pings } from '../ui/Pings.js';
 import { StormFX } from '../effects/StormFX.js';
 import { Projectiles } from '../weapons/Projectiles.js';
@@ -105,6 +106,7 @@ export class Game {
     this.frustum = new THREE.Frustum();
     this.pings = new Pings(this, ui);
     this.map = new MapScreen(ui, this);
+    this.inv = new Inventory(ui, this);
     this.stormFX = new StormFX(this.scene);
     this.mood = applyMood(this, 'day'); // variant sky for the lobby too
     this.snow = VARIANT.weather === 'snow' ? new Snowfall(this.scene) : null;
@@ -231,10 +233,70 @@ export class Game {
     }
   }
 
+  // Inventory screen (Tab): frees the mouse while open; the match keeps running.
+  toggleInventory(v = !this.inv.open) {
+    if (v && (this.state !== 'playing' || !this.player?.alive || this.map.open)) return;
+    if (this.inv.open === v) return;
+    this.inv.show(v);
+    this.input.reset();
+    if (!isTouch) {
+      if (v && document.pointerLockElement) { this._mapUnlock = true; document.exitPointerLock(); }
+      else if (!v && this.state === 'playing') this.input.requestLock();
+    }
+  }
+
+  // --- inventory actions (player) ---
+  dropFromSlot(slot, count = Infinity) {
+    const p = this.player, it = p?.items[slot];
+    if (!it || slot <= 0 || !p.alive || p.state === 'bus') return false;
+    if (p.useT > 0) p.useT = 0;
+    const n = it.isConsumable ? Math.min(it.count, count) : 1;
+    this.loot.dropItem(it, p, n, true);
+    if (it.isConsumable && (it.count -= n) > 0) return true;
+    p.items[slot] = null;
+    if (p.slot === slot) { const next = p.items.findIndex((x, i) => i > 0 && x); if (!p.switchSlot(next > 0 ? next : 0)) p._equip(); }
+    this.sound.play('pickup');
+    return true;
+  }
+
+  splitSlot(slot) {
+    const p = this.player, it = p?.items[slot];
+    const free = p.items.findIndex((x, i) => i > 0 && !x);
+    if (!it?.isConsumable || it.count < 2 || free < 0) return false;
+    const half = Math.floor(it.count / 2);
+    it.count -= half;
+    p.items[free] = new it.constructor(it.type, half);
+    return true;
+  }
+
+  swapSlots(a, b) {
+    const p = this.player;
+    if (!p || a === b || a <= 0 || b <= 0 || a > 5 || b > 5) return false;
+    [p.items[a], p.items[b]] = [p.items[b], p.items[a]];
+    if (p.slot === a || p.slot === b) p._equip();
+    return true;
+  }
+
+  dropMat(type, n) {
+    const p = this.player, have = p?.mats[type] || 0;
+    if (!have || !p.alive || p.state === 'bus') return;
+    const k = Math.min(have, n);
+    p.mats[type] -= k;
+    this.loot.dropItem({ type: 'mat', matType: type, amount: k }, p, 1, true);
+  }
+
+  dropAmmo(type, n) {
+    const p = this.player, have = p?.ammo[type] || 0;
+    if (!have || !p.alive || p.state === 'bus') return;
+    const k = Math.min(have, n);
+    p.ammo[type] -= k;
+    this.loot.dropItem({ type: 'ammo', ammoType: type, amount: k }, p, 1, true);
+  }
+
   onPointerLockChange() {
     if (isTouch) return;
     if (this._mapUnlock) { this._mapUnlock = false; return; }
-    if (this.map?.open) return;
+    if (this.map?.open || this.inv?.open) return;
     if (this.input.locked) {
       this.paused = false;
       this.menus.showPause(false);
@@ -425,8 +487,11 @@ export class Game {
     this.time += dt;
     if (this.input.pressed('mute')) this.hud.toast(this.sound.toggleMute() ? 'Sound off' : 'Sound on');
     const p = this.player;
-    if (this.input.pressed('map')) this.toggleMap();
+    if (this.input.pressed('map')) { this.toggleInventory(false); this.toggleMap(); }
     else if (this.map.open && this.input.pressed('pause')) this.toggleMap(false);
+    if (this.input.pressed('inventory')) this.toggleInventory();
+    else if (this.inv.open && (this.input.pressed('pause') || !p.alive)) this.toggleInventory(false);
+    if (this.inv.open) this.inv.tick(dt);
     if (this.spectating) this.updateSpectate(dt);
     if (this.warmup > 0) this.updateWarmup(dt);
     this.updateEmoteWheel(dt);
@@ -533,6 +598,7 @@ export class Game {
       }
     }
     if (input.pressed('reload') && !p.buildMode) this.combat.reload(p);
+    if (input.pressed('drop') && !p.buildMode && p.state === 'ground') this.dropFromSlot(p.slot, Infinity);
     if (input.pressed('ping') && p.state !== 'bus') {
       const dir = this.camera.getWorldDirection(_dir);
       this.pings.ping(_origin.copy(this.camera.position).addScaledVector(dir, this.rig.curDist), dir);

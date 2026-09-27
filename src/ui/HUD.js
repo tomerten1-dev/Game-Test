@@ -439,9 +439,11 @@ export class HUD {
     }
     this.slotEls.forEach((s, i) => {
       const it = p.items[i];
-      const sig = `${it ? it.type + (it.rarity ?? '') + (it.count ?? '') : ''}|${i === p.slot}`;
+      const key = (this.game.input.keyFor('slot' + (i + 1)) || '').replace(/^Key/, '').replace(/^Digit/, '');
+      const sig = `${it ? it.type + (it.rarity ?? '') + (it.count ?? '') : ''}|${i === p.slot}|${key}`;
       if (this.cache['slot' + i] === sig) return;
       this.cache['slot' + i] = sig;
+      s.querySelector('.key').textContent = key;
       s.classList.toggle('active', i === p.slot);
       const col = !it ? 'rgba(255,255,255,0.15)' : it.isGun ? RARITIES[it.rarity].color : it.isConsumable ? it.def.color : '#e8d7b0';
       s.style.setProperty('--rar', col);

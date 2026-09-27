@@ -6,6 +6,8 @@ const BINDABLE = [
   ['jump', 'Jump'], ['sprint', 'Sprint'], ['crouch', 'Crouch / slide'], ['reload', 'Reload'], ['interact', 'Interact'],
   ['wall', 'Wall'], ['floor', 'Floor'], ['ramp', 'Ramp'], ['cone', 'Cone'], ['build', 'Build mode'], ['edit', 'Edit'], ['ninety', 'Quick 90s'],
   ['map', 'Map'], ['emote', 'Emote'], ['mute', 'Mute'],
+  ['slot1', 'Harvesting tool'], ['slot2', 'Weapon slot 2'], ['slot3', 'Weapon slot 3'], ['slot4', 'Weapon slot 4'], ['slot5', 'Weapon slot 5'], ['slot6', 'Weapon slot 6'],
+  ['inventory', 'Inventory'], ['drop', 'Drop held item'], ['ping', 'Ping (also middle mouse)'],
 ];
 const SLIDERS = [
   ['sensitivity', 'Mouse sensitivity', 0.3, 3, 0.05, (v) => `${v.toFixed(2)}×`],

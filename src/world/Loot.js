@@ -422,11 +422,16 @@ export class Loot {
   }
 
   // Throw an item (gun or consumable stack) out of an actor's inventory.
-  dropItem(item, actor) {
-    const vel = new THREE.Vector3((Math.random() - 0.5) * 2, 3, (Math.random() - 0.5) * 2);
+  dropItem(item, actor, count = item.count, forward = false) {
+    const vel = forward
+      ? new THREE.Vector3(Math.sin(actor.aimYaw) * 3.2, 3.2, Math.cos(actor.aimYaw) * 3.2)
+      : new THREE.Vector3((Math.random() - 0.5) * 2, 3, (Math.random() - 0.5) * 2);
     const pos = _v.copy(actor.pos).setY(actor.pos.y + 0.8);
-    if (item.isGun) this.spawnPickup({ type: 'weapon', weapon: item }, pos, vel);
-    else if (item.isConsumable) this.spawnPickup({ type: 'consumable', ctype: item.type, count: item.count }, pos, vel);
+    let p = null;
+    if (item.isGun) p = this.spawnPickup({ type: 'weapon', weapon: item }, pos, vel);
+    else if (item.isConsumable) p = this.spawnPickup({ type: 'consumable', ctype: item.type, count }, pos, vel);
+    else if (item.type === 'mat' || item.type === 'ammo') p = this.spawnPickup(item, pos, vel);
+    if (p && forward) p.droppedBy = actor; // don't walk straight back over it and re-collect
   }
 
   // Auto-pickup of ammo and materials when walking over them.
@@ -435,6 +440,7 @@ export class Loot {
     for (const p of this.pickups) {
       if (!p.alive || !p.settled || (p.type !== 'ammo' && p.type !== 'mat')) continue;
       if (!actor.isPlayer && p.type === 'ammo') continue;
+      if (p.droppedBy === actor && p.age < 2.5) continue;
       const dx = p.pos.x - actor.pos.x, dz = p.pos.z - actor.pos.z;
       if (dx * dx + dz * dz < 2.6 && Math.abs(p.pos.y - actor.pos.y) < 2) {
         this.collect(p, actor);

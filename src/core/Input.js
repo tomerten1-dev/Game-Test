@@ -15,6 +15,7 @@ export const DEFAULT_KEYMAP = {
   KeyC: 'crouch', ControlLeft: 'crouch',
   Escape: 'pause',
   KeyM: 'map', KeyN: 'mute',
+  KeyP: 'ping', KeyJ: 'drop', Tab: 'inventory',
 };
 
 export class Input {
@@ -37,7 +38,7 @@ export class Input {
       if (this.capture) { e.preventDefault(); const cb = this.capture; this.capture = null; cb(e.code); return; }
       const a = this.keymap[e.code];
       if (!a) return;
-      if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
+      if (e.code === 'Space' || e.code === 'Tab' || e.code.startsWith('Arrow')) e.preventDefault();
       if (!this.held.has(a)) this.pressedSet.add(a);
       this.held.add(a);
     });
