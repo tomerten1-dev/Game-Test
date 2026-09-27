@@ -1,4 +1,5 @@
 import { DEFAULT_SETTINGS } from '../meta/Profile.js';
+import { VARIANT_KEY } from '../world/Variant.js';
 
 const BINDABLE = [
   ['forward', 'Move forward'], ['back', 'Move back'], ['left', 'Move left'], ['right', 'Move right'],
@@ -37,6 +38,8 @@ export function renderSettings(el, game, { compact = false } = {}) {
         <label class="set-row"><span>${label}</span><input type="range" data-k="${k}" min="${min}" max="${max}" step="${step}" value="${s[k]}"><b data-v="${k}"></b></label>`).join('')}
       <div class="set-row"><span>Graphics</span><div class="seg">${['auto', 'low', 'medium', 'high'].map((q) => `<button data-q="${q}">${q[0].toUpperCase() + q.slice(1)}</button>`).join('')}</div></div>
       <div class="set-row"><span>Visualize sound</span><div class="seg"><button data-sv="0">Off</button><button data-sv="1">On</button></div></div>
+      ${compact ? '' : `<div class="set-row"><span>Island season</span><div class="seg">${[['auto', 'Auto'], ['summer', 'Summer'], ['winter', 'Winter'], ['desert', 'Desert']].map(([k, n]) => `<button data-island="${k}">${n}</button>`).join('')}</div></div>
+      <div class="set-row island-note hidden"><span></span><div class="seg"><button data-act="reload">Reload to build the new island</button></div></div>`}
     </div>
     ${compact ? '' : `<div class="set-sub">Key bindings <small>click a key, then press the new one</small></div>
     <div class="binds">${BINDABLE.map(([a, label]) => `<div class="bind"><span>${label}</span><button data-bind="${a}"></button></div>`).join('')}</div>
@@ -46,6 +49,9 @@ export function renderSettings(el, game, { compact = false } = {}) {
     const q = game.quality?.setting || 'auto';
     el.querySelectorAll('[data-q]').forEach((b) => b.classList.toggle('on', b.dataset.q === q));
     el.querySelectorAll('[data-sv]').forEach((b) => b.classList.toggle('on', (b.dataset.sv === '1') === !!s.soundViz));
+    el.querySelectorAll('[data-island]').forEach((b) => b.classList.toggle('on', b.dataset.island === (s.island || 'auto')));
+    const want = s.island && s.island !== 'auto' ? s.island : null;
+    el.querySelector('.island-note')?.classList.toggle('hidden', !want || want === VARIANT_KEY);
     el.querySelectorAll('[data-bind]').forEach((b) => { b.textContent = keyName(game.input.keyFor(b.dataset.bind)); b.classList.remove('wait'); });
   };
   el.querySelectorAll('input[type=range]').forEach((inp) => inp.addEventListener('input', () => { s[inp.dataset.k] = Number(inp.value); save(); sync(); }));
@@ -65,6 +71,8 @@ export function renderSettings(el, game, { compact = false } = {}) {
       sync();
     };
   }));
+  el.querySelectorAll('[data-island]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); s.island = b.dataset.island; save(); sync(); }));
+  el.querySelector('[data-act="reload"]')?.addEventListener('click', (e) => { e.stopPropagation(); window.location.reload(); });
   el.querySelector('[data-act="keys"]')?.addEventListener('click', (e) => { e.stopPropagation(); s.keys = {}; save(); sync(); });
   el.querySelector('[data-act="wipe"]')?.addEventListener('click', (e) => {
     e.stopPropagation();

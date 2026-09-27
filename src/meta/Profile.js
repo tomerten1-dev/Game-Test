@@ -3,7 +3,7 @@ import { STARTERS, DEFAULT_EQUIPPED, COSMETICS } from './Cosmetics.js';
 const KEY = 'stormbound.profile.v1';
 
 export const DEFAULT_SETTINGS = {
-  sensitivity: 1, fov: 70, master: 0.8, music: 0.5, hudScale: 1, soundViz: false, quality: 'auto', keys: {},
+  sensitivity: 1, fov: 70, master: 0.8, music: 0.5, hudScale: 1, soundViz: false, quality: 'auto', keys: {}, island: 'auto',
 };
 
 function fresh() {

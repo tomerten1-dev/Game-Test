@@ -79,6 +79,10 @@ Production build: `npm run build` (output in `dist/`), preview it with `npm run 
 - Each match rolls a lighting mood: **Sunny Day**, **Golden Hour** or **Dusk**.
 - Bots switch to the sniper at long range and the rocket launcher against builds, lob grenades at enemies hiding in boxes, and race for supply drops.
 
+## Seasons
+
+**Settings → Island season** picks the island: *Summer*, *Winter* (snow, frosted trees, falling snow, pale sky) or *Desert* (sand, dry scrub, saguaro cacti, warm sky). *Auto* uses Winter from December to February and Summer otherwise. The island is generated on load, so the change applies after the reload button.
+
 ## Map, storm & spectating
 
 - The compass at the top shows your heading plus your marker, pings and (when you're outside) the direction of the safe zone.

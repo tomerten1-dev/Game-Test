@@ -35,6 +35,8 @@ import { applySettings } from '../ui/Settings.js';
 import { Pickaxe } from '../weapons/Items.js';
 import { Weapon } from '../weapons/Weapon.js';
 import { COSMETICS } from '../meta/Cosmetics.js';
+import { VARIANT } from '../world/Variant.js';
+import { Snowfall } from '../effects/Weather.js';
 import { BossEvent } from '../world/Boss.js';
 
 const WARMUP_TIME = 20;
@@ -104,6 +106,8 @@ export class Game {
     this.pings = new Pings(this, ui);
     this.map = new MapScreen(ui, this);
     this.stormFX = new StormFX(this.scene);
+    this.mood = applyMood(this, 'day'); // variant sky for the lobby too
+    this.snow = VARIANT.weather === 'snow' ? new Snowfall(this.scene) : null;
     this.sound.onPositional = (name, pos, v) => this.hud.soundViz(name, pos, v);
     this.stage = new LobbyStage(this);
     this.warmup = 0;
@@ -407,6 +411,7 @@ export class Game {
     this.time += dt;
     this.stage.frameCamera(this.camera, dt);
     this.stage.update(dt);
+    this.snow?.update(dt, this.camera);
     this.rig.fov = this.camera.fov;
     this.focus.copy(this.stage.group.position);
     this.world.update(dt, this.time, this.focus, this.camera);
@@ -497,6 +502,7 @@ export class Game {
     for (const a of this.actors) a.updateVisual(dt, this.camera.position);
     this.focus.copy(view.pos);
     this.pings.update(dt);
+    this.snow?.update(dt, this.camera);
     const cam = this.camera.position;
     this.stormFX.update(dt, this.camera, this.state === 'playing' && view.state !== 'bus' && !this.storm.isInside(cam.x, cam.z) ? 1 : 0);
     this.map.draw();

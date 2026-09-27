@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Terrain, WATER_LEVEL, WORLD_HALF } from './Terrain.js';
+import './Variant.js'; // seasonal colour overrides (must run before the island is generated)
 import { createSkyMesh, Clouds, SKY_HORIZON, SUN_DIR } from './Sky.js';
 import { bakeLighting, bakeTexture } from './Bake.js';
 import { Water } from './Water.js';

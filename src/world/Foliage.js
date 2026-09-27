@@ -6,10 +6,11 @@ import { jitter, gradientY } from './geomUtils.js';
 import { TOWNS, WORLD_HALF, ISLAND_RADIUS, PALETTE, AREA_SCALE } from './Terrain.js';
 import { quality } from '../core/device.js';
 import { Nature } from './Nature.js';
+import { VARIANT, tint } from './Variant.js';
 
-const TREE_GREENS = ['#4caf50', '#5fc25a', '#3f9e4c', '#78cc5c', '#56b84e'].map((c) => new THREE.Color(c));
-const AUTUMN = ['#f39a34', '#e9722c', '#f4b83f', '#d9582b'].map((c) => new THREE.Color(c));
-const PINE_GREENS = ['#2f7d52', '#3a915e', '#2b6f49', '#44a066'].map((c) => new THREE.Color(c));
+const TREE_GREENS = tint(VARIANT.treeGreens, ['#4caf50', '#5fc25a', '#3f9e4c', '#78cc5c', '#56b84e'].map((c) => new THREE.Color(c)));
+const AUTUMN = tint(VARIANT.autumn, ['#f39a34', '#e9722c', '#f4b83f', '#d9582b'].map((c) => new THREE.Color(c)));
+const PINE_GREENS = tint(VARIANT.pineGreens, ['#2f7d52', '#3a915e', '#2b6f49', '#44a066'].map((c) => new THREE.Color(c)));
 
 function roundCanopyGeo(rand) {
   const parts = [];
@@ -57,7 +58,7 @@ export class Foliage {
     this.roundTrees = [];
     this._trees();
     this._rocks();
-    if (models) { this._palms(); this._spires(); }
+    if (models) { this._palms(); this._spires(); if (VARIANT.cacti) this._cacti(); }
     if (this.nature) {
       this.nature.occluders = this.occluders;
       this.nature.scatterUndergrowth(
@@ -98,7 +99,7 @@ export class Foliage {
 
   _trees() {
     const r = this.rand;
-    const count = Math.round(quality.trees * AREA_SCALE);
+    const count = Math.round(quality.trees * AREA_SCALE * (VARIANT.trees ?? 1));
     const trunkGeo = new THREE.CylinderGeometry(0.16, 0.26, 1, 6);
     trunkGeo.translate(0, 0.5, 0);
     const trunkMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9 });
@@ -132,7 +133,7 @@ export class Foliage {
         const info = this.models.get(type);
         const H = 7 + sc * 3.5;
         const ks = H / info.size.y;
-        const shade = 0.85 + r() * 0.25;
+        const shade = (0.85 + r() * 0.25) * (VARIANT.pineShade || 1);
         kkPines[type].push({ x: c.x, y: c.h - 0.2, z: c.z, rot: yaw, scale: ks, colors: { hexagons_medieval: new THREE.Color(shade, shade * (0.95 + r() * 0.1), shade) } });
         this.colliders.add({ kind: 'circle', x: c.x, z: c.z, r: 0.45, y0: c.h - 2, y1: c.h + H, tree: true });
         this.occluders.push({ x: c.x, y: c.h + H * 0.45, z: c.z, r: info.size.x * ks * 0.42 });
@@ -245,11 +246,52 @@ export class Foliage {
   }
 
   // Kenney palms along the beaches.
+  // Desert island: saguaro cacti (procedural, instanced) with colliders.
+  _cacti() {
+    const r = this.rand;
+    const green = '#5f9a4a';
+    const parts = [
+      new THREE.CylinderGeometry(0.34, 0.4, 1, 10).translate(0, 0.5, 0),
+      new THREE.SphereGeometry(0.34, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, 1, 0),
+      // arms
+      new THREE.CylinderGeometry(0.22, 0.22, 0.5, 8).rotateZ(Math.PI / 2).translate(0.45, 0.45, 0),
+      new THREE.CylinderGeometry(0.22, 0.22, 0.42, 8).translate(0.68, 0.64, 0),
+      new THREE.SphereGeometry(0.22, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2).translate(0.68, 0.85, 0),
+      new THREE.CylinderGeometry(0.2, 0.2, 0.44, 8).rotateZ(Math.PI / 2).translate(-0.42, 0.62, 0),
+      new THREE.CylinderGeometry(0.2, 0.2, 0.34, 8).translate(-0.62, 0.78, 0),
+      new THREE.SphereGeometry(0.2, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2).translate(-0.62, 0.95, 0),
+    ].map((g) => { g.deleteAttribute('uv'); return g; });
+    const geo = mergeGeometries(parts);
+    geo.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({ color: green, roughness: 0.8, flatShading: true });
+    const max = Math.round(110 * AREA_SCALE);
+    const im = new THREE.InstancedMesh(geo, mat, max);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+    const col = new THREE.Color();
+    let n = 0;
+    for (let i = 0; i < 3000 && n < max; i++) {
+      const c = this._candidate(2.4, 26, 0.85);
+      if (!c || !this._free(c.x, c.z, 4)) continue;
+      const H = 2.6 + r() * 3.2;
+      q.setFromAxisAngle(up, r() * Math.PI * 2);
+      m.compose(p.set(c.x, c.h - 0.1, c.z), q, sc.set(H * 0.55, H, H * 0.55));
+      im.setMatrixAt(n, m);
+      im.setColorAt(n, col.set(green).multiplyScalar(0.85 + r() * 0.3));
+      this.colliders.add({ kind: 'circle', x: c.x, z: c.z, r: 0.3 * H * 0.55 + 0.1, y0: c.h - 1, y1: c.h + H, tree: true });
+      n++;
+    }
+    im.count = n;
+    im.castShadow = im.receiveShadow = true;
+    im.instanceMatrix.needsUpdate = true;
+    im.computeBoundingSphere();
+    this.scene.add(im);
+  }
+
   _palms() {
     const r = this.rand;
     const pl = { 'palm-long': [], 'palm-short': [] };
     for (let i = 0; i < 900 * AREA_SCALE && pl['palm-long'].length + pl['palm-short'].length < 46 * AREA_SCALE; i++) {
-      const a = r() * Math.PI * 2, d = 130 + r() * 60;
+      const a = r() * Math.PI * 2, d = ISLAND_RADIUS * 0.72 + r() * ISLAND_RADIUS * 0.45;
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
       const h = this.terrain.heightAt(x, z);
       if (h < 0.9 || h > 3.2 || this._inTown(x, z, 2)) continue;
@@ -362,8 +404,8 @@ export class Foliage {
       uRadius: { value: radius },
       uHalf: { value: WORLD_HALF },
       uHeightTex: { value: this.heightTex || this.terrain.buildDataTexture() },
-      uGrassA: { value: PALETTE.grassA.clone() },
-      uGrassB: { value: PALETTE.grassB.clone() },
+      uGrassA: { value: VARIANT.grass ? new THREE.Color(VARIANT.grass[0]) : PALETTE.grassA.clone() },
+      uGrassB: { value: VARIANT.grass ? new THREE.Color(VARIANT.grass[1]) : PALETTE.grassB.clone() },
       uBakeTex: { value: null },
     };
     this.grassUniforms = uniforms;
@@ -427,7 +469,7 @@ export class Foliage {
   setBakeTexture(tex) { if (this.grassUniforms) this.grassUniforms.uBakeTex.value = tex; }
 
   setGrassDensity(k) {
-    if (this.grassMesh) this.grassMesh.geometry.instanceCount = Math.max(200, Math.round(quality.grassCount * k));
+    if (this.grassMesh) this.grassMesh.geometry.instanceCount = Math.max(200, Math.round(quality.grassCount * k * (VARIANT.grassDensity ?? 1)));
   }
 
   // Swap round trees near the camera for the detailed Quaternius trees.
