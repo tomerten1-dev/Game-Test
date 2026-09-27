@@ -16,7 +16,7 @@ export class CameraRig {
     this.yaw = 0;
     this.pitch = -0.1;
     this.dist = 3.6;
-    this.side = 0.72;
+    this.side = 1.15;
     this.shoulder = 1; // 1 = over the right shoulder, -1 = left
     this.up = 0.28;
     this.curDist = 3.6;
@@ -45,8 +45,9 @@ export class CameraRig {
       this.recoil -= r;
     }
     const base = this.baseFov || 70;
-    let dist = 3.6, side = 0.72, up = 0.28, fov = base, pivotH = 1.55;
-    if (mode === 'aim') { dist = 2.3; side = 0.65; fov = base - 15; }
+    // the character sits left of the crosshair (big hooded heads must never block the aim point)
+    let dist = 3.5, side = 1.15, up = 0.5, fov = base, pivotH = 1.6;
+    if (mode === 'aim') { dist = 2.2; side = 1.0; up = 0.42; fov = base - 15; }
     else if (mode === 'scope') { dist = 1.6; side = 0.55; fov = 20; }
     else if (mode === 'skydive' || mode === 'glide') { dist = 7.5; side = 0; up = 1.2; fov = base + 8; pivotH = 1.0; }
     else if (mode === 'bus') { dist = 18; side = 0; up = 4; fov = base; pivotH = 0; }
