@@ -7,6 +7,8 @@ import { Pickaxe, Consumable, CONSUMABLES, MAT_CAP } from '../weapons/Items.js';
 
 export const RUN_SPEED = 6.4;
 export const SPRINT_SPEED = 9.0;
+export const TAC_SPRINT_SPEED = 10.6; // tactical sprint (uses stamina)
+const STAMINA_DRAIN = 22, STAMINA_REGEN = 26;
 const CROUCH_SPEED = 3.4;
 const SLIDE_TIME = 0.85;
 const FALL_SAFE = 17; // landing speed (m/s) before fall damage
@@ -16,6 +18,7 @@ const GLIDE_HEIGHT = 35;
 // Shared body for the player and bots: state machine, physics, animation, health.
 const _tc = new THREE.Color();
 const _sph = new THREE.Sphere(new THREE.Vector3(), 2.2);
+const _mq = [];
 
 // Cosmetic weapon wrap: recolour the gun body (keeps the rarity stripe).
 export function applyWrap(mesh, wrap) {
@@ -79,6 +82,11 @@ export class Actor {
     this.buildMat = 'wood';
     this.swingT = 0;
     this._stepDist = 0;
+    this.stamina = 100;
+    this.staminaIdle = 0;
+    this.mantleT = 0;
+    this.mantleFrom = new THREE.Vector3();
+    this.mantleTo = new THREE.Vector3();
     this.distToCam = 0;
     this._animAcc = 0;
   }
@@ -182,6 +190,47 @@ export class Actor {
     return best;
   }
 
+  // Find a ledge in front we can climb onto (0.9-2.6 m above the feet, clear on top).
+  _tryMantle(dx, dz) {
+    const w = this.game.world;
+    const reach = this.radius + 0.55;
+    const px = this.pos.x + dx * reach, pz = this.pos.z + dz * reach;
+    const top = w.groundAt(px, pz, this.pos.y + 2.2, 0.25);
+    const rise = top - this.pos.y;
+    const min = this.onGround ? 0.85 : -0.2;
+    if (rise < min || rise > 2.6) return false;
+    // something must actually block us at knee height, and there must be headroom on top
+    const list = w.colliders.query(px - 0.4, px + 0.4, pz - 0.4, pz + 0.4, _mq);
+    let blocked = w.heightAt(px, pz) > this.pos.y + 0.8;
+    for (const c of list) {
+      if (c.kind === 'ramp' || c.kind === 'cone') continue;
+      if (c.y1 > top + 0.05 && c.y0 < top + 1.8) return false;
+      if (c.y1 > this.pos.y + (this.onGround ? 0.5 : 0.1)) blocked = true;
+    }
+    if (!blocked) return false;
+    this.mantleT = 0.32;
+    this.mantleFrom.copy(this.pos);
+    this.mantleTo.set(px + dx * 0.25, top + 0.02, pz + dz * 0.25);
+    this.vel.set(0, 0, 0);
+    this.crouched = false;
+    this.character.setPose('Jump_Start', null, 0.05, 1.8);
+    this.game.sound?.play('jump', this.isPlayer ? null : this.pos);
+    return true;
+  }
+
+  _updateMantle(dt) {
+    this.mantleT -= dt;
+    const k = 1 - Math.max(0, this.mantleT) / 0.32;
+    // up first, then over
+    const up = Math.min(1, k * 1.6), over = Math.max(0, (k - 0.35) / 0.65);
+    this.pos.set(
+      this.mantleFrom.x + (this.mantleTo.x - this.mantleFrom.x) * over,
+      this.mantleFrom.y + (this.mantleTo.y - this.mantleFrom.y) * up,
+      this.mantleFrom.z + (this.mantleTo.z - this.mantleFrom.z) * over,
+    );
+    if (this.mantleT <= 0) { this.pos.copy(this.mantleTo); this.onGround = true; this.vel.set(0, 0, 0); }
+  }
+
   // Launch pad: fly up and redeploy the glider.
   launch(vy = 40) {
     if (this.state !== 'ground') return;
@@ -246,13 +295,18 @@ export class Actor {
       }
       return;
     }
+    if (this.state === 'ground' && this.mantleT > 0) { this._updateMantle(dt); return; }
     if (this.state === 'ground') {
       const mlen = Math.hypot(it.mx, it.mz);
       if (this.emote && (mlen > 0.2 || it.jump || this.slideT > 0)) this.emote = null;
       // sprint only when moving roughly forward and not busy
       const fwdDot = mlen > 0.1 ? (it.mx * Math.sin(this.aimYaw) + it.mz * Math.cos(this.aimYaw)) / mlen : 0;
       this.sprinting = !!it.sprint && !this.crouched && this.useT <= 0 && mlen > 0.3 && (fwdDot > 0.3 || !this.aiming) && !this.aiming;
-      let speed = this.sprinting ? SPRINT_SPEED : this.crouched ? CROUCH_SPEED : RUN_SPEED;
+      // tactical sprint burns stamina; it refills after a short breather
+      this.tacSprint = this.sprinting && this.stamina > 0 && this.onGround;
+      if (this.tacSprint) { this.stamina = Math.max(0, this.stamina - STAMINA_DRAIN * dt); this.staminaIdle = 0; }
+      else if ((this.staminaIdle += dt) > 0.8) this.stamina = Math.min(100, this.stamina + STAMINA_REGEN * dt);
+      let speed = this.sprinting ? (this.tacSprint ? TAC_SPRINT_SPEED : SPRINT_SPEED) : this.crouched ? CROUCH_SPEED : RUN_SPEED;
       if (this.useT > 0) speed = Math.min(speed, 3.2);
       if (this.inWater) speed *= this.groundY < -1.2 ? 0.5 : 0.65;
       const k = this.onGround ? 14 : 3;
@@ -266,6 +320,8 @@ export class Actor {
         this.vel.x = damp(this.vel.x, it.mx * speed, k, dt);
         this.vel.z = damp(this.vel.z, it.mz * speed, k, dt);
       }
+      // mantle onto ledges: jumping into something waist-to-head high, or reaching one mid-air
+      if (mlen > 0.3 && this.slideT <= 0 && ((it.jump && this.onGround) || (!this.onGround && this.vel.y < 4)) && this._tryMantle(it.mx / mlen, it.mz / mlen)) return;
       if (it.jump && this.onGround) {
         this.crouched = false;
         this.crouchHeld = false;

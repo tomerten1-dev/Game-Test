@@ -55,6 +55,7 @@ export class HUD {
 
         <div id="bottom-left">
           <div class="bar-row shield"><span class="bar-ico">⛊</span><div class="bar"><div class="fill" id="shield-fill"></div></div><span class="bar-num" id="shield-num">0</span></div>
+          <div class="bar-row stamina" id="stamina-row"><span class="bar-ico">⚡</span><div class="bar"><div class="fill" id="stamina-fill"></div></div></div>
           <div class="bar-row health"><span class="bar-ico">✚</span><div class="bar"><div class="fill" id="health-fill"></div></div><span class="bar-num" id="health-num">100</span></div>
         </div>
 
@@ -87,7 +88,7 @@ export class HUD {
       mats: { wood: $('#mat-wood'), stone: $('#mat-stone'), metal: $('#mat-metal') },
       killfeed: $('#killfeed'), alive: $('#st-alive'), kills: $('#st-kills'), storm: $('#st-storm'), stormLabel: $('#storm-label'),
       shieldFill: $('#shield-fill'), shieldNum: $('#shield-num'), healthFill: $('#health-fill'), healthNum: $('#health-num'),
-      dmgDir: $('#dmg-dir'),
+      dmgDir: $('#dmg-dir'), staminaFill: $('#stamina-fill'), staminaRow: $('#stamina-row'),
       speed: $('#speedlines'),
     };
     this.el.slots.innerHTML = [0, 1, 2, 3, 4, 5].map((i) => `<div class="slot${i === 0 ? ' pick' : ''}" data-slot="${i}"><span class="key">${i + 1}</span><span class="icon"></span><span class="count"></span></div>`).join('');
@@ -400,6 +401,9 @@ export class HUD {
     if (this.cache.sl !== slq) { this.cache.sl = slq; this.el.speed.style.opacity = String(slq); }
 
     // health / shield
+    const stam = Math.round(p.stamina ?? 100);
+    this.set('stam', this.el.staminaFill.style, `${stam}%`, 'width');
+    this.set('stamShow', this.el.staminaRow.style, stam < 100 && p.alive ? '1' : '0', 'opacity');
     const view = g.spectating || p;
     const hp = Math.ceil(view.health), sh = Math.ceil(view.shield);
     this.set('hpw', this.el.healthFill.style, `${Math.min(100, hp)}%`, 'width');

@@ -421,3 +421,9 @@ body.touch .kbd { display: none; }
 #end .rank { font-size: clamp(40px, 9vh, 110px); }
 #end .logo { font-size: clamp(40px, 10vh, 110px); }
 #end .end-stats div { padding: 6px 12px; }
+
+/* stamina (tactical sprint) */
+.bar-row.stamina { transition: opacity 0.4s; height: 12px; }
+.bar-row.stamina .bar { height: 7px; }
+.bar-row.stamina .bar-ico { font-size: 12px; color: #ffd23f; }
+#stamina-fill { background: linear-gradient(90deg, #ffe066, #ffb319); }
