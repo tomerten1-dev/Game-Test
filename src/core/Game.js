@@ -134,6 +134,7 @@ export class Game {
   // It's you against bots, so there's no matchmaking or warm-up: straight onto the Storm Bus.
   play(mode = 'solo') {
     this.mode = mode;
+    this.zeroBuild = mode === 'zb';
     this.map.show(false);
     this.menus.showMenu(false);
     this.menus.hideEnd();
@@ -686,6 +687,11 @@ export class Game {
   updateBuild(dt) {
     const p = this.player, input = this.input, b = this.building;
     this._buildCd = Math.max(0, (this._buildCd || 0) - dt);
+    if (this.zeroBuild) {
+      if (p.buildMode) p.setBuildMode(null);
+      if ((input.pressed('build') || input.pressed('ninety') || PIECES.some((k) => input.pressed(k))) && !this._buildCd) { this.hud.toast?.('Zero Build · no building in this mode'); this._buildCd = 1; }
+      return false;
+    }
     if (input.pressed('edit') && p.state === 'ground') { this.toggleEdit(); return !!this.editing; }
     if (this.editing) { this.updateEdit(); return true; }
     for (const piece of PIECES) {

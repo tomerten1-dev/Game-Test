@@ -58,6 +58,7 @@ export class Menus {
               <div class="modes">
                 <button class="mode" data-mode="solo"><b>Solo</b><span>You vs 99 bots</span></button>
                 <button class="mode" data-mode="quick"><b>Quick Match</b><span>You vs 29 bots · faster storm</span></button>
+                <button class="mode" data-mode="zb"><b>Zero Build</b><span>No building · 50 overshield</span></button>
               </div>
               <button id="play-btn" class="btn big">PLAY</button>
               <div class="sub">Straight onto the Storm Bus</div>

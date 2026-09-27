@@ -61,6 +61,7 @@ export class HUD {
         </div>
 
         <div id="bottom-left">
+          <div class="bar-row overshield hidden" id="os-row"><span class="bar-ico">◈</span><div class="bar"><div class="fill" id="os-fill"></div></div><span class="bar-num" id="os-num">0</span></div>
           <div class="bar-row shield"><span class="bar-ico">⛊</span><div class="bar"><div class="fill" id="shield-fill"></div></div><span class="bar-num" id="shield-num">0</span></div>
           <div class="bar-row stamina" id="stamina-row"><span class="bar-ico">⚡</span><div class="bar"><div class="fill" id="stamina-fill"></div></div></div>
           <div class="bar-row health"><span class="bar-ico">✚</span><div class="bar"><div class="fill" id="health-fill"></div></div><span class="bar-num" id="health-num">100</span></div>
@@ -534,6 +535,13 @@ export class HUD {
     this.set('hpn', this.el.healthNum, String(hp));
     this.set('shw', this.el.shieldFill.style, `${Math.min(100, sh)}%`, 'width');
     this.set('shn', this.el.shieldNum, String(sh));
+    const osRow = this.el.osRow || (this.el.osRow = document.getElementById('os-row'));
+    if (this.cache.osOn !== !!g.zeroBuild) { this.cache.osOn = !!g.zeroBuild; osRow.classList.toggle('hidden', !g.zeroBuild); }
+    if (g.zeroBuild) {
+      const os = Math.ceil(view.overshield || 0);
+      this.set('osw', document.getElementById('os-fill').style, `${os * 2}%`, 'width');
+      this.set('osn', document.getElementById('os-num'), String(os));
+    }
 
     // stats
     this.set('alive', this.el.alive, String(g.aliveCount));

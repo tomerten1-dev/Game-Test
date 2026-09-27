@@ -16,6 +16,7 @@ const FALL_SAFE = 17; // landing speed (m/s) before fall damage
 const JUMP_VEL = 8.2;
 const GLIDE_HEIGHT = 35;
 const REDEPLOY_HEIGHT = 14;
+const OVERSHIELD = 50; // Zero Build mode
 
 // Shared body for the player and bots: state machine, physics, animation, health.
 const _tc = new THREE.Color();
@@ -65,6 +66,7 @@ export class Actor {
     this.alive = true;
     this.health = 100;
     this.shield = 0;
+    this.overshield = this.game.zeroBuild ? OVERSHIELD : 0;
     this.kills = 0;
     this.lastFireTime = -10;
     this.lastHurtTime = -10;
@@ -379,6 +381,7 @@ export class Actor {
 
   updateMovement(dt) {
     this._tickRegen(dt);
+    if (this.game.zeroBuild && this.alive && this.overshield < OVERSHIELD && this.game.time - this.lastHurtTime > 6) this.overshield = Math.min(OVERSHIELD, this.overshield + 12 * dt);
     const world = this.game.world;
     const it = this.intent;
     if (this.noFallT > 0) this.noFallT -= dt;
@@ -690,6 +693,12 @@ export class Actor {
     if (!this.alive) return 0;
     this._shieldWas = this.shield;
     let dmg = amount;
+    // Zero Build overshield soaks damage first and regenerates on its own
+    if (this.overshield > 0) {
+      const o = Math.min(this.overshield, dmg);
+      this.overshield -= o;
+      dmg -= o;
+    }
     if (this.shield > 0) {
       const s = Math.min(this.shield, dmg);
       this.shield -= s;
@@ -736,6 +745,7 @@ export class Actor {
     if (this.hiddenCorpse) { this.hiddenCorpse = false; this.root.visible = true; }
     this.health = 100;
     this.shield = 0;
+    this.overshield = this.game.zeroBuild ? OVERSHIELD : 0;
     this.killer = null;
     this.deathCause = null;
     this.useT = 0;

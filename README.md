@@ -27,7 +27,7 @@ Production build: `npm run build` (output in `dist/`), preview it with `npm run 
 | Mouse | Aim (click the game to capture the mouse) |
 | Left click | Shoot · swing the axe · use a heal/shield item |
 | Right click | Zoom (over-the-shoulder aim) |
-| Space | Jump · jump out of the bus · open glider early |
+| Space | Jump · jump out of the bus · open glider early · redeploy the glider when falling from high up |
 | Shift | Sprint |
 | C (or Ctrl) | Crouch · press while sprinting to slide |
 | R | Reload (uses reserve ammo of the matching type) |
@@ -41,7 +41,7 @@ Production build: `npm run build` (output in `dist/`), preview it with `npm run 
 | 1 – 6 / mouse wheel | Switch slot (1 = harvesting axe) · leaves build mode |
 | M | Full-screen map (click: marker, right-click: clear, wheel: zoom, drag: pan) |
 | Middle click (or P) | Ping what you're looking at |
-| Tab | Inventory screen: drag slots to swap, drop / drop one / split stacks, drop materials and ammo |
+| Tab | Inventory screen: drag slots to swap or drag one out of the row to drop it; drop / drop one / split stacks; drop materials and ammo |
 | J | Drop the held item |
 | Y | Swap camera shoulder |
 | T | Emote — tap for your equipped emote, hold for the emote wheel |
@@ -54,7 +54,9 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 
 ## Inventory & survival
 
-- **Slot 1** is the harvesting axe: hit trees, crates and wooden houses for wood, rocks and walls for stone, cars, lamps and city props for metal.
+- **Slot 1** is the harvesting axe: hit trees, crates and wooden houses for wood, rocks and walls for stone, cars, lamps and city props for metal. Trees and rocks show a glowing blue **weak point**; hit it for double materials.
+- **Picking up:** walking over a gun or heal that fits (a free slot, or room in a stack) picks it up; weapons fill slots from the left and consumables from the right. With full slots, picking something up swaps it with what you're holding. Looking at a gun on the floor shows a **stat card** compared with your gun. Each of these can be turned off in Settings.
+- **Foraging:** red apples under trees (+5 health) and blue mushrooms in the woods (+5 shield).
 - **Slots 2–6** hold guns or stacks of heals: Bandages (+15 up to 75), Medkit (full health), Small Shield (+25 up to 50), Shield Potion (+50), **Med-Mist** (+30, use it on the move), **Slurp Juice** (+75 over time: health, then shield), **Chug Jug** (full health and shield, 15 s). Placeables: **Shield Keg** (shields everyone nearby up to 100) and **Campfire** (heals everyone nearby over time). Hold still-ish while the ring fills.
 - **Mobility:** **Shockwave Grenade** (goes off on impact and launches everyone nearby, you too, ~40 m with no fall damage), **Grappler** (10 charges: pulls you to where you aim, up to 60 m), **Rift-to-Go** (warps you into the sky to glide).
 - **Upgrade benches** in six towns (orange on the map): hold a gun and interact to raise its rarity for 100 wood / 150 stone / 200 metal / 300 metal.
@@ -64,11 +66,12 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 - **Movement:** sprint into a low fence or crate to **hurdle** it; land from a big drop while running to **roll**; crouch-walking is almost silent.
 - Guns use **light / medium / shells** ammo; reserve shows after the slash. Green **ammo boxes** near houses and anything dropped on the ground are picked up by walking over it.
 - Sprinting is fast but inaccurate; standing still gives a perfectly accurate first shot. Falls from high up hurt.
+- Guns take a moment to **draw** before they fire, and swapping straight from one shotgun to another right after a shot adds a delay. Pump and tactical shotguns **reload one shell at a time** and can fire mid-reload. Headshot multipliers differ per gun.
 
 ## Lobby & progression
 
 - **Lobby:** your hero stands on a floating stage off the island's coast next to three party pads, with a nameplate showing your level and wins; leave it alone for a bit and your hero dances your equipped emote. Tabs: **Play**, **Locker**, **Item Shop**, **Quests**, **Career**, **Settings**. Drag to spin your hero; the Emote button (or **T** in a match) plays your equipped emote.
-- **Modes:** *Solo* (you vs 99 bots) or *Quick Match* (you vs 29 bots, faster storm). It's you against bots, so there's no matchmaking or warm-up: Play drops you straight onto the Storm Bus.
+- **Modes:** *Solo* (you vs 99 bots), *Quick Match* (you vs 29 bots, faster storm) or *Zero Build* (you vs 99 bots, no building, and everyone has a 50-point overshield that regenerates after 6 s without taking damage). It's you against bots, so there's no matchmaking or warm-up: Play drops you straight onto the Storm Bus.
 - **XP & levels:** earned for time survived, eliminations, chests, supply drops, damage, placement and quests; the results screen itemises it. Every level gives Storm Coins, and the **Season 1 reward track** (levels 2–30) unlocks outfits colours, gliders, contrails, emotes, weapon wraps and heroes.
 - **Daily quests:** three per day (e.g. "Open 3 chests", "Land at Candy Corners"), +500 XP and 100 Storm Coins each.
 - **Weekly quests:** seven bigger goals each week (e.g. 25 eliminations, defeat the Foreman, open the vault, win a match), +2000 XP and 250 Storm Coins each.
@@ -86,6 +89,7 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 - **Rare chests** (purple, ~1 in 8) drop two weapons and grenades.
 - **Supply drops** float down under a blue balloon three times a match inside the next safe zone. They leave blue smoke and hold an epic or legendary weapon, heals, grenades or a launch pad, and 60 metal.
 - **Jump pads** (cyan discs around the island) bounce you high with no fall damage.
+- **Loot llamas:** three hide away from the towns each match; open one for 200 of each material, ammo and heals.
 - **Vending machines** in four towns rotate rare / epic / legendary weapons for 100 wood / 200 stone / 300 metal.
 - Each match rolls a lighting mood: **Sunny Day**, **Golden Hour** or **Dusk**.
 - Bots switch to the sniper at long range and the rocket launcher against builds, lob grenades at enemies hiding in boxes, and race for supply drops.
@@ -98,7 +102,9 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 
 ## Map, storm & spectating
 
-- The compass at the top shows your heading plus your marker, pings and (when you're outside) the direction of the safe zone.
+- The compass at the top shows your heading plus your marker, pings and (when you're outside) the direction of the safe zone. Outside the next circle, the minimap draws a dashed line to it and the storm label shows the distance.
+- The kill feed shows the weapon and the distance of each elimination. Damage numbers on the same target stack into one number (Settings to turn off).
+- Sounds use 3D (HRTF) positioning, so you can hear whether shots come from in front, behind, above or below.
 - The last two storm circles move instead of just shrinking. Inside the storm the world goes purple, foggy and rainy.
 - **Storm surge:** from the third circle, while more players are alive than the circle allows, the ones who dealt the least damage take 20 damage every 10 s. The storm line shows your damage against the safe threshold.
 - When you're eliminated you spectate whoever got you (then whoever gets them). Click / right-click to switch to the next / previous player; press Space or click **See results** to continue.

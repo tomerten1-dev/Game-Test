@@ -206,7 +206,7 @@ export class Building {
     return [[0, 1], [1, 0], [0, -1], [-1, 0]][i];
   }
 
-  canAfford(actor, mat) { return mat ? actor.mats[mat] >= COST : BUILD_MATS.some((m) => actor.mats[m] >= COST); }
+  canAfford(actor, mat) { if (this.game.zeroBuild) return false; return mat ? actor.mats[mat] >= COST : BUILD_MATS.some((m) => actor.mats[m] >= COST); }
 
   // Material an actor will build with: the preferred one if affordable, else the one they have most of.
   pickMat(actor, preferred) {
@@ -329,6 +329,7 @@ export class Building {
 
   // Place a planned piece. Returns the structure or null.
   build(actor, plan, mat) {
+    if (this.game.zeroBuild) return null;
     mat = this.pickMat(actor, mat);
     if (!plan || actor.state !== 'ground' || !this.isValid(plan, actor, mat)) return null;
     const st = MAT_STATS[mat];
@@ -367,6 +368,7 @@ export class Building {
   // Quick "90s": wall in your own cell and drop a ramp inside it whose low end is where you stand.
   // Returns the climb direction, or null when nothing could be built.
   do90(actor, mat) {
+    if (this.game.zeroBuild) return null;
     const ix = Math.floor(actor.pos.x / GRID), iz = Math.floor(actor.pos.z / GRID);
     const fx = actor.pos.x - (ix * GRID + GRID / 2), fz = actor.pos.z - (iz * GRID + GRID / 2);
     // climb away from the edge we're closest to

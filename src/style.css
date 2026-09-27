@@ -510,3 +510,8 @@ body.touch .kbd { display: none; }
 #loot-card .lc-row i.down { color: #ff5d73; }
 #loot-card .lc-vs { margin-top: 5px; font-size: 11px; opacity: 0.6; }
 body.touch #loot-card { left: auto; right: 12px; top: 30%; width: 160px; font-size: 12px; }
+/* Zero Build overshield */
+.bar-row.overshield .bar { height: 10px; }
+.bar-row.overshield .bar-ico { font-size: 13px; color: #d6b8ff; }
+.bar-row.overshield .bar-num { font-size: 14px; }
+#os-fill { background: linear-gradient(90deg, #b18cff, #f0e6ff); }
