@@ -3,9 +3,9 @@ import { isMobile } from './device.js';
 // Graphics presets. "auto" starts high on desktop / low on phones and steps down if FPS is low.
 const dpr = Math.min(window.devicePixelRatio || 1, 2);
 export const PRESETS = {
-  low: { pixelRatio: Math.min(dpr, 1), shadowSize: 1024, shadowRange: 40, grass: 0.35, post: false, ao: false, bloom: false },
-  medium: { pixelRatio: Math.min(dpr, 1.25), shadowSize: 2048, shadowRange: 55, grass: 0.7, post: true, ao: false, bloom: true },
-  high: { pixelRatio: Math.min(dpr, 1.6), shadowSize: 2048, shadowRange: 65, grass: 1, post: true, ao: true, bloom: true },
+  low: { pixelRatio: Math.min(dpr, 1), shadowSize: 1024, shadowRange: 40, treeLod: 45, grass: 0.35, post: false, ao: false, bloom: false },
+  medium: { pixelRatio: Math.min(dpr, 1.25), shadowSize: 2048, shadowRange: 55, treeLod: 70, grass: 0.7, post: true, ao: false, bloom: true },
+  high: { pixelRatio: Math.min(dpr, 1.6), shadowSize: 2048, shadowRange: 65, treeLod: 95, grass: 1, post: true, ao: true, bloom: true },
 };
 export const LEVELS = ['low', 'medium', 'high'];
 
@@ -42,6 +42,7 @@ export class Quality {
     g.renderer.setSize(window.innerWidth, window.innerHeight);
     g.world.lighting.setShadowQuality(p.shadowSize, p.shadowRange);
     g.world.foliage.setGrassDensity(isMobile ? 1 : p.grass);
+    if (g.world.foliage.nature) { g.world.foliage.nature.lodRadius = p.treeLod; g.world.foliage._lodT = 0; }
     g.post.configure(p);
     g.post.setSize(window.innerWidth, window.innerHeight);
   }

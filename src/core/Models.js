@@ -15,6 +15,8 @@ export const ENV_MODELS = [
   'palm-long', 'palm-short', 'formation-large-stone', 'formation-stone',
   'blaster', 'blaster-repeater', 'blaster-a',
   ...KK,
+  // Quaternius "Stylized Nature" (CC0), textures assigned in world/Nature.js
+  'nature/CommonTree_1', 'nature/CommonTree_3', 'nature/Bush_Common_Flowers', 'nature/Clover_1', 'nature/Clover_2',
 ];
 
 // Loads GLBs and flattens each into "parts" (one merged geometry per material),
@@ -40,14 +42,16 @@ export class Models {
     root.traverse((o) => {
       if (!o.isMesh) return;
       const g = o.geometry.clone().applyMatrix4(o.matrixWorld);
-      const textured = !!o.material.map;
-      for (const k of Object.keys(g.attributes)) {
-        if (k !== 'position' && k !== 'normal' && !(textured && k === 'uv')) g.deleteAttribute(k);
-      }
-      const key = o.material.name + (textured ? ':t' : '');
+      for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv', 'color'].includes(k)) g.deleteAttribute(k);
+      const key = o.material.name + (o.material.map ? ':t' : '');
       if (!byMat.has(key)) byMat.set(key, { material: o.material, geos: [] });
       byMat.get(key).geos.push(g.index ? g.toNonIndexed() : g);
     });
+    // geometries merged per material must share one attribute set
+    for (const entry of byMat.values()) {
+      const common = ['position', 'normal', 'uv', 'color'].filter((k) => entry.geos.every((g) => g.attributes[k]));
+      for (const g of entry.geos) for (const k of Object.keys(g.attributes)) if (!common.includes(k)) g.deleteAttribute(k);
+    }
     const box = new THREE.Box3();
     const parts = [];
     for (const { material, geos } of byMat.values()) {

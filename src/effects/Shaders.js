@@ -7,8 +7,13 @@ export const WIND = { uTime: { value: 0 } };
 function patch(material, key, fn) {
   const prev = material.onBeforeCompile;
   material.onBeforeCompile = (shader, r) => { prev?.call(material, shader, r); fn(shader); };
+  if (!material.userData.patches) {
+    // keep any cache key the material already had (e.g. its own shader patch)
+    const own = Object.prototype.hasOwnProperty.call(material, 'customProgramCacheKey') ? material.customProgramCacheKey : null;
+    material.userData.baseKey = own ? own.call(material) : '';
+  }
   const keys = (material.userData.patches = [...(material.userData.patches || []), key]);
-  material.customProgramCacheKey = () => keys.join('|');
+  material.customProgramCacheKey = () => material.userData.baseKey + '|' + keys.join('|');
 }
 
 // Fresnel rim light: bright edge that separates characters from the background.

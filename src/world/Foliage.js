@@ -5,6 +5,7 @@ import { mulberry32, smoothstep } from '../core/noise.js';
 import { jitter, gradientY } from './geomUtils.js';
 import { TOWNS, WORLD_HALF, ISLAND_RADIUS, PALETTE } from './Terrain.js';
 import { quality } from '../core/device.js';
+import { Nature } from './Nature.js';
 
 const TREE_GREENS = ['#4caf50', '#5fc25a', '#3f9e4c', '#78cc5c', '#56b84e'].map((c) => new THREE.Color(c));
 const AUTUMN = ['#f39a34', '#e9722c', '#f4b83f', '#d9582b'].map((c) => new THREE.Color(c));
@@ -51,10 +52,20 @@ export class Foliage {
     this.rand = mulberry32(4242);
     this.occluders = [];
     this.occupied = new Set();
+    this.nature = models ? new Nature(scene, models, quality) : null;
+    if (this.nature && !this.nature.ready) this.nature = null;
+    this.roundTrees = [];
     this._trees();
     this._rocks();
     if (models) { this._palms(); this._spires(); }
-    this._bushes();
+    if (this.nature) {
+      this.nature.occluders = this.occluders;
+      this.nature.scatterUndergrowth(
+        (a, b, c) => { const pt = this._candidate(a, b, c); return pt && { x: pt.x, y: pt.h, z: pt.z }; },
+        (x, z, cell) => this._free(x, z, cell), this.rand,
+        quality.trees > 300 ? { bushes: 170, clovers: 360 } : { bushes: 60, clovers: 100 },
+      );
+    } else this._bushes();
     this._grass();
   }
 
@@ -143,14 +154,19 @@ export class Foliage {
         const cs = sc * (1.1 + r() * 0.3);
         m.compose(p.set(c.x, c.h + trunkH + cs * 0.7, c.z), q, s.set(cs * 1.3, cs * 1.15, cs * 1.3));
         rounds.setMatrixAt(nR, m);
+        this.roundTrees.push({ x: c.x, y: c.h, z: c.z, yaw, height: 6.2 + sc * 2.4, variant: nR, color: null, trunkIdx: nT - 1, canopyIdx: nR, trunkMat: null, canopyMat: m.clone() });
         this.occluders.push({ x: c.x, y: c.h + trunkH + cs * 0.75, z: c.z, r: cs * 1.55 });
         const autumn = r() < 0.13;
         const base = autumn ? AUTUMN[Math.floor(r() * AUTUMN.length)] : TREE_GREENS[Math.floor(r() * TREE_GREENS.length)];
         rounds.setColorAt(nR, col.copy(base).multiplyScalar(0.9 + r() * 0.2));
+        this.roundTrees[this.roundTrees.length - 1].color = col.clone();
         nR++;
       }
       this.colliders.add({ kind: 'circle', x: c.x, z: c.z, r: 0.38 * sc, y0: c.h - 2, y1: c.h + trunkH + 4 * sc, tree: true });
     }
+    this.trunkIM = trunks;
+    this.roundIM = rounds;
+    for (const t of this.roundTrees) { const mm = new THREE.Matrix4(); trunks.getMatrixAt(t.trunkIdx, mm); t.trunkMat = mm; }
     for (const [im, n] of [[trunks, nT], [rounds, nR], [pines, nP]]) {
       im.count = n;
       im.castShadow = true;
@@ -414,8 +430,24 @@ export class Foliage {
     if (this.grassMesh) this.grassMesh.geometry.instanceCount = Math.max(200, Math.round(quality.grassCount * k));
   }
 
-  update(dt, t, focus) {
+  // Swap round trees near the camera for the detailed Quaternius trees.
+  _updateTreeLOD(cam) {
+    const shown = this.nature.updateLOD(this.roundTrees, cam);
+    const zero = this._zero || (this._zero = new THREE.Matrix4().makeScale(0, 0, 0));
+    const prev = this._shown || new Set();
+    for (const i of prev) if (!shown.has(i)) { const t = this.roundTrees[i]; this.trunkIM.setMatrixAt(t.trunkIdx, t.trunkMat); this.roundIM.setMatrixAt(t.canopyIdx, t.canopyMat); }
+    for (const i of shown) if (!prev.has(i)) { const t = this.roundTrees[i]; this.trunkIM.setMatrixAt(t.trunkIdx, zero); this.roundIM.setMatrixAt(t.canopyIdx, zero); }
+    this.trunkIM.instanceMatrix.needsUpdate = true;
+    this.roundIM.instanceMatrix.needsUpdate = true;
+    this._shown = shown;
+  }
+
+  update(dt, t, focus, cam) {
     WIND.uTime.value = t;
+    if (this.nature && cam) {
+      this._lodT = (this._lodT || 0) - dt;
+      if (this._lodT <= 0) { this._lodT = 0.3; this._updateTreeLOD(cam); }
+    }
     if (!this.grassUniforms) return;
     this.grassUniforms.uTime.value = t;
     this.grassUniforms.uCenter.value.set(focus.x, focus.z);

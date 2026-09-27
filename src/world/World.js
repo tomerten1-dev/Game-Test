@@ -53,7 +53,7 @@ export class World {
     this.sky.position.copy(camera.position);
     this.clouds.update(dt);
     this.water.update(dt, t);
-    this.foliage.update(dt, t, focus);
+    this.foliage.update(dt, t, focus, camera.position);
     this.lighting.follow(focus);
   }
 

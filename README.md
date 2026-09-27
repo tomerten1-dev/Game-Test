@@ -45,9 +45,9 @@ The start menu and pause screen have a **Graphics** selector:
 | Setting | What you get |
 | --- | --- |
 | **Auto** (default) | High on desktop, Low on phones. Drops a level automatically if the frame rate stays under ~42 fps. |
-| **High** | Ambient occlusion (N8AO), bloom, color grading, SMAA, 2048 shadow map, full grass |
-| **Medium** | Bloom + color grading + SMAA, no ambient occlusion, less grass |
-| **Low** | No post-processing, 1024 shadows, sparse grass, pixel ratio 1 |
+| **High** | Ambient occlusion (N8AO), bloom, color grading, SMAA, 2048 shadow map, full grass, detailed trees out to 95 m |
+| **Medium** | Bloom + color grading + SMAA, no ambient occlusion, less grass, detailed trees to 70 m |
+| **Low** | No post-processing, 1024 shadows, sparse grass, pixel ratio 1, detailed trees to 45 m |
 
 ## How a match works
 
@@ -88,6 +88,7 @@ public/models/        CC0 models: chars/ (KayKit heroes), kk/ (KayKit world), en
 - **Assets (all CC0):**
   - **KayKit** by Kay Lousberg: characters and animations, medieval buildings (homes, tavern, blacksmith, market, church, towers, windmills, castle), pine trees, rocks, clouds, crates, barrels, sacks, tents, flags, lumber and the treasure chest. See `public/models/kk/CREDITS.md`.
   - **Kenney:** palms, rock spires and the pistol/SMG/AR blasters. See `public/models/env/CREDITS.md`.
+  - **Quaternius Stylized Nature:** painted leafy trees (shown near the camera; cheaper trees stand in far away), flowering bushes and clover. See `public/models/nature/CREDITS.md`.
   - **Procedural:** round/autumn trees, bushes, grass, the shotgun, the bus, fences, fountains and lamps are built from low-poly shapes.
   - **Audio:** all sounds are synthesized with Web Audio.
 
