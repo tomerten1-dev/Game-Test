@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { addRim } from '../effects/Shaders.js';
 
 // Shared robot asset; every player/bot gets its own SkeletonUtils clone.
 export class CharacterAssets {
@@ -52,6 +53,7 @@ export class Character {
         } else {
           m.roughness = 0.4;
         }
+        if (src.name !== 'Black') addRim(m, '#e6f4ff', src.name === 'Main' ? 0.55 : 0.35);
         o.material = m;
         this.materials.push(m);
       }

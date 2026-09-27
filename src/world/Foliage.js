@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { addWind, WIND } from '../effects/Shaders.js';
 import { mulberry32, smoothstep } from '../core/noise.js';
 import { jitter, gradientY } from './geomUtils.js';
 import { TOWNS, WORLD_HALF, ISLAND_RADIUS, PALETTE } from './Terrain.js';
@@ -13,13 +14,16 @@ function roundCanopyGeo(rand) {
   const parts = [];
   const blobs = [[0, 0, 0, 1.25], [0.75, -0.25, 0.3, 0.85], [-0.65, -0.2, -0.35, 0.9], [0.1, 0.55, -0.1, 0.85]];
   for (const [x, y, z, r] of blobs) {
-    const g = new THREE.IcosahedronGeometry(r, 1);
+    const g = new THREE.IcosahedronGeometry(r, 2);
     g.deleteAttribute('uv');
     g.translate(x, y, z);
     parts.push(g);
   }
   let geo = mergeGeometries(parts);
-  geo = jitter(geo, 0.18, rand);
+  geo = jitter(geo, 0.16, rand);
+  geo.deleteAttribute('normal');
+  geo = mergeVertices(geo);
+  geo.computeVertexNormals();
   return gradientY(geo, new THREE.Color(0.55, 0.6, 0.55), new THREE.Color(1.15, 1.15, 1.05));
 }
 
@@ -85,10 +89,13 @@ export class Foliage {
     const trunkGeo = new THREE.CylinderGeometry(0.16, 0.26, 1, 6);
     trunkGeo.translate(0, 0.5, 0);
     const trunkMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9 });
-    const canopyMat = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.85 });
+    const canopyMat = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.8 });
+    const pineMat = canopyMat.clone();
+    addWind(canopyMat, { amount: 0.05, pivot: -1.3, speed: 1.3 });
+    addWind(pineMat, { amount: 0.035, pivot: 0.0, speed: 1.1 });
     const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
     const rounds = new THREE.InstancedMesh(roundCanopyGeo(r), canopyMat, count);
-    const pines = new THREE.InstancedMesh(pineCanopyGeo(), canopyMat, count);
+    const pines = new THREE.InstancedMesh(pineCanopyGeo(), pineMat, count);
     let nT = 0, nR = 0, nP = 0;
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
     const up = new THREE.Vector3(0, 1, 0);
@@ -189,7 +196,8 @@ export class Foliage {
       pl[type].push({ x, y: h - 0.2, z, rot: r() * Math.PI * 2, scale: s });
       this.colliders.add({ kind: 'circle', x, z, r: 0.35, y0: h - 2, y1: h + 8, tree: true });
     }
-    for (const [type, list] of Object.entries(pl)) if (list.length) this.scene.add(this.models.instanced(type, list));
+    const palmMat = (p) => { const m = p.material.clone(); m.roughness = 0.8; addWind(m, { amount: 0.035, pivot: 0.5, speed: 1.2 }); return m; };
+    for (const [type, list] of Object.entries(pl)) if (list.length) this.scene.add(this.models.instanced(type, list, { material: palmMat }));
   }
 
   // Tall Kenney rock spires on the mountain and a few on the coast.
@@ -224,6 +232,7 @@ export class Foliage {
     geo = jitter(geo, 0.25, r);
     gradientY(geo, new THREE.Color(0.5, 0.55, 0.5), new THREE.Color(1.15, 1.2, 1.05));
     const mat = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.9 });
+    addWind(mat, { amount: 0.06, pivot: -0.6, speed: 1.6 });
     const im = new THREE.InstancedMesh(geo, mat, count);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
     const col = new THREE.Color();
@@ -341,6 +350,7 @@ export class Foliage {
   }
 
   update(dt, t, focus) {
+    WIND.uTime.value = t;
     if (!this.grassUniforms) return;
     this.grassUniforms.uTime.value = t;
     this.grassUniforms.uCenter.value.set(focus.x, focus.z);

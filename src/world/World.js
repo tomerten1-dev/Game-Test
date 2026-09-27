@@ -23,7 +23,7 @@ export class World {
 
     this.sky = createSkyMesh();
     scene.add(this.sky);
-    scene.fog = new THREE.Fog(SKY_HORIZON.clone(), 170, 640);
+    scene.fog = new THREE.Fog(SKY_HORIZON.clone(), 130, 600);
     scene.background = SKY_HORIZON.clone();
 
     // Environment lighting/reflections baked from the sky gradient.

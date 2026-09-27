@@ -53,7 +53,7 @@ export class Terrain {
     let mt = 0;
     if (md < 1) {
       const fall = 1 - smoothstep(0, 1, md);
-      mt = Math.pow(fall, 1.25) * MOUNTAIN.h * (0.7 + 0.55 * nz.ridged(x * 0.022, z * 0.022, 4));
+      mt = Math.pow(fall, 1.2) * MOUNTAIN.h * (0.78 + 0.34 * nz.ridged(x * 0.013, z * 0.013, 3)) + nz.fbm(x * 0.06, z * 0.06, 2) * 1.2 * fall;
     }
     return lerp(-7.5, 3.2 + hills + detail + mt, mask);
   }
@@ -167,6 +167,9 @@ export class Terrain {
     // rock on steep slopes / high ground
     const rockW = Math.max((1 - smoothstep(0.66, 0.8, ny)) * smoothstep(3, 6, y), smoothstep(24, 33, y));
     const rockC = _tmp.copy(P.rock).lerp(P.rockDark, clamp(this.variation[k] * 1.3 - 0.2, 0, 1));
+    // layered cliff strata
+    const strata = 0.5 + 0.5 * Math.sin(y * 0.9 + this.variation[k] * 2.0);
+    rockC.lerp(_tmp2.set('#b5a48f'), strata * 0.35);
     out.lerp(rockC, rockW);
     out.lerp(P.snow, smoothstep(44, 50, y));
     // beach
@@ -212,7 +215,45 @@ export class Terrain {
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
     geo.computeBoundingSphere();
+    // town mask as a vertex attribute (1 = paved plaza)
+    const town = new Float32Array(n * n);
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const x = -WORLD_HALF + i * CELL, z = -WORLD_HALF + j * CELL;
+      let w = 0;
+      for (const t of TOWNS) w = Math.max(w, 1 - smoothstep(t.r * 0.32, t.r * 0.6, Math.hypot(x - t.x, z - t.z)));
+      town[j * n + i] = w;
+    }
+    geo.setAttribute('aTown', new THREE.BufferAttribute(town, 1));
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
+    mat.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute float aTown;\nvarying vec3 vWPos;\nvarying float vTown;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(position, 1.0)).xyz;\nvTown = aTown;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>
+          varying vec3 vWPos;
+          varying float vTown;
+          float tHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+          float tNoise(vec2 p) {
+            vec2 i = floor(p), f = fract(p);
+            vec2 u = f * f * (3.0 - 2.0 * f);
+            return mix(mix(tHash(i), tHash(i + vec2(1, 0)), u.x), mix(tHash(i + vec2(0, 1)), tHash(i + vec2(1, 1)), u.x), u.y);
+          }`)
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          vec2 wp = vWPos.xz;
+          float dn = tNoise(wp * 0.35) * 0.6 + tNoise(wp * 1.3) * 0.4;
+          diffuseColor.rgb *= 0.9 + dn * 0.2;
+          // paved plaza: offset stone tiles with dark grout
+          if (vTown > 0.01) {
+            vec2 tp = wp * vec2(0.9, 1.3);
+            tp.x += step(1.0, mod(floor(tp.y), 2.0)) * 0.5;
+            vec2 f = fract(tp);
+            float grout = smoothstep(0.0, 0.07, f.x) * smoothstep(1.0, 0.93, f.x) * smoothstep(0.0, 0.1, f.y) * smoothstep(1.0, 0.9, f.y);
+            float tileVar = tHash(floor(tp)) * 0.12;
+            vec3 stone = vec3(0.56, 0.49, 0.41) * (0.88 + tileVar) * mix(0.62, 1.0, grout);
+            diffuseColor.rgb = mix(diffuseColor.rgb, stone, vTown * smoothstep(0.1, 0.5, vTown));
+          }`);
+    };
     const mesh = new THREE.Mesh(geo, mat);
     mesh.receiveShadow = true;
     mesh.castShadow = true;
@@ -273,3 +314,4 @@ export class Terrain {
 }
 
 const _tmp = new THREE.Color();
+const _tmp2 = new THREE.Color();
