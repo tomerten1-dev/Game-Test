@@ -59,7 +59,7 @@ class Particles {
     geo.setAttribute('size', new THREE.BufferAttribute(this.size, 1).setUsage(THREE.DynamicDrawUsage));
     this.geo = geo;
     const mat = new THREE.ShaderMaterial({
-      uniforms: { uScale: { value: 400 } },
+      uniforms: { uScale: { value: 400 }, uBoost: { value: additive ? 2.4 : 1 } },
       vertexShader: /* glsl */ `
         attribute float size;
         attribute vec4 color;
@@ -73,12 +73,13 @@ class Particles {
         }`,
       fragmentShader: /* glsl */ `
         varying vec4 vColor;
+        uniform float uBoost;
         void main() {
           vec2 c = gl_PointCoord - 0.5;
           float d = length(c);
           if (d > 0.5) discard;
           float a = smoothstep(0.5, ${additive ? '0.0' : '0.35'}, d) * vColor.a;
-          gl_FragColor = vec4(vColor.rgb, a);
+          gl_FragColor = vec4(vColor.rgb * uBoost, a);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
         }`,
@@ -144,7 +145,7 @@ export class Effects {
     const flashGeo = new THREE.PlaneGeometry(1, 1);
     this.flashes = [];
     for (let i = 0; i < 24; i++) {
-      const m = new THREE.Mesh(flashGeo, new THREE.MeshBasicMaterial({ map: flashTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+      const m = new THREE.Mesh(flashGeo, new THREE.MeshBasicMaterial({ map: flashTex, color: new THREE.Color(3, 2.6, 2), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
       m.visible = false;
       m.renderOrder = 6;
       scene.add(m);
@@ -240,7 +241,7 @@ export class Effects {
     t.mesh.position.copy(from);
     t.mesh.lookAt(to);
     t.mesh.scale.set(width, width, len);
-    t.mesh.material.color.set(color);
+    t.mesh.material.color.set(color).multiplyScalar(2.5);
     t.mesh.material.opacity = 1;
     t.mesh.visible = true;
     t.max = t.life = Math.min(0.12, 0.05 + len / 900);
@@ -282,7 +283,7 @@ export class Effects {
     }
     const r = this.rings.find((x) => x.life <= 0) || this.rings[0];
     r.mesh.position.set(pos.x, pos.y + 0.3, pos.z);
-    r.mesh.material.color.copy(c).lerp(new THREE.Color('#ffffff'), 0.3);
+    r.mesh.material.color.copy(c).lerp(new THREE.Color('#ffffff'), 0.3).multiplyScalar(2);
     r.life = 0.6;
     r.mesh.visible = true;
   }

@@ -177,3 +177,7 @@ body.touch .kf-row { font-size: 14px; }
   .btn.big { font-size: 30px; padding: 10px 50px; }
 }
 body.touch #storm-label { display: none; }
+.gfx { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 12px; background: rgba(10,18,40,0.5); font-weight: 700; font-size: 16px; pointer-events: auto; }
+.gfx span { margin: 0 6px; opacity: 0.85; }
+.gfx-btn { cursor: pointer; border: 2px solid rgba(255,255,255,0.35); background: transparent; color: #fff; font-family: var(--num); font-weight: 700; font-size: 16px; padding: 4px 12px; border-radius: 8px; }
+.gfx-btn.active { background: #fff; color: #14204a; border-color: #fff; }

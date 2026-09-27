@@ -6,6 +6,8 @@ import { Player } from '../player/Player.js';
 import { CameraRig } from '../player/CameraRig.js';
 import { Input } from './Input.js';
 import { Models } from './Models.js';
+import { Post } from './Post.js';
+import { Quality } from './Quality.js';
 import { setWeaponModels } from '../weapons/WeaponModels.js';
 import { quality } from './device.js';
 import { Sound } from './Audio.js';
@@ -72,6 +74,9 @@ export class Game {
     this.loot = new Loot(this);
     this.building = new Building(this);
     this._firstMatch = true;
+    this.post = new Post(this.renderer, this.scene, this.camera);
+    this.quality = new Quality(this);
+    this.quality.apply();
     this.rig = new CameraRig(this.camera, this.world);
     this.focus = new THREE.Vector3();
     this.menus = new Menus(ui, this);
@@ -195,8 +200,11 @@ export class Game {
     this.timer.update();
     const dt = Math.min(this.timer.getDelta(), 0.05);
     if (this.state === 'menu') this.updateMenu(dt);
-    else if (!this.paused) this.update(dt);
-    this.renderer.render(this.scene, this.camera);
+    else if (!this.paused) {
+      this.update(dt);
+      if (this.state === 'playing') this.quality.monitor(dt);
+    }
+    this.post.render(dt);
   }
 
   // Slow cinematic orbit behind the start screen.
@@ -333,6 +341,7 @@ export class Game {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.post?.setSize(window.innerWidth, window.innerHeight);
   }
 }
 

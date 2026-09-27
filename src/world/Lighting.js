@@ -22,6 +22,18 @@ export class Lighting {
     this._texel = (range * 2) / quality.shadowSize;
   }
 
+  setShadowQuality(size, range) {
+    const sh = this.sun.shadow;
+    if (sh.mapSize.x !== size) {
+      sh.mapSize.set(size, size);
+      if (sh.map) { sh.map.dispose(); sh.map = null; }
+    }
+    Object.assign(sh.camera, { left: -range, right: range, top: range, bottom: -range });
+    sh.camera.updateProjectionMatrix();
+    this.range = range;
+    this._texel = (range * 2) / size;
+  }
+
   // Shadow camera follows the focus point, snapped to shadow texels to avoid shimmering.
   follow(focus) {
     const s = this._texel;

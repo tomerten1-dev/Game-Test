@@ -73,7 +73,7 @@ export class Loot {
     this.chests = [];
     this.pickups = [];
     const cg = chestGeometries();
-    this.chestMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.55, emissive: '#6b4200', emissiveIntensity: 0.35 });
+    this.chestMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.55, emissive: '#8a5a00', emissiveIntensity: 0.55 });
     this.itemGeo = itemGeometries();
     this.itemMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.1, emissive: '#222222' });
     this.glowTex = game.effects.glowTex;
@@ -99,6 +99,7 @@ export class Loot {
       base.castShadow = lid.castShadow = true;
       group.add(base, lidPivot);
       const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTex, color: '#ffd76a', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.7 }));
+      glow.material.color.multiplyScalar(1.6);
       glow.scale.set(2.6, 2.6, 1);
       glow.position.y = 0.5;
       group.add(glow);
@@ -155,9 +156,11 @@ export class Loot {
     g.add(mesh);
     // rarity light beam + base ring
     const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.32, 3.2, 10, 1, true), new THREE.MeshBasicMaterial({ map: beamTexture(), color, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    beam.material.color.multiplyScalar(1.6);
     beam.position.y = 1.6;
     g.add(beam);
     const ring = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTex, color, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
+    ring.material.color.multiplyScalar(1.8);
     ring.scale.set(1.4, 1.4, 1);
     ring.position.y = 0.35;
     g.add(ring);

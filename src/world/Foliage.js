@@ -336,6 +336,10 @@ export class Foliage {
     this.grassMesh = mesh;
   }
 
+  setGrassDensity(k) {
+    if (this.grassMesh) this.grassMesh.geometry.instanceCount = Math.max(200, Math.round(quality.grassCount * k));
+  }
+
   update(dt, t, focus) {
     if (!this.grassUniforms) return;
     this.grassUniforms.uTime.value = t;

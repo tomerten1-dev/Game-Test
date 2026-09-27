@@ -16,6 +16,7 @@ export class Menus {
     this.game = game;
     const controls = (isTouch ? TOUCH_CONTROLS : DESKTOP_CONTROLS)
       .map(([k, v]) => `<div class="ctl"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
+    const gfx = `<div class="gfx"><span>Graphics</span>${['auto', 'low', 'medium', 'high'].map((q) => `<button class="gfx-btn" data-q="${q}">${q[0].toUpperCase() + q.slice(1)}</button>`).join('')}</div>`;
     root.insertAdjacentHTML('beforeend', `
       <div id="menu" class="screen">
         <div class="menu-inner">
@@ -23,6 +24,7 @@ export class Menus {
           <div class="tagline">Drop in. Loot up. Outlast the storm.</div>
           <button id="play-btn" class="btn big">PLAY</button>
           <div class="sub">You vs 19 bots · 1 winner</div>
+          ${gfx}
           <div class="controls">${controls}</div>
         </div>
       </div>
@@ -30,6 +32,7 @@ export class Menus {
         <div class="menu-inner small">
           <div class="logo mid">PAUSED</div>
           <button id="resume-btn" class="btn">RESUME</button>
+          ${gfx}
           <div class="controls">${controls}</div>
         </div>
       </div>
@@ -53,6 +56,20 @@ export class Menus {
     tap('#play-btn', () => game.play());
     tap('#again-btn', () => game.play());
     tap('#resume-btn', () => game.resume());
+    this.gfxBtns = [...root.querySelectorAll('.gfx-btn')];
+    for (const b of this.gfxBtns) {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        game.quality.set(b.dataset.q);
+        this.syncGfx();
+      });
+    }
+    this.syncGfx();
+  }
+
+  syncGfx() {
+    const q = this.game.quality?.setting || 'auto';
+    for (const b of this.gfxBtns) b.classList.toggle('active', b.dataset.q === q);
   }
 
   showMenu(v) { this.el.menu.classList.toggle('hidden', !v); }

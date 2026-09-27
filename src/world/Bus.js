@@ -28,7 +28,7 @@ function buildBusMesh() {
   body.castShadow = true;
   const group = new THREE.Group();
   group.add(body);
-  const flameMat = new THREE.MeshBasicMaterial({ color: '#7fd4ff', transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
+  const flameMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.2, 2.6, 4), transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
   const flames = [];
   for (const s of [-1, 1]) {
     const f = new THREE.Mesh(new THREE.ConeGeometry(0.4, 2.2, 10), flameMat);
