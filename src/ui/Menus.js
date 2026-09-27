@@ -4,6 +4,9 @@ import { TRACK, SEASON, xpForLevel, QUEST_REWARD, WEEKLY_REWARD, milestoneReward
 import { renderSettings } from './Settings.js';
 
 const HERO_ICON = { Knight: '🛡️', Barbarian: '🪓', Mage: '🔮', Rogue: '🗡️', Rogue_Hooded: '🏹' };
+const HAT_ICON = { party: '🥳', cowboy: '🤠', ice_horns: '❄️', pumpkin: '🎃', pirate: '🏴‍☠️', ninja: '🥷', astro: '🧑‍🚀', halo: '😇' };
+const BACK_ICON = { antenna: '📡', quiver: '🏹', shield: '🛡️', llama: '🦙', guitar: '🎸', cape: '🧣', sword: '⚔️', jetpack: '🚀', wings: '🪽', crystal: '💎' };
+const TOOL_ICON = { pan: '🍳', wrench: '🔧', candy: '🍬', hammer: '🔨', crystal: '❄️', neon: '⚡', gold: '🪙' };
 const TIPS = [
   'Harvest with the axe before a fight — walls save lives.',
   'Supply drops follow the next safe zone. Watch for blue smoke.',
@@ -18,7 +21,9 @@ const coin = '<i class="coin"></i>';
 
 export function itemIcon(c) {
   const v = c.value;
-  if (c.type === 'hero') return `<i class="ic ic-hero">${HERO_ICON[v] || '★'}</i>`;
+  if (c.type === 'hero') return `<i class="ic ic-hero" style="${c.tint ? `--tint:${c.tint}` : ''}">${HAT_ICON[c.hat] || HERO_ICON[v] || '★'}</i>`;
+  if (c.type === 'backbling') return `<i class="ic ic-hero">${BACK_ICON[v] || '∅'}</i>`;
+  if (c.type === 'pickaxe') return `<i class="ic ic-hero">${TOOL_ICON[v] || '🪓'}</i>`;
   if (c.type === 'tint') return `<i class="ic ic-swatch" style="background:${v || 'conic-gradient(#20d6c0, #2f6bff, #ff4d5e, #ffc93c, #20d6c0)'}"></i>`;
   if (c.type === 'glider') return `<i class="ic ic-glider" style="--a:${v[0]};--b:${v[1]}"></i>`;
   if (c.type === 'trail') return `<i class="ic ic-trail" style="background:${!v ? 'rgba(255,255,255,0.15)' : v === 'rainbow' ? 'linear-gradient(90deg,#ff5a5f,#ffd23f,#6ef0a8,#5fd4ff,#a15cff)' : `linear-gradient(90deg,transparent,${v[0]},${v[1]})`}"></i>`;
@@ -124,11 +129,13 @@ export class Menus {
   stageLook() {
     const prof = this.meta.profile;
     const val = (slot) => prof.equippedItem(slot).value;
-    const look = { hero: val('hero'), tint: val('tint'), glider: val('glider'), trail: val('trail'), wrap: val('wrap'), preview: null };
+    const hero = prof.equippedItem('hero');
+    const look = { hero: val('hero'), tint: val('tint') || hero.tint || null, hat: hero.hat || null, backbling: val('backbling'), pickaxe: val('pickaxe'), glider: val('glider'), trail: val('trail'), wrap: val('wrap'), emote: val('emote'), preview: null, crowned: !!prof.d.crowned };
     if (this.tab === 'locker') look.preview = this.lockerSlot;
     if (this.tab === 'shop' && this.shopSel) {
       const c = COSMETICS[this.shopSel];
       look[c.type] = c.value;
+      if (c.type === 'hero') { look.hat = c.hat || null; look.tint = val('tint') || c.tint || null; }
       look.preview = c.type;
     }
     return look;
@@ -179,7 +186,7 @@ export class Menus {
       prof.equip(c.type, c.id);
       this.game.sound.play('click');
       this.refresh();
-      if (c.type === 'emote') this.game.stage.emote(c.value);
+      if (c.type === 'emote') { this.game.stage.emote(c.value); this.game.emoteFx?.(null, c.value, this.game.stage.heroPos); }
     }));
   }
 
@@ -205,7 +212,7 @@ export class Menus {
       this.shopSel = b.dataset.id;
       this.refresh();
       const c = COSMETICS[this.shopSel];
-      if (c.type === 'emote') this.game.stage.emote(c.value);
+      if (c.type === 'emote') { this.game.stage.emote(c.value); this.game.emoteFx?.(null, c.value, this.game.stage.heroPos); }
     }));
     $('#shop').querySelector('[data-bundle]')?.addEventListener('click', (e) => {
       e.stopPropagation();

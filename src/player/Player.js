@@ -7,33 +7,17 @@ export class Player extends Actor {
   constructor(game) {
     const prof = game.meta?.profile;
     const look = (slot) => prof?.equippedItem(slot)?.value;
-    super(game, { name: 'You', color: '#20d6c0', isPlayer: true, type: look('hero') || 'Rogue_Hooded', glider: look('glider'), tint: look('tint') ? 0.1 : 0.3, outfit: look('tint') });
+    const hero = prof?.equippedItem('hero');
+    // skins bring their own colours unless you picked an outfit colour
+    const outfit = look('tint') || hero?.tint || null;
+    super(game, { name: 'You', color: '#20d6c0', isPlayer: true, type: hero?.value || 'Rogue_Hooded', glider: look('glider'), tint: outfit ? 0.1 : 0.3, outfit });
     this.trail = look('trail') || null;
     this.wrap = look('wrap') || null;
     this.emoteClip = look('emote') || 'Cheer';
     this.victoryEmote = this.emoteClip;
-    this._addBackpack();
-  }
-
-  // Little backpack with a glowing antenna so your hero stands out.
-  _addBackpack() {
-    const g = new THREE.Group();
-    const bodyMat = new THREE.MeshStandardMaterial({ color: '#1a8f86', roughness: 0.5, metalness: 0.2 });
-    const trim = new THREE.MeshStandardMaterial({ color: '#f2f5f8', roughness: 0.5 });
-    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.36, 0.18), bodyMat);
-    const lid = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.08, 0.2), trim);
-    lid.position.y = 0.2;
-    const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.95, 6), trim);
-    ant.position.set(0.12, 0.66, -0.02);
-    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), new THREE.MeshStandardMaterial({ color: '#8ffff0', emissive: '#2ee6c9', emissiveIntensity: 2.5 }));
-    tip.position.set(0.12, 1.15, -0.02);
-    for (const m of [pack, lid, ant, tip]) { m.castShadow = true; g.add(m); }
-    g.position.set(0, 0.78, -0.24);
-    this.character.root.add(g);
-    this.character.root.updateMatrixWorld(true);
-    const torso = this.character.chestBone || this.character.spine;
-    if (torso) torso.attach(g);
-    this.backpack = g;
+    this.pickaxeSkin = look('pickaxe') || null;
+    this.applyGear({ hat: hero?.hat, backbling: prof ? look('backbling') : 'antenna' });
+    this._equip?.();
   }
 
   // Landing quest: which named place did we touch down in?

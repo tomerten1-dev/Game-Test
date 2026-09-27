@@ -16,6 +16,12 @@ export const TRACK = {
   22: { item: 'wrap_ice' }, 23: { coins: 350 }, 24: { item: 'tint_midnight' }, 25: { item: 'emote_nap' },
   26: { coins: 400 }, 27: { item: 'glider_storm' }, 28: { item: 'trail_storm' }, 29: { coins: 500 },
   30: { item: 'hero_mage' },
+  // season track continues: skins, back blings and tools
+  31: { item: 'bb_quiver' }, 32: { coins: 300 }, 33: { item: 'pick_pan' }, 34: { item: 'emote_moon' },
+  35: { item: 'skin_dusty' }, 36: { coins: 350 }, 37: { item: 'bb_llama' }, 38: { item: 'pick_candy' },
+  39: { coins: 400 }, 40: { item: 'skin_frost' }, 41: { item: 'emote_power' }, 42: { item: 'bb_cape' },
+  43: { coins: 400 }, 44: { item: 'pick_crystal' }, 45: { item: 'skin_ninja' }, 46: { coins: 500 },
+  47: { item: 'bb_wings' }, 48: { item: 'emote_summon' }, 49: { coins: 600 }, 50: { item: 'skin_saint' },
 };
 
 export const today = () => {

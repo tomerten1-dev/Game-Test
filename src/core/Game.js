@@ -38,6 +38,8 @@ import { Pickaxe } from '../weapons/Items.js';
 import { Weapon } from '../weapons/Weapon.js';
 import { COSMETICS } from '../meta/Cosmetics.js';
 import { arenaDivision } from '../meta/Progression.js';
+import { HAT_IDS, BACK_IDS, TOOL_IDS } from '../player/Gear.js';
+import { EMOTE_FX } from '../meta/Cosmetics.js';
 import { VARIANT, VARIANT_KEY } from '../world/Variant.js';
 import { Snowfall } from '../effects/Weather.js';
 import { WeatherSystem } from '../effects/WeatherFX.js';
@@ -358,6 +360,10 @@ export class Game {
       // arena bots get sharper as you climb the divisions
       const boost = this.mode === 'arena' ? 0.15 + arenaDivision(this.meta.profile.d.arena?.points || 0).skill : 0;
       const b = new Bot(this, BOT_NAMES[i], colors[i], Math.min(1, Math.random() * (1 - boost * 0.5) + boost), CHARACTER_TYPES[i % CHARACTER_TYPES.length]);
+      // bots show off random gear too
+      const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+      if (Math.random() < 0.35) b.pickaxeSkin = pick(TOOL_IDS);
+      b.applyGear({ hat: Math.random() < 0.12 ? pick(HAT_IDS) : null, backbling: Math.random() < 0.45 ? pick(BACK_IDS) : null });
       this.bots.push(b);
       this.actors.push(b);
     }
@@ -852,6 +858,18 @@ export class Game {
     a.needsUpdate = true;
   }
 
+  // Particle effects that come with some emotes.
+  emoteFx(a, clip, pos = a.pos) {
+    const fx = EMOTE_FX[clip];
+    if (fx === 'confetti') setTimeout(() => this.effects.confetti(new THREE.Vector3(pos.x, pos.y - 4.5, pos.z)), 450);
+    else if (fx === 'sparkle') {
+      const c = new THREE.Color();
+      for (let k = 0; k < 6; k++) setTimeout(() => {
+        for (let i = 0; i < 14; i++) { c.setHSL(0.12 + Math.random() * 0.6, 1, 0.7); this.effects.sparks.emit(pos.x + (Math.random() - 0.5) * 1.4, pos.y + 0.4 + Math.random() * 1.6, pos.z + (Math.random() - 0.5) * 1.4, (Math.random() - 0.5) * 2, 1 + Math.random() * 2, (Math.random() - 0.5) * 2, c, 0.8, 0.15, -1); }
+      }, k * 350);
+    }
+  }
+
   updateConsumable(dt) {
     const p = this.player;
     this._updateGrappleLine();
@@ -916,7 +934,7 @@ export class Game {
     const release = w.touch ? w.picked !== undefined : !input.down('emote');
     if (!release && can) return;
     const pick = w.touch ? w.picked : w.sel >= 0 ? w.sel : w.t < 0.25 ? 0 : -1;
-    if (can && pick >= 0 && w.list[pick]) p.emote = p.emote === w.list[pick].value ? null : w.list[pick].value;
+    if (can && pick >= 0 && w.list[pick]) { p.emote = p.emote === w.list[pick].value ? null : w.list[pick].value; if (p.emote) this.emoteFx(p, p.emote); }
     this.emoteWheel = null;
     this.hud.emoteWheel(null);
   }

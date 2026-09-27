@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { makeCrownMesh } from '../world/ItemMeshes.js';
+import { attachHat, attachBackBling, makeHarvestTool, HEAD_TOP } from './Gear.js';
 import { Character } from './Character.js';
 import { makeGlider } from './Glider.js';
 import { damp, dampAngle } from '../core/noise.js';
@@ -442,13 +443,19 @@ export class Actor {
 
   heightAboveGround() { return this.pos.y - this.game.world.groundAt(this.pos.x, this.pos.z, this.pos.y); }
 
+  // Cosmetics: a hat (from the skin) and a back bling.
+  applyGear({ hat = null, backbling = null } = {}) {
+    if (hat) this.hat = attachHat(this.character, hat);
+    if (backbling) this.backBling = attachBackBling(this.character, backbling);
+  }
+
   // Put the Victory Crown on (or take it off): a gold crown on the head bone.
   setCrown(on) {
     this.crowned = on;
     if (on && !this.crownMesh) {
       const c = makeCrownMesh();
       const ch = this.character;
-      c.position.set(0, ch.headTop ?? 1.62, 0);
+      c.position.set(0, HEAD_TOP - (this.hat ? -0.12 : 0.08), 0);
       ch.root.add(c);
       ch.root.updateMatrixWorld(true);
       if (ch.head) ch.head.attach(c);
@@ -778,7 +785,7 @@ export class Actor {
     const h = this.held;
     if (this.buildMode) this.character.setWeapon(null);
     else if (h && h.isGun) this.character.setWeapon(applyWrap(makeWeaponMesh(h.type, h.rarity), this.wrap));
-    else if (h && h.isPickaxe) this.character.setWeapon(makePickaxeMesh(), true);
+    else if (h && h.isPickaxe) this.character.setWeapon(makeHarvestTool(this.pickaxeSkin), true);
     else if (h?.def?.throw) this.character.setWeapon(makeThrowableMesh(h.type, 1.2));
     else if (h?.isConsumable && !h.def.key) {
       // heals / placeables: hold the actual item
