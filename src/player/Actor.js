@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Character } from './Character.js';
 import { makeGlider } from './Glider.js';
 import { damp, dampAngle } from '../core/noise.js';
+import { makeWeaponMesh } from '../weapons/WeaponModels.js';
 
 export const RUN_SPEED = 6.4;
 const JUMP_VEL = 8.2;
@@ -178,6 +179,35 @@ export class Actor {
       ch.update(this._animAcc, pitch, armed, far);
       this._animAcc = 0;
     }
+  }
+
+  // --- inventory ---
+  giveWeapon(weapon, slot = -1) {
+    if (slot < 0) slot = this.weapons.findIndex((w) => !w);
+    if (slot < 0) slot = this.slot;
+    const old = this.weapons[slot];
+    this.weapons[slot] = weapon;
+    if (slot === this.slot) this._equip();
+    return old;
+  }
+
+  switchSlot(i) {
+    if (i === this.slot || i < 0 || i > 2) return false;
+    this.weapon?.cancelReload();
+    this.slot = i;
+    this._equip();
+    return true;
+  }
+
+  _equip() {
+    const w = this.weapon;
+    this.character.setWeapon(w ? makeWeaponMesh(w.type, w.rarity) : null);
+  }
+
+  muzzleWorld(out = new THREE.Vector3()) {
+    const m = this.character.weaponMesh;
+    if (!m) return this.chest(out);
+    return m.localToWorld(out.copy(m.userData.muzzle));
   }
 
   // --- combat state ---

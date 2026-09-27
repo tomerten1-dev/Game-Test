@@ -17,3 +17,53 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1830; col
 .load-bar { width: min(360px, 70vw); height: 14px; border-radius: 10px; background: rgba(255,255,255,0.2); overflow: hidden; }
 #load-fill { height: 100%; width: 5%; background: linear-gradient(90deg, #ffd23f, #ff9f1c); border-radius: 10px; transition: width 0.3s; }
 #load-text { font-size: 20px; font-weight: 600; letter-spacing: 1px; opacity: 0.9; }
+
+/* ---------- HUD ---------- */
+#hud { position: fixed; inset: 0; pointer-events: none; }
+#hud.hidden, .hidden { display: none !important; }
+.vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 58%, rgba(10,20,50,0.38) 100%); }
+#storm-tint { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(150,40,220,0.18), rgba(110,20,190,0.55)); opacity: 0; transition: opacity 0.4s; }
+#storm-tint.on { opacity: 1; }
+#hurt-flash { position: absolute; inset: 0; box-shadow: inset 0 0 120px 30px rgba(255,40,40,0.65); opacity: 0; }
+#hurt-flash.on { animation: hurt 0.45s ease-out; }
+@keyframes hurt { from { opacity: 1; } to { opacity: 0; } }
+
+#crosshair { --gap: 10px; position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+#crosshair .ch { position: absolute; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.55); border-radius: 2px; transition: transform 0.05s; }
+#crosshair .t, #crosshair .b { width: 3px; height: 11px; left: -1.5px; }
+#crosshair .l, #crosshair .r { width: 11px; height: 3px; top: -1.5px; }
+#crosshair .t { bottom: var(--gap); }
+#crosshair .b { top: var(--gap); }
+#crosshair .l { right: var(--gap); }
+#crosshair .r { left: var(--gap); }
+#crosshair .dot { position: absolute; width: 4px; height: 4px; left: -2px; top: -2px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.5); }
+#hitmarker { position: absolute; left: 0; top: 0; opacity: 0; }
+#hitmarker.show { opacity: 1; }
+#hitmarker i { position: absolute; width: 14px; height: 3px; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.5); border-radius: 2px; }
+#hitmarker i:nth-child(1) { transform: translate(-50%,-50%) rotate(45deg) translateX(-15px); }
+#hitmarker i:nth-child(2) { transform: translate(-50%,-50%) rotate(135deg) translateX(-15px); }
+#hitmarker i:nth-child(3) { transform: translate(-50%,-50%) rotate(225deg) translateX(-15px); }
+#hitmarker i:nth-child(4) { transform: translate(-50%,-50%) rotate(315deg) translateX(-15px); }
+#hitmarker.head i { background: #ffd23f; }
+#hitmarker.kill i { background: #ff4d4d; width: 18px; }
+
+#reload-ring { position: absolute; left: 50%; top: calc(50% + 46px); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px; }
+#reload-ring svg { width: 34px; height: 34px; transform: rotate(-90deg); }
+#reload-ring circle { fill: none; stroke: #fff; stroke-width: 4; stroke-dasharray: 100.5; stroke-linecap: round; filter: drop-shadow(0 0 2px rgba(0,0,0,0.6)); }
+#reload-ring span { font-weight: 700; font-size: 13px; letter-spacing: 1.5px; text-shadow: 0 1px 3px rgba(0,0,0,0.7); }
+
+#bottom-right { position: absolute; right: 22px; bottom: 20px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+#ammo { font-weight: 800; text-shadow: 0 2px 0 rgba(0,0,0,0.35), 0 0 12px rgba(0,0,0,0.25); line-height: 1; }
+#ammo-cur { font-size: 46px; }
+#ammo-max { font-size: 24px; opacity: 0.8; }
+#weapon-name { font-family: var(--title); font-size: 18px; letter-spacing: 0.5px; text-shadow: 0 2px 0 rgba(0,0,0,0.4); }
+#slots { display: flex; gap: 8px; pointer-events: auto; }
+.slot { --rar: rgba(255,255,255,0.15); position: relative; width: 64px; height: 58px; border-radius: 10px; background: linear-gradient(180deg, rgba(20,30,60,0.55), rgba(10,15,35,0.7)); border: 3px solid rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; transform: skewX(-6deg); transition: transform 0.12s, border-color 0.12s; box-shadow: inset 0 -6px 0 var(--rar); cursor: pointer; }
+.slot.active { border-color: #fff; transform: skewX(-6deg) translateY(-6px) scale(1.06); }
+.slot .key { position: absolute; left: 6px; top: 3px; font-size: 13px; font-weight: 700; opacity: 0.8; }
+.slot .icon { font-family: var(--title); font-size: 19px; color: var(--rar); text-shadow: 0 2px 0 rgba(0,0,0,0.45); }
+
+.dmg-layer { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.dmg-num { position: absolute; left: 0; top: 0; font-family: var(--num); font-weight: 800; font-size: 30px; color: #fff; -webkit-text-stroke: 1.5px rgba(20,20,40,0.85); text-shadow: 0 3px 0 rgba(0,0,0,0.35); will-change: transform; }
+.dmg-num.shield { color: #d8f0ff; }
+.dmg-num.head { color: #ffd23f; font-size: 36px; }
