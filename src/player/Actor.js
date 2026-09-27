@@ -43,6 +43,7 @@ export function applyWrap(mesh, wrap) {
   return mesh;
 }
 
+const _useCol = new THREE.Color();
 export class Actor {
   constructor(game, { name, color, isPlayer = false, type = 'Knight', glider = null, tint, outfit = null }) {
     this.game = game;
@@ -441,6 +442,18 @@ export class Actor {
   // falling from high enough (a cliff, a tall build, a launch) to open the glider again
   canRedeploy() { return this.state === 'ground' && !this.onGround && !this.swimming && this.vel.y < -4 && this.heightAboveGround() > REDEPLOY_HEIGHT; }
 
+  // Sparkles while using an item: blue at the mouth for drinks, green around the chest for heals.
+  _useFx(dt, drink) {
+    this._useFxT = (this._useFxT || 0) - dt;
+    if (this._useFxT > 0) return;
+    this._useFxT = 0.07;
+    const fx = this.game.effects;
+    const c = _useCol.set(drink ? (this.useItem.def.color || '#4aa8ff') : '#7dffb2');
+    const y = this.pos.y + (drink ? 1.62 : 1.05), f = drink ? 0.18 : 0.05;
+    const x = this.pos.x + Math.sin(this.bodyYaw) * f, z = this.pos.z + Math.cos(this.bodyYaw) * f;
+    for (let i = 0; i < 2; i++) fx.sparks.emit(x + (Math.random() - 0.5) * 0.35, y + (Math.random() - 0.5) * 0.3, z + (Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.6, 0.5 + Math.random() * 0.8, (Math.random() - 0.5) * 0.6, c, 0.55, 0.1, 0);
+  }
+
   heightAboveGround() { return this.pos.y - this.game.world.groundAt(this.pos.x, this.pos.z, this.pos.y); }
 
   // Cosmetics: a hat (from the skin) and a back bling.
@@ -648,7 +661,12 @@ export class Actor {
     const hand = w && w.type === 'pistol' ? '1H' : '2H';
     const firing = this.game.time - this.lastFireTime < 0.25;
     let upperArmed = !armed ? null : w.reloading ? `${hand}_Ranged_Reload` : firing ? `${hand}_Ranged_Shooting` : `${hand}_Ranged_Aiming`;
-    if (this.useT > 0) upperArmed = 'Use_Item';
+    // using a consumable: drink it (shields) or patch up (heals); the outfit characters have real
+    // drinking / kneeling animations, the KayKit heroes use their one "use item" clip
+    const useDef = this.useT > 0 ? this.useItem?.def : null;
+    const drink = !!useDef && (!!useDef.shield || !!useDef.overTime || !!useDef.mobile);
+    if (useDef) upperArmed = ch.q ? (drink ? 'Consume' : 'Fixing_Kneeling') : 'Use_Item';
+    if (useDef && this.distToCam < 40) this._useFx(dt, drink);
     else if (held && held.isPickaxe && this.swingT > 0) upperArmed = '1H_Melee_Attack_Chop';
     if (this.state === 'ground') {
       let targetYaw = this.bodyYaw;
@@ -683,7 +701,9 @@ export class Actor {
         else lower = right > 0 ? 'Running_Strafe_Right' : 'Running_Strafe_Left';
         ch.setPose(lower, upperArmed, 0.18, lower === 'Walking_Backwards' ? rate * 1.4 : rate);
       } else {
-        ch.setPose(armed ? `${hand}_Ranged_Aiming` : 'Idle', upperArmed, 0.2);
+        // standing still with bandages / a medkit: kneel down for it
+        if (useDef && ch.q && !drink) ch.setPose('Fixing_Kneeling', null, 0.25);
+        else ch.setPose(armed ? `${hand}_Ranged_Aiming` : 'Idle', upperArmed, 0.2);
       }
       if (this.onGround && this._wasAir) { this._wasAir = false; this.landT = 0.2; ch.setPose('Jump_Land', upperArmed, 0.08, 1.4); }
       // swimming: a forward-leaning stroke when moving, upright treading water when still

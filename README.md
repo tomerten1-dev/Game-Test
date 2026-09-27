@@ -55,6 +55,8 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 ## Inventory & survival
 
 - **Slot 1** is the harvesting axe: hit trees, crates and wooden houses for wood, rocks and walls for stone, cars, lamps and city props for metal. Trees and rocks show a glowing blue **weak point**; hit it for double materials. Trees and rocks have HP: chop a tree down and it **topples over**, and rocks **crumble**. Bullets and explosions wear them down too. Everything grows back next match.
+- **Floor loot tag:** when you're next to something on the ground, a tag beside the item shows the key and 'Pick up' (or 'Swap' when your slots are full), the name, a rarity chip and the ammo in the gun or the stack count.
+- **Using items:** a countdown dial beside the crosshair shows the seconds left for heals, shields and reloads. The outfit characters drink shield potions and slurps (blue sparkles) and kneel to use bandages and medkits (green sparkles).
 - **HP bars:** hitting a build, a house wall or door, a tree, a rock or furniture shows a Fortnite-style health bar with its HP (e.g. `150 / 300`).
 - **Picking up:** walking over a gun or heal that fits (a free slot, or room in a stack) picks it up; weapons fill slots from the left and consumables from the right. With full slots, picking something up swaps it with what you're holding. Looking at a gun on the floor shows a **stat card** compared with your gun. Each of these can be turned off in Settings.
 - **Foraging:** red apples under trees (+5 health) and blue mushrooms in the woods (+5 shield).

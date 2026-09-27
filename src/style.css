@@ -47,9 +47,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1830; col
 #hitmarker.head i { background: #ffd23f; }
 #hitmarker.kill i { background: #ff4d4d; width: 18px; }
 
-#reload-ring { position: absolute; left: 50%; top: calc(50% + 46px); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px; }
-#reload-ring svg { width: 34px; height: 34px; transform: rotate(-90deg); }
-#reload-ring circle { fill: none; stroke: #fff; stroke-width: 4; stroke-dasharray: 100.5; stroke-linecap: round; filter: drop-shadow(0 0 2px rgba(0,0,0,0.6)); }
+#reload-ring { position: absolute; left: calc(50% + 64px); top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; gap: 3px; }
+#reload-ring .rr-dial { position: relative; width: 52px; height: 52px; }
+#reload-ring svg { width: 52px; height: 52px; transform: rotate(-90deg); }
+#reload-ring #ring-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--title); font-size: 24px; font-weight: 900; font-style: italic; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.75); }
+#reload-ring circle { fill: none; stroke-width: 4.5; }
+#reload-ring .rr-bg { stroke: rgba(10,16,30,0.45); }
+#reload-ring .rr-fg { stroke: #fff; stroke-dasharray: 100.5; stroke-linecap: round; filter: drop-shadow(0 0 2px rgba(0,0,0,0.6)); }
 #reload-ring span { font-weight: 700; font-size: 13px; letter-spacing: 1.5px; text-shadow: 0 1px 3px rgba(0,0,0,0.7); }
 
 #bottom-right { position: absolute; right: 22px; bottom: 20px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
@@ -687,3 +691,15 @@ body.touch #bottom-left { padding: 6px 8px; }
 .lb-tabs button::after { left: 8px; right: 8px; }
 .lb-wallet { gap: 8px; }
 .xpbar { width: 84px; }
+
+/* floor-loot tag beside the item: action, then name / rarity / ammo */
+#loot-tag { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 10px; pointer-events: none; z-index: 5; }
+#loot-tag.hidden { display: none; }
+#loot-tag .lt-act { width: 108px; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; color: #fff; font-weight: 800; font-size: 12px; letter-spacing: 0.6px; text-transform: uppercase; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+#loot-tag .lt-key { min-width: 22px; height: 22px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center; border-radius: 5px; background: #fff; color: #14204a; font-size: 13px; text-shadow: none; box-shadow: 0 2px 0 #9aa6c8; }
+#loot-tag .lt-box { padding: 6px 16px 7px 12px; background: linear-gradient(90deg, rgba(14,18,28,0.82), rgba(14,18,28,0.62)); border-left: 3px solid var(--rar); border-radius: 3px; box-shadow: 0 3px 12px rgba(0,0,0,0.3); }
+#loot-tag .lt-name { color: #fff; font-weight: 900; font-style: italic; font-size: 20px; letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap; text-shadow: 0 2px 4px rgba(0,0,0,0.6); }
+#loot-tag .lt-sub { display: flex; align-items: center; gap: 8px; margin-top: 2px; font-size: 12px; font-weight: 800; text-transform: uppercase; }
+#loot-tag .lt-rar { padding: 1px 6px; background: var(--rar); color: #10131c; font-style: italic; letter-spacing: 0.5px; border-radius: 2px; }
+#loot-tag .lt-count { color: #d6dce8; letter-spacing: 0.5px; }
+body.touch #loot-tag .lt-name { font-size: 16px; }

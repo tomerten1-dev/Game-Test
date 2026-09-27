@@ -44,9 +44,10 @@ export class HUD {
         <div id="banner"></div>
         <div id="prompt" class="hidden"><span class="key">E</span><span id="prompt-text"></span></div>
         <div id="loot-card" class="hidden"></div>
+        <div id="loot-tag" class="hidden"><div class="lt-act"><span class="lt-key"></span><span class="lt-verb">Pick up</span></div><div class="lt-box"><div class="lt-name"></div><div class="lt-sub"><span class="lt-rar"></span><span class="lt-count"></span></div></div></div>
         <div id="obj-hp" class="hidden"><div class="oh-bar"><div class="oh-fill"></div></div><span class="oh-num"></span></div>
         <div id="toast"></div>
-        <div id="reload-ring" class="hidden"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16"/></svg><span id="ring-label">RELOADING</span></div>
+        <div id="reload-ring" class="hidden"><div class="rr-dial"><svg viewBox="0 0 40 40"><circle class="rr-bg" cx="20" cy="20" r="16"/><circle class="rr-fg" cx="20" cy="20" r="16"/></svg><b id="ring-num"></b></div><span id="ring-label">RELOADING</span></div>
         <div id="pickup-notes"></div>
 
         <div id="killfeed"></div>
@@ -94,7 +95,7 @@ export class HUD {
     this.el = {
       hud: $('#hud'), crosshair: $('#crosshair'), hitmarker: $('#hitmarker'),
       ammoCur: $('#ammo-cur'), ammoMax: $('#ammo-max'), weaponName: $('#weapon-name'), slots: $('#slots'),
-      reload: $('#reload-ring'), reloadCircle: $('#reload-ring circle'), stormTint: $('#storm-tint'), hurt: $('#hurt-flash'),
+      reload: $('#reload-ring'), reloadCircle: $('#reload-ring .rr-fg'), ringNum: $('#ring-num'), stormTint: $('#storm-tint'), hurt: $('#hurt-flash'),
       banner: $('#banner'), prompt: $('#prompt'), promptText: $('#prompt-text'), toast: $('#toast'), ringLabel: $('#ring-label'), notes: $('#pickup-notes'),
       mats: { wood: $('#mat-wood'), stone: $('#mat-stone'), metal: $('#mat-metal') },
       killfeed: $('#killfeed'), alive: $('#st-alive'), kills: $('#st-kills'), storm: $('#st-storm'), stormLabel: $('#storm-label'),
@@ -183,12 +184,14 @@ export class HUD {
     this._bannerT = setTimeout(() => b.classList.remove('show'), seconds * 1000);
   }
 
-  prompt(text, rarity, weapon = null) {
+  prompt(text, rarity, weapon = null, pickup = null) {
     this.lootCard(text ? weapon : null);
-    const key = text ? text + rarity : null;
+    // floor loot gets a tag next to the item instead of the centre prompt
+    this._lt = text && pickup ? pickup : null;
+    const key = text ? text + rarity + (this._lt ? '|tag' : '') : null;
     if (this.cache.prompt === key) return;
     this.cache.prompt = key;
-    this.el.prompt.classList.toggle('hidden', !text);
+    this.el.prompt.classList.toggle('hidden', !text || !!this._lt);
     if (text) {
       const k = this.el.prompt.querySelector('.key');
       if (k && this.game.input?.keyFor) k.textContent = keyLabel(this.game.input.keyFor('interact')).replace('Mouse ', 'M');
@@ -221,6 +224,48 @@ export class HUD {
     el.dataset.mat = o.mat;
     el.querySelector('.oh-fill').style.width = `${Math.min(100, (hp / max) * 100)}%`;
     el.querySelector('.oh-num').textContent = `${hp} / ${max}`;
+  }
+
+  // Tag beside the floor item you'd pick up: action on the left, then name, rarity and ammo / count.
+  _updateLootTag() {
+    const el = this.el.lootTag || (this.el.lootTag = document.getElementById('loot-tag'));
+    const pk = this._lt;
+    if (!pk || !pk.alive) { if (!el.classList.contains('hidden')) el.classList.add('hidden'); this._ltKey = null; return; }
+    const v = this._ltV || (this._ltV = pk.pos.clone());
+    v.copy(pk.pos); v.y += 0.55;
+    v.project(this.game.camera);
+    if (v.z > 1) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    const p = this.game.player;
+    const full = pk.type === 'weapon' || pk.type === 'consumable' ? p.items.every((it, i) => i === 0 || it) : false;
+    const keyTxt = keyLabel(this.game.input?.keyFor?.('interact') || 'KeyE').replace('Mouse ', 'M');
+    const key = `${pk.type}|${pk.weapon ? pk.weapon.type + pk.weapon.rarity + pk.weapon.ammo : pk.count ?? pk.amount}|${full}|${keyTxt}`;
+    if (key !== this._ltKey) {
+      this._ltKey = key;
+      let name, rar = null, count = '';
+      if (pk.type === 'weapon') {
+        const w = pk.weapon;
+        rar = RARITIES[w.rarity];
+        name = w.title || w.def.name;
+        count = `▮ ×${w.ammo}`;
+      } else {
+        const label = this.game.loot.label(pk);
+        const m = label.match(/^(.*) x(\d+)$/);
+        name = m ? m[1] : label;
+        if (m) count = `×${m[2]}`;
+        if (pk.type === 'medallion') rar = RARITIES[4];
+        if (pk.type === 'crown') rar = RARITIES[RARITIES.length - 1];
+      }
+      el.style.setProperty('--rar', rar ? rar.color : '#9fb3c8');
+      el.querySelector('.lt-key').textContent = keyTxt;
+      el.querySelector('.lt-verb').textContent = full ? 'Swap' : 'Pick up';
+      el.querySelector('.lt-name').textContent = name;
+      const re = el.querySelector('.lt-rar');
+      re.textContent = rar ? rar.name : '';
+      re.style.display = rar ? '' : 'none';
+      el.querySelector('.lt-count').textContent = count;
+    }
+    el.style.transform = `translate(${((v.x + 1) / 2) * window.innerWidth - 118}px, ${((1 - v.y) / 2) * window.innerHeight}px) translateY(-50%)`;
   }
 
   // Stat card for the weapon you're looking at on the floor, compared with the gun you hold
@@ -472,6 +517,7 @@ export class HUD {
     if (!p) return;
     if (this.hitT > 0) { this.hitT -= dt; if (this.hitT <= 0) this.el.hitmarker.className = ''; }
     this._updateObjHp(dt);
+    this._updateLootTag();
     this._drawCompass();
     if (this.vig > 0) {
       this.vig = Math.max(0, this.vig - dt * 0.35);
@@ -549,12 +595,12 @@ export class HUD {
     }
     const rl = w?.reloading, using = p.useT > 0 && p.useItem;
     this.el.reload.classList.toggle('hidden', !rl && !using);
-    if (rl) {
-      this.set('ring', this.el.ringLabel, 'RELOADING');
-      this.el.reloadCircle.style.strokeDashoffset = String(100.5 * (w.reloadT / w.def.reload));
-    } else if (using) {
-      this.set('ring', this.el.ringLabel, `USING ${p.useItem.def.name.toUpperCase()}`);
-      this.el.reloadCircle.style.strokeDashoffset = String(100.5 * (p.useT / p.useItem.def.time));
+    // countdown dial: seconds left in the middle, the ring fills as it goes
+    if (rl || using) {
+      const left = rl ? w.reloadT : p.useT, total = rl ? w.def.reload : p.useItem.def.time;
+      this.set('ring', this.el.ringLabel, rl ? 'RELOADING' : p.useItem.def.name.toUpperCase());
+      this.el.reloadCircle.style.strokeDashoffset = String(100.5 * Math.max(0, Math.min(1, left / total)));
+      this.set('ringNum', this.el.ringNum, String(Math.max(1, Math.ceil(left - 0.05))));
     }
 
     // speed lines while skydiving

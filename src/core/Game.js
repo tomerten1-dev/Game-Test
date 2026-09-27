@@ -649,7 +649,7 @@ export class Game {
       const door = this.homes.nearestDoor(p.pos, 1.7);
       const near = (door && { kind: 'door', door, text: door.open ? 'Close Door' : 'Open Door' }) || this.events.nearestInteractable(p.pos) || this.boss.nearestInteractable(p) || this.loot.nearestInteractable(p.pos);
       const text = !near ? null : near.text || (near.kind === 'chest' ? (near.chest.rare ? 'Open Rare Chest' : 'Open Chest') : near.kind === 'ammobox' ? 'Open Ammo Box' : `Pick up ${this.loot.label(near.pickup)}`);
-      this.hud.prompt?.(text || (p.canRedeploy() ? `Deploy glider · ${keyLabel(this.input.keyFor('jump'))}` : null), near?.pickup?.weapon?.rarity ?? near?.rarity, near?.pickup?.weapon || null);
+      this.hud.prompt?.(text || (p.canRedeploy() ? `Deploy glider · ${keyLabel(this.input.keyFor('jump'))}` : null), near?.pickup?.weapon?.rarity ?? near?.rarity, near?.pickup?.weapon || null, near?.pickup || null);
       if (near && input.pressed('interact') && this.warmup > 0) this.hud.toast?.('Loot unlocks when the match starts');
       else if (near && input.pressed('interact')) {
         if (near.kind === 'supply') this.events.openSupply(near.supply, p);
