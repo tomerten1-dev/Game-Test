@@ -51,7 +51,7 @@ export const WEAPONS = {
     damage: 100, pellets: 1, rate: 0.4, mag: 1, reload: 2.4,
     spread: 0.035, bloom: 0, maxSpread: 0.035, recover: 1, scopedSpread: 0,
     range: 420, falloffStart: 400, recoil: 0.09, idealRange: 70, shake: 0.35, headMult: 2.5,
-    projectile: { speed: 280, gravity: 9 }, scope: true,
+    projectile: { speed: 600, gravity: 6, pad: 0.16 }, scope: true, // fast, flat, a little forgiving
   },
   rocket: {
     key: 'rocket', name: 'Rocket Launcher', icon: 'RKT', ammoType: 'rockets',

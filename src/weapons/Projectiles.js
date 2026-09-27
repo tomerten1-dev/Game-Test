@@ -169,7 +169,7 @@ export class Projectiles {
       const len = p.vel.length() * h;
       if (len < 1e-4) return;
       _dir.copy(p.vel).normalize();
-      const r = g.combat.trace(_prev, _dir, len, p.owner);
+      const r = g.combat.trace(_prev, _dir, len, p.owner, p.kind === 'bullet' ? p.weapon?.def.projectile?.pad || 0 : 0);
       if (!r.hit) {
         p.pos.addScaledVector(_dir, len);
         if (p.kind === 'bullet') g.effects.tracer(_prev, p.pos, '#fff2b0', 0.05);

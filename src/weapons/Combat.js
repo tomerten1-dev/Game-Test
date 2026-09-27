@@ -26,8 +26,9 @@ export class Combat {
     this.result = { t: 0, actor: null, head: false, collider: null, terrain: false };
   }
 
-  // Closest hit among actors, colliders and terrain.
-  trace(o, d, maxT, ignore) {
+  // Closest hit among actors, colliders and terrain. `pad` widens the actor hitboxes
+  // (sniper rounds get a little bullet magnetism).
+  trace(o, d, maxT, ignore, pad = 0) {
     const res = this.result;
     res.actor = null; res.head = false; res.collider = null; res.terrain = false;
     let best = maxT;
@@ -38,17 +39,17 @@ export class Combat {
       const p = _p.copy(a.pos);
       p.y -= a.crouchAmt * 0.3; // crouching lowers the hitboxes
       // broad phase
-      if (raySphere(o.x, o.y, o.z, d.x, d.y, d.z, p.x, p.y + 0.95, p.z, 1.25, best) < 0) continue;
+      if (raySphere(o.x, o.y, o.z, d.x, d.y, d.z, p.x, p.y + 0.95, p.z, 1.25 + pad, best) < 0) continue;
       if (a.state !== 'ground') {
-        const t = raySphere(o.x, o.y, o.z, d.x, d.y, d.z, p.x, p.y + 0.9, p.z, 0.8, best);
+        const t = raySphere(o.x, o.y, o.z, d.x, d.y, d.z, p.x, p.y + 0.9, p.z, 0.8 + pad, best);
         if (t >= 0 && t < best) { best = t; res.actor = a; res.head = false; res.collider = null; res.terrain = false; }
         continue;
       }
-      const th = raySphere(o.x, o.y, o.z, d.x, d.y, d.z, p.x, p.y + 1.5, p.z, 0.42, best);
+      const th = raySphere(o.x, o.y, o.z, d.x, d.y, d.z, p.x, p.y + 1.5, p.z, 0.42 + pad * 0.5, best);
       if (th >= 0 && th < best) { best = th; res.actor = a; res.head = true; res.collider = null; res.terrain = false; }
-      const tb = raySphere(o.x, o.y, o.z, d.x, d.y, d.z, p.x, p.y + 0.82, p.z, 0.34, best);
+      const tb = raySphere(o.x, o.y, o.z, d.x, d.y, d.z, p.x, p.y + 0.82, p.z, 0.34 + pad, best);
       if (tb >= 0 && tb < best) { best = tb; res.actor = a; res.head = false; res.collider = null; res.terrain = false; }
-      const tl = raySphere(o.x, o.y, o.z, d.x, d.y, d.z, p.x, p.y + 0.36, p.z, 0.28, best);
+      const tl = raySphere(o.x, o.y, o.z, d.x, d.y, d.z, p.x, p.y + 0.36, p.z, 0.28 + pad, best);
       if (tl >= 0 && tl < best) { best = tl; res.actor = a; res.head = false; res.collider = null; res.terrain = false; }
     }
     res.t = best;
@@ -76,13 +77,12 @@ export class Combat {
     shooter.sprinting = false;
     const def = w.def;
     if (def.projectile) {
-      // aim the projectile from the muzzle at whatever the aiming ray points at
+      // the round travels along the aiming ray itself (starting level with the muzzle), so there's no
+      // parallax between the over-the-shoulder camera and the gun: led shots go where the crosshair is
       coneDir(aimDir, spread, _dir);
-      const r = this.trace(origin, _dir, def.range, shooter);
-      _end.copy(origin).addScaledVector(_dir, r.t);
-      const pd = _a.copy(_end).sub(muzzle);
-      if (r.t > 3 && pd.lengthSq() > 1) _dir.copy(pd.normalize());
-      g.projectiles.fireWeapon(shooter, w, muzzle, _dir);
+      const t0 = Math.max(0, _a.copy(muzzle).sub(origin).dot(_dir));
+      const start = _end.copy(origin).addScaledVector(_dir, t0);
+      g.projectiles.fireWeapon(shooter, w, start, _dir);
       g.effects.muzzle(muzzle, aimDir, def.key === 'rocket' ? 1.6 : 1.3, shooter.isPlayer || shooter.distToCam < 40);
       g.sound.play(def.key, shooter.isPlayer ? null : shooter.pos, { range: 220 });
       if (shooter.isPlayer) {
