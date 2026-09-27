@@ -51,10 +51,15 @@ export class Bot extends Actor {
     this.peekT = 0;         // window open toward the target
     this.peekCd = 0;
     this.shootWall = false; // target hides behind a build: shoot through it
+    this.climb = null;      // running up a ramp after a quick 90
+    this.ninetyCd = 0;
+    this.tunnelCd = 0;
+    this.coneCd = 0;
   }
 
   // Fresh brain for the real match (after the warm-up).
   resetAI() {
+    this.climb = null; this.ninetyCd = 0; this.tunnelCd = 0; this.coneCd = 0;
     this.target = null; this.mode = 'idle'; this.hasGoal = false;
     this.boxed = false; this.retreatT = 0; this.exitT = 0; this.peekT = 0; this.peekWall = null;
     this.lootChest = null; this.pickup = null; this.tree = null; this.huntT = 0;
@@ -274,6 +279,21 @@ export class Bot extends Actor {
         this._leaveBox(this._yawTo(to));
       } else {
         this.mode = 'boxed';
+        // skilled bots take the high ground with quick 90s instead of sitting tight
+        this.ninetyCd -= THINK;
+        const b = g.building;
+        if (!needHeal && this.useT <= 0 && this.target && this.skill > 0.3 && this.matTotal >= 60 && this.ninetyCd <= 0 &&
+            this.target.pos.y > this.pos.y - 1.5 && this.peekT <= 0 && b) {
+          if (this.peekT > 0) this._closePeek();
+          const dir = b.do90(this);
+          if (dir) {
+            this.climb = { x: dir.x, z: dir.z, t: dir.dist / 6.4 + 0.15, top: dir.top };
+            this.ninetyCd = 2.2 + Math.random() * 1.5;
+            this.boxed = false;
+            this.mode = 'engage';
+            return;
+          }
+        }
         if (this.useT <= 0 && needHeal && this.peekT <= 0) {
           let slot = this.health < 75 ? this.findConsumable('heal') : -1;
           if (slot < 0) slot = this.findConsumable('shield');
@@ -492,7 +512,10 @@ export class Bot extends Actor {
       const done = this.tickUse(dt);
       if (done && this.distToCam < 40) g.sound.play(done.def.heal ? 'heal' : 'shield', this.pos, { range: 30 });
     }
-    if (this.exitT > 0) {
+    if (this.climb && (this.climb.t -= dt) > 0 && this.pos.y < this.climb.top - 0.3) {
+      mx = this.climb.x; mz = this.climb.z;
+      this.stuckT = 0; this.detourT = 0;
+    } else if (this.exitT > 0) {
       // walk straight out through the door we just cut
       this.exitT -= dt;
       const ex = this.exitPt.x - this.pos.x, ez = this.exitPt.z - this.pos.z, el = Math.hypot(ex, ez);
@@ -540,6 +563,21 @@ export class Bot extends Actor {
         wantSprint = melee && d > 4;
         // crouch-peek at long range for accuracy
         this.crouched = !melee && this.skill > 0.35 && d > 25 && fwd === 0 && this.onGround && this.slideT <= 0;
+        const bld = g.building;
+        this.tunnelCd -= dt; this.coneCd -= dt;
+        // pushing a higher enemy under fire: walls on both sides + a cone overhead ("tunnel")
+        if (bld && this.skill > 0.45 && fwd > 0 && tgt.pos.y - this.pos.y > 2 && g.time - this.lastHurtTime < 2 && this.matTotal >= 40 && this.tunnelCd <= 0 && this.onGround) {
+          this.tunnelCd = 1.4;
+          const yaw = Math.atan2(dx, dz);
+          bld.buildPiece(this, 'wall', yaw + Math.PI / 2);
+          bld.buildPiece(this, 'wall', yaw - Math.PI / 2);
+          bld.buildPiece(this, 'cone', 0, 1);
+        }
+        // above an enemy box next to us: cap it with a cone so they can't take our height
+        if (bld && this.skill > 0.35 && d < 6.5 && this.pos.y - tgt.pos.y > 2.5 && this.matTotal >= 10 && this.coneCd <= 0) {
+          this.coneCd = 3;
+          bld.buildPiece(this, 'cone', Math.atan2(dx, dz), 0);
+        }
         // take the high ground with a ramp when the enemy is above us
         if (tgt.pos.y - this.pos.y > 2.5 && d < 20 && g.building?.canAfford(this) && this.rampCooldown <= 0 && this.onGround && g.building) {
           this.rampCooldown = 3 - this.skill;
