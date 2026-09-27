@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Houses } from './Houses.js';
+import { Houses, YARD } from './Houses.js';
 import { makeWeaponMesh } from '../weapons/WeaponModels.js';
 import { mulberry32 } from '../core/noise.js';
 import { part, merge, mat } from './geomUtils.js';
@@ -30,8 +30,9 @@ export class Towns {
     const crates = [];
     this._townList = TOWNS;
     // enterable homes (interiors, doors, stairs); their furniture goes through the prop instancer
-    this.homes = new Houses(scene, colliders, mulberry32(77), (type, x, y, z, height, rot, colR) => this._propAt(type, x, y, z, height, rot, colR));
+    this.homes = new Houses(scene, colliders, mulberry32(77), models, (type, x, y, z, height, rot, colR) => this._propAt(type, x, y, z, height, rot, colR));
     for (const town of TOWNS) this._town(town, parts, crates);
+    this.homes.finish();
     this.chestSpots.push(...this.homes.chestSpots);
     this._scatterCrates(crates);
     this._landmark(parts);
@@ -112,6 +113,7 @@ export class Towns {
       if (BREAKABLE.test(type)) c.breakable = { type, idx: [idx], hp: 90, loot: 0.35 };
       this.colliders.add(c);
     }
+    return idx;
   }
 
   // A castle tower on a hill as a landmark.
@@ -183,35 +185,40 @@ export class Towns {
       const info = this.models.get(type);
       const scale = KK_SCALE;
       const size = home ? Houses.size(kind) : null;
-      const w = home ? size.W : info.size.x * scale * 0.86, d = home ? size.D : info.size.z * scale * 0.86, h = home ? (kind === 'two' ? 11 : 7) : info.size.y * scale;
+      const w = home ? size.W : info.size.x * scale * 0.86, d = home ? size.D : info.size.z * scale * 0.86, h = home ? (kind === 'two' ? 12.5 : 8.2) : info.size.y * scale;
       const sw = rotIdx % 2 ? d : w, sd = rotIdx % 2 ? w : d;
       const box = { minX: x - sw / 2, maxX: x + sw / 2, minZ: z - sd / 2, maxZ: z + sd / 2 };
       if (this._overlaps(box, 3)) continue;
-      let y = this.terrain.heightAt(x, z);
+      let y = this.terrain.heightAt(x, z), homeRec = null;
       if (home) {
         // floor sits just above the highest ground under the house
         for (const [ax, az] of [[box.minX, box.minZ], [box.maxX, box.minZ], [box.minX, box.maxZ], [box.maxX, box.maxZ]]) y = Math.max(y, this.terrain.heightAt(ax, az));
-        this.homes.add({ x, z, y: y + 0.25, rot, color: type.split('_').pop(), kind });
+        homeRec = this.homes.add({ x, z, y: y + 0.25, rot, color: type.split('_').pop(), kind });
       } else this._house(parts, type, scale, x, y, z, rot, w, d);
-      if (r() < 0.4 && type.includes('home')) this._fence(parts, x, y, z, rot, w, d);
+      if (r() < 0.4 && home) { this._fence(parts, x, y, z, rot, w, d, Houses.doorX(kind)); this.homes.setFence(homeRec); }
       if (type.includes('home')) this._flowers(parts, x, y, z, rot, w, d);
-      if (type.includes('home') && r() < 0.45) this._porch(x, z, rot, w, d);
       if (!home) this.colliders.add({ kind: 'box', ...box, y0: y - 3, y1: y + h, house: true });
       this.houses.push({ ...box, x, z, y, h, rot, home });
       placed++;
       // chest spot next to the door side, crates at the corner
       const fx = Math.sin(rot), fz = Math.cos(rot);
       const sideX = Math.cos(rot), sideZ = -Math.sin(rot);
-      this.chestSpots.push({ x: x + fx * (d / 2 + 1.6) + sideX * (w / 2 - 1.2), z: z + fz * (d / 2 + 1.6) + sideZ * (w / 2 - 1.2), rot });
+      // front-yard slots (local x across the front) that keep the door path clear
+      const doorX = home ? Houses.doorX(kind) : 0;
+      const slots = [w / 2 - 0.8, -w / 2 + 0.8, w / 2 - 2.0, -w / 2 + 2.0].filter((sx) => Math.abs(sx - doorX) >= 1.6);
+      const yard = (sx, dz) => [x + fx * (d / 2 + dz) + sideX * sx, z + fz * (d / 2 + dz) + sideZ * sx];
+      const chestAt = yard(slots.shift() ?? w / 2 - 0.8, 1.6);
+      this.chestSpots.push({ x: chestAt[0], z: chestAt[1], rot });
       if (r() < 0.8) {
-        const cx = x - fx * 0 + sideX * (w / 2 + 1.1), cz = z + sideZ * (w / 2 + 1.1);
+        const cx = x + sideX * (w / 2 + 0.85), cz = z + sideZ * (w / 2 + 0.85);
         this._crateStack(crates, cx, cz, r() < 0.4 ? 2 : 1);
       } else {
-        this._barrel(x - sideX * (w / 2 + 1), z - sideZ * (w / 2 + 1) + fz * 1.5);
+        this._barrel(x - sideX * (w / 2 + 0.65), z - sideZ * (w / 2 + 0.65) + fz * 1.5);
       }
-      if (r() < 0.6) this._barrel(x + sideX * (w / 2 + 1.2) + fx * 2.2, z + sideZ * (w / 2 + 1.2) + fz * 2.2);
+      if (r() < 0.6) this._barrel(x + sideX * (w / 2 + 0.65) + fx * 2.2, z + sideZ * (w / 2 + 0.65) + fz * 2.2);
       // small props by the door
-      const px = x + fx * (d / 2 + 1.2) - sideX * (w / 2 - 0.8), pz = z + fz * (d / 2 + 1.2) - sideZ * (w / 2 - 0.8);
+      if (home && slots.length > 1 && r() < 0.45) { const [qx, qz] = yard(slots.pop(), 1.1); this._porch(qx, qz, rot); }
+      const [px, pz] = yard(slots.shift() ?? -w / 2 + 0.8, 1.2);
       const pick = r();
       if (pick < 0.3) this._prop('kk/sack', px, pz, 0.55, r() * 6, 0.4);
       else if (pick < 0.5) this._prop('kk/bucket_water', px, pz, 0.6, r() * 6, 0.3);
@@ -307,15 +314,15 @@ export class Towns {
   }
 
   // White picket fence around the front yard, with a gate gap at the door path.
-  _fence(parts, x, y, z, rot, w, d) {
+  _fence(parts, x, y, z, rot, w, d, doorX = 0) {
     const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rot);
     const toWorld = (lx, lz) => new THREE.Vector3(lx, 0, lz).applyQuaternion(q).add(new THREE.Vector3(x, 0, z));
-    const yardD = 3.2, hw = w / 2 + 0.6;
+    const yardD = YARD, hw = w / 2 + 0.6;
     const segs = [
       [[-hw, d / 2], [-hw, d / 2 + yardD]],
       [[hw, d / 2], [hw, d / 2 + yardD]],
-      [[-hw, d / 2 + yardD], [-1.3, d / 2 + yardD]],
-      [[1.3, d / 2 + yardD], [hw, d / 2 + yardD]],
+      [[-hw, d / 2 + yardD], [doorX - 1.3, d / 2 + yardD]],
+      [[doorX + 1.3, d / 2 + yardD], [hw, d / 2 + yardD]],
     ];
     const white = '#f7f4ee';
     for (const [[ax, az], [bx, bz]] of segs) {
@@ -674,17 +681,13 @@ export class Towns {
     }
   }
 
-  // Porch furniture in front of homes.
-  _porch(x, z, rot, w, d) {
+  // Porch furniture in front of a home, at (x, z).
+  _porch(x, z, rot) {
     const r = this.rand;
-    const fx = Math.sin(rot), fz = Math.cos(rot), sx = Math.cos(rot), sz = -Math.sin(rot);
-    const px = x + fx * (d / 2 + 1.1) + sx * (w / 4), pz = z + fz * (d / 2 + 1.1) + sz * (w / 4);
     const pick = r();
-    if (pick < 0.35) this._prop('kk/furn_couch_pillows', px, pz, 0.95, rot, 0.9);
-    else if (pick < 0.7) this._prop('kk/furn_armchair', px, pz, 0.95, rot + (r() - 0.5) * 0.6, 0.6);
-    else this._prop('kk/furn_lamp_standing', px, pz, 1.9, rot, 0.25);
-    const cx = x + fx * (d / 2 + 0.8) - sx * (w / 2 - 0.5), cz = z + fz * (d / 2 + 0.8) - sz * (w / 2 - 0.5);
-    this._prop(r() < 0.5 ? 'kk/furn_cactus_medium_A' : 'kk/furn_cactus_small_A', cx, cz, 0.9, r() * 6, 0.3);
+    if (pick < 0.35) this._prop('kk/furn_couch_pillows', x, z, 0.95, rot, 0.9);
+    else if (pick < 0.7) this._prop('kk/furn_armchair', x, z, 0.95, rot + (r() - 0.5) * 0.6, 0.6);
+    else this._prop('kk/furn_lamp_standing', x, z, 1.9, rot, 0.25);
   }
 
   _barrel(x, z) {

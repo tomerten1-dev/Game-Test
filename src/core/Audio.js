@@ -1,8 +1,9 @@
 // Web Audio: CC0 Kenney samples for the main sounds (public/audio), a small synth for the
 // rest and as a fallback if a sample can't be decoded.
 
-// CC0 music (public/audio/music, see CREDITS.md). Loops fade in and out; jingles play once.
-const MUSIC_TRACKS = { lobby: { loop: true, gain: 0.8 }, bus: { loop: true, gain: 0.7 }, endgame: { loop: true, gain: 0.7 }, victory: { loop: false, gain: 1 }, defeat: { loop: false, gain: 1 } };
+// Music (public/audio/music, see CREDITS.md). Loops fade in and out; jingles play once; a playlist
+// plays its files one after another (a different one each time it starts).
+const MUSIC_TRACKS = { lobby: { playlist: ['menu', 'title', 'title_alt'], gain: 0.75 }, bus: { file: 'battle', loop: true, gain: 0.75 }, endgame: { loop: true, gain: 0.7 }, victory: { loop: false, gain: 1 }, defeat: { loop: false, gain: 1 } };
 const SAMPLE_FILES = ['blaster', 'blaster_repeater', 'enemy_destroy', 'enemy_hurt', 'jump_a', 'jump_b', 'jump_c', 'land', 'walking', 'weapon_change', 'coin', 'break', 'fall', 'impact', 'engine', 'ui-tap', 'build'];
 // sound name -> [sample, playbackRate, gain, (optional) synth layer too]
 const SAMPLE_MAP = {
@@ -193,7 +194,7 @@ export class Sound {
     tr.src.stop(t + fade + 0.05);
   }
 
-  // Music: a CC0 track when there is one (falls back to the procedural lobby loop / synth stings).
+  // Music: a track file when there is one (falls back to the procedural lobby loop / synth stings).
   music(name) {
     if (name === this.musicName) return;
     this.musicName = name;
@@ -203,7 +204,10 @@ export class Sound {
     if (!name) return;
     const cfg = MUSIC_TRACKS[name];
     if (cfg && this.ctx) {
-      this._loadTrack(name).then((buf) => {
+      const list = cfg.playlist;
+      if (list && this._plIdx === undefined) this._plIdx = Math.floor(Math.random() * list.length);
+      const file = list ? list[this._plIdx++ % list.length] : cfg.file || name;
+      this._loadTrack(file).then((buf) => {
         if (this.musicName !== name || this._track) return;
         if (!buf) { this._proceduralMusic(name); return; }
         const src = this.ctx.createBufferSource(), g = this.ctx.createGain();
@@ -214,7 +218,11 @@ export class Sound {
         g.gain.linearRampToValueAtTime(cfg.gain, t + (cfg.loop ? 1.5 : 0.05));
         src.connect(g); g.connect(this.musicGain);
         src.start(t);
-        src.onended = () => { if (this._track?.src === src) { this._track = null; if (!cfg.loop && this.musicName === name) this.musicName = null; } };
+        src.onended = () => {
+          if (this._track?.src !== src) return;
+          this._track = null;
+          if (!cfg.loop && this.musicName === name) { this.musicName = null; if (list) this.music(name); }
+        };
         this._track = { src, g, name };
       });
       return;

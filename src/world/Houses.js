@@ -1,38 +1,53 @@
 import * as THREE from 'three';
 
-// Enterable houses: painted plank walls with doors and glass windows, one or two stories
-// (stairs + open upper floor), a shingled gable roof, and furnished rooms with loot.
-// Walls are split into panels that break (bullets, axe, explosions) and give materials; windows
-// shatter; doors open with interact (bots open them as they walk up). Everything resets per match.
+// Enterable houses built from the Medieval Village MegaKit (Quaternius, CC0): plaster / brick wall
+// pieces on a 2 m grid with round-top doors and windows, tiled gable roofs with brick gable ends,
+// one or two stories (interior stairs + upper floor), furnished with the Fantasy Props MegaKit.
+// Every 2 m wall piece is a panel that breaks (bullets, axe, explosions) and gives materials;
+// windows shatter; doors open with interact (bots open them as they walk up). Everything resets
+// per match.
 //
 // Houses are built in local space (x across the front, +z out of the front door, y up from the
 // ground-floor top) and placed with a 90-degree rotation so every collider stays axis-aligned.
+// All kit pieces of all houses are drawn by one InstancedMesh per piece part (KitBatch); a broken
+// panel just hides its instances.
 
-const T = 0.25;          // wall thickness
-const STORY = 3.6;       // floor-to-floor height (walls run the full story, the slab sits inside)
+const T = 0.4;           // wall thickness (the kit's wall pieces span z -0.31..0.09)
+const STORY = 3.12;      // kit wall height
 const SLAB = 0.2;
-const DOOR_W = 1.2, DOOR_H = 2.3;
-const WIN_W = 1.25, WIN_Y0 = 1.0, WIN_Y1 = 2.25;
-const OVERHANG = 0.5;
+const DOOR_W = 1.12, DOOR_H = 2.38;
+const WIN_W = 1.2, WIN_Y0 = 1.02, WIN_Y1 = 2.74;
+const GLASS_W = 1.08, GLASS_Y0 = 1.06, GLASS_Y1 = 2.62;
 const PANEL_HP = 220, DOOR_HP = 120;
+export const YARD = 3.2;  // depth of a fenced front yard (Towns draws the fence)
 
-const PALETTES = {
-  blue: { ext: '#8ab0e0', roof: '#3f5f93', shutter: '#2c5a95', inA: '#f6d7a4', inB: '#d8e6b8' },
-  red: { ext: '#e59c80', roof: '#8d3b35', shutter: '#9b3a2e', inA: '#f7d6a6', inB: '#ecc9c4' },
-  yellow: { ext: '#f0d383', roof: '#a4553a', shutter: '#3f7a5a', inA: '#e9e2b0', inB: '#f5cfa8' },
-  green: { ext: '#a0cd95', roof: '#4c6e3f', shutter: '#6b4428', inA: '#f4d9ac', inB: '#d6dcb8' },
+// per-kind layout: footprint, roof and gable pieces with their measured extents
+const KINDS = {
+  one: { W: 6, D: 8, stories: 1, pz: 0, frontDoor: 0, partDoor: 0, roof: 'village/Roof_RoundTiles_6x8', gable: 'village/Roof_Front_Brick6', rx: 4.12, rz: 4.85, eave: -0.64, ridge: 4.89, gH: 4.38 },
+  two: { W: 8, D: 10, stories: 2, pz: -1, frontDoor: 1, partDoor: 0.9, backDoor: 3, roof: 'village/Roof_RoundTiles_8x10', gable: 'village/Roof_Front_Brick8', rx: 4.98, rz: 5.9, eave: -0.57, ridge: 6.0, gH: 5.31 },
 };
-const TRIM = '#f5f2ea', FOUND = '#9a9790', FLOOR_A = '#b98552', FLOOR_B = '#a8764a', CEIL = '#f8e3bf';
-const DOOR = '#8a5630', DOOR_DARK = '#6d4224', STAIR = '#9c6b40', KNOB = '#e8c35a';
+// stairs in two-story houses: along the left wall, low end at the front, climbing toward -z
+const STAIR = { x0: -3.6, x1: -1.95, z0: -1.0, z1: 3.35, cx: -2.78 };
+
+// plaster and roof-tile tints per house colour (multiplied over the kit textures)
+const PALETTES = {
+  blue: { plaster: '#e3ebf7', roof: '#aebfe8' },
+  red: { plaster: '#f7e2d8', roof: '#ffffff' },
+  yellow: { plaster: '#f7eccb', roof: '#f1d6a6' },
+  green: { plaster: '#e3f0da', roof: '#bcd9a8' },
+};
+const FOUND = '#8f8b82', CEIL = '#d9c7a3', BEAM = '#5d4230', RAIL = '#6d4c33';
 
 const _c = new THREE.Color();
 const _n = new THREE.Vector3(), _e1 = new THREE.Vector3(), _e2 = new THREE.Vector3();
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _p = new THREE.Vector3();
+const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
+const UP = new THREE.Vector3(0, 1, 0);
 
-// Tiny vertex-colored geometry builder (one draw call per house).
+// Tiny vertex-colored geometry builder (foundations, ceilings, railings, rugs).
 class Geo {
   constructor() { this.p = []; this.n = []; this.c = []; }
 
-  // Quad a-b-c-d (any winding) facing along n.
   quad(a, b, c, d, n, col) {
     _e1.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
     _e2.set(c[0] - a[0], c[1] - a[1], c[2] - a[2]);
@@ -43,44 +58,19 @@ class Geo {
     for (const v of tri) { this.p.push(v[0], v[1], v[2]); this.n.push(n[0], n[1], n[2]); this.c.push(_c.r, _c.g, _c.b); }
   }
 
-  tri(a, b, c, n, col) {
-    _e1.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
-    _e2.set(c[0] - a[0], c[1] - a[1], c[2] - a[2]);
-    _n.crossVectors(_e1, _e2);
-    const tri = _n.x * n[0] + _n.y * n[1] + _n.z * n[2] < 0 ? [a, c, b] : [a, b, c];
-    _c.set(col);
-    for (const v of tri) { this.p.push(v[0], v[1], v[2]); this.n.push(n[0], n[1], n[2]); this.c.push(_c.r, _c.g, _c.b); }
-  }
-
-  // Axis-aligned box. style(face) -> null (skip), a color, or { c, c2, step, axis } to paint stripes
-  // (siding, floor planks) alternating c / c2 every `step` metres along `axis` ('x' | 'y' | 'z').
+  // Axis-aligned box. style(face) -> null (skip) or a color; or a plain color for every face.
   box(x0, x1, y0, y1, z0, z1, style) {
     const faces = {
-      px: { n: [1, 0, 0], at: (u, v) => [x1, u, v], u: [y0, y1], v: [z0, z1], ax: ['y', 'z'] },
-      nx: { n: [-1, 0, 0], at: (u, v) => [x0, u, v], u: [y0, y1], v: [z0, z1], ax: ['y', 'z'] },
-      py: { n: [0, 1, 0], at: (u, v) => [u, y1, v], u: [x0, x1], v: [z0, z1], ax: ['x', 'z'] },
-      ny: { n: [0, -1, 0], at: (u, v) => [u, y0, v], u: [x0, x1], v: [z0, z1], ax: ['x', 'z'] },
-      pz: { n: [0, 0, 1], at: (u, v) => [u, v, z1], u: [x0, x1], v: [y0, y1], ax: ['x', 'y'] },
-      nz: { n: [0, 0, -1], at: (u, v) => [u, v, z0], u: [x0, x1], v: [y0, y1], ax: ['x', 'y'] },
+      px: { n: [1, 0, 0], q: [[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]] },
+      nx: { n: [-1, 0, 0], q: [[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]] },
+      py: { n: [0, 1, 0], q: [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]] },
+      ny: { n: [0, -1, 0], q: [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]] },
+      pz: { n: [0, 0, 1], q: [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]] },
+      nz: { n: [0, 0, -1], q: [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]] },
     };
     for (const k in faces) {
       const s = typeof style === 'function' ? style(k) : style;
-      if (!s) continue;
-      const f = faces[k];
-      const [u0, u1] = f.u, [v0, v1] = f.v;
-      if (typeof s === 'string' || !s.step) { this.quad(f.at(u0, v0), f.at(u1, v0), f.at(u1, v1), f.at(u0, v1), f.n, s.c || s); continue; }
-      // stripes along one of the face's two axes, aligned to world-local multiples of step
-      const alongU = f.ax[0] === s.axis;
-      const [a0, a1] = alongU ? [u0, u1] : [v0, v1];
-      let a = a0;
-      while (a < a1 - 1e-4) {
-        const band = Math.floor(a / s.step + 1e-4);
-        const b = Math.min(a1, (band + 1) * s.step);
-        const col = band % 2 ? s.c2 : s.c;
-        if (alongU) this.quad(f.at(a, v0), f.at(b, v0), f.at(b, v1), f.at(a, v1), f.n, col);
-        else this.quad(f.at(u0, a), f.at(u1, a), f.at(u1, b), f.at(u0, b), f.n, col);
-        a = b;
-      }
+      if (s) this.quad(...faces[k].q, faces[k].n, s);
     }
   }
 
@@ -94,44 +84,109 @@ class Geo {
   }
 }
 
-const shade = (hex, k) => '#' + _c.set(hex).multiplyScalar(k).getHexString();
+// All kit pieces of every house: one InstancedMesh per (model, part). add() before finish(),
+// hide()/show() after.
+class KitBatch {
+  constructor(models) {
+    this.models = models;
+    this.slots = new Map(); // key -> { part, mats: Matrix4[], colors: (Color|null)[] }
+    this.meshes = new Map();
+  }
+
+  // Returns [{ key, idx }] handles, one per part (filter(partName) picks parts).
+  add(type, matrix, { tint = null, filter = null } = {}) {
+    const m = this.models.get(type);
+    if (!m) return [];
+    const out = [];
+    m.parts.forEach((part, i) => {
+      if (filter && !filter(part.name)) return;
+      const key = `${type}#${i}`;
+      if (!this.slots.has(key)) this.slots.set(key, { part, mats: [], colors: [] });
+      const s = this.slots.get(key);
+      s.mats.push(matrix.clone());
+      s.colors.push(tint?.[part.name] || null);
+      out.push({ key, idx: s.mats.length - 1 });
+    });
+    return out;
+  }
+
+  finish(scene) {
+    const group = new THREE.Group();
+    group.name = 'house-kit';
+    for (const [key, s] of this.slots) {
+      const tinted = s.colors.some(Boolean);
+      const im = new THREE.InstancedMesh(s.part.geometry, s.part.material, s.mats.length);
+      s.mats.forEach((mt, i) => {
+        im.setMatrixAt(i, mt);
+        if (tinted) im.setColorAt(i, s.colors[i] || _c.set('#ffffff'));
+      });
+      const glass = /Glass/.test(s.part.name);
+      im.castShadow = !glass;
+      im.receiveShadow = true;
+      if (glass) im.renderOrder = 2;
+      im.computeBoundingSphere();
+      group.add(im);
+      this.meshes.set(key, im);
+    }
+    scene.add(group);
+    this.group = group;
+  }
+
+  set(handles, on) {
+    const touched = new Set();
+    for (const hd of handles) {
+      const im = this.meshes.get(hd.key);
+      if (!im) continue;
+      im.setMatrixAt(hd.idx, on ? this.slots.get(hd.key).mats[hd.idx] : ZERO);
+      touched.add(im);
+    }
+    for (const im of touched) im.instanceMatrix.needsUpdate = true;
+  }
+}
 
 export class Houses {
-  // placeProp(type, x, y, z, height, rot, colR) puts a (breakable) KayKit prop at a world position.
-  constructor(scene, colliders, rand, placeProp) {
+  // placeProp(type, x, y, z, height, rot, colR) puts a (breakable) prop at a world position and
+  // returns its instance index.
+  constructor(scene, colliders, rand, models, placeProp) {
     this.scene = scene;
     this.colliders = colliders;
     this.rand = rand;
+    this.models = models;
     this.placeProp = placeProp;
+    this.kit = new KitBatch(models);
     this.list = [];
     this.doors = [];
     this.lootSpots = [];   // { x, y, z } floor loot inside houses
     this.chestSpots = [];  // { x, y, z, rot }
-    // a touch of warm self-light so rooms in the roof's shadow don't go cold and grey
-    this.mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0, emissive: '#4a3520', emissiveIntensity: 0.6, envMapIntensity: 0.35 });
-    this.glassMat = new THREE.MeshStandardMaterial({ color: '#cdeeff', roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide });
+    this.mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0, envMapIntensity: 0.35 });
+    // the kit's window glass (WeatherFX lights it up at night)
+    this.glassMat = models.sharedMats?.get('MI_WindowGlass') || new THREE.MeshStandardMaterial({ color: '#cdeeff', transparent: true, opacity: 0.35 });
+    if (this.glassMat.isMeshStandardMaterial) this.glassMat.depthWrite = false;
     this._t = 0;
   }
 
   // ---------- building ----------
 
   // Footprint size for a house kind (before rotation).
-  static size(kind) { return kind === 'two' ? { W: 12, D: 9 } : { W: 10, D: 8 }; }
+  static size(kind) { const k = KINDS[kind] || KINDS.one; return { W: k.W, D: k.D }; }
+
+  // Local x of the front door.
+  static doorX(kind) { return (KINDS[kind] || KINDS.one).frontDoor; }
 
   add({ x, z, y, rot, color = 'blue', kind = 'one' }) {
-    const { W, D } = Houses.size(kind);
+    const K = KINDS[kind] || KINDS.one;
     const r = this.rand;
     const pal = PALETTES[color] || PALETTES.blue;
-    const stories = kind === 'two' ? 2 : 1;
     const h = {
-      x, z, y, rot, W, D, stories, pal, kind,
+      x, z, y, rot, W: K.W, D: K.D, stories: K.stories, K, kind,
       cos: Math.cos(rot), sin: Math.sin(rot),
-      panels: [], glass: [], doors: [], deco: [], cols: [], portals: [],
-      top: stories * STORY, // roof base (ceiling top)
+      panels: [], glass: [], doors: [], cols: [], portals: [], handles: [],
+      top: K.stories * STORY, pz: K.pz,
+      tint: { MI_Plaster: new THREE.Color(pal.plaster), MI_RoundTiles: new THREE.Color(pal.roof) },
+      brick: kind === 'two' || r() < 0.3, // brick ground floor
     };
-    h.px = kind === 'two' ? 2 : W / 2 - W / 3; // partition x (ground floor)
-    h.ridge = D * 0.34;
-    // group holds the static mesh, glass and doors in local space
+    h.stairs = K.stories === 2 ? STAIR : null;
+    // group holds the static mesh and doors in local space
     h.group = new THREE.Group();
     h.group.position.set(x, y, z);
     h.group.rotation.y = rot;
@@ -139,11 +194,15 @@ export class Houses {
 
     this._layout(h, r);
     this._staticColliders(h);
+    this._shell(h, r);
     this._furnish(h, r);
-    this.rebuild(h);
+    this._buildDoors(h);
     this.list.push(h);
     return h;
   }
+
+  // Build the instanced kit meshes once every house is placed.
+  finish() { this.kit.finish(this.scene); }
 
   // local (lx, lz) -> world [x, z]
   w(h, lx, lz) { return [h.x + lx * h.cos + lz * h.sin, h.z - lx * h.sin + lz * h.cos]; }
@@ -155,74 +214,84 @@ export class Houses {
   }
 
   // local ramp rising toward local direction (dx, dz) -> world ramp collider
-  wramp(h, x0, x1, y0, y1, z0, z1, dx, dz) {
+  wramp(h, x0, x1, y0, y1, z0, z1, dx, dz, mat = 'wood') {
     const c = this.wbox(h, x0, x1, y0, y1, z0, z1);
     const wx = dx * h.cos + dz * h.sin, wz = -dx * h.sin + dz * h.cos;
-    return { ...c, kind: 'ramp', dirX: Math.round(wx), dirZ: Math.round(wz), house: true, mat: 'wood' };
+    return { ...c, kind: 'ramp', dirX: Math.round(wx), dirZ: Math.round(wz), house: true, mat };
+  }
+
+  // Place a kit piece at a local position / rotation (and scale) in house h.
+  _piece(h, type, lx, ly, lz, lrot = 0, sx = 1, sy = 1, sz = 1, opts = {}) {
+    const [x, z] = this.w(h, lx, lz);
+    _q.setFromAxisAngle(UP, h.rot + lrot);
+    _m.compose(_p.set(x, h.y + ly, z), _q, _s.set(sx, sy, sz));
+    return this.kit.add(type, _m, { tint: h.tint, ...opts });
   }
 
   _layout(h, r) {
-    const { W, D, stories } = h;
+    const { W, D, stories, K } = h;
     const hw = W / 2, hd = D / 2;
-    const thirds = [-hw, -hw + W / 3, -hw + (2 * W) / 3, hw];
-    const sideSplit = [-hd + T, 0, hd - T];
+    const centers = (len) => Array.from({ length: len / 2 }, (_, i) => -len / 2 + 1 + i * 2);
+    const win = (p) => (r() < p ? 'window' : 'solid');
     for (let s = 0; s < stories; s++) {
       const y0 = s * STORY;
-      // front (+z) and back (-z): three panels across; ground front middle is the front door
-      for (let i = 0; i < 3; i++) {
-        const u0 = thirds[i], u1 = thirds[i + 1];
-        const front = s === 0 && i === 1 ? 'door' : (i === 1 || r() < 0.55) ? 'window' : 'solid';
-        const back = s === 0 && stories === 2 && i === 2 ? 'door' : r() < 0.5 ? 'window' : 'solid';
-        this._panel(h, { side: 'front', u0, u1, y0, type: front, room: s ? 'up' : u1 <= h.px + 0.01 ? 'A' : 'B' });
-        this._panel(h, { side: 'back', u0, u1, y0, type: s === 0 && stories === 2 && i === 0 ? 'solid' : back, room: s ? 'up' : u1 <= h.px + 0.01 ? 'A' : 'B' });
+      for (const uc of centers(W)) {
+        const front = s === 0 && uc === K.frontDoor ? 'door' : s === 0 ? win(0.75) : win(0.6);
+        const back = s === 0 && uc === K.backDoor ? 'door' : win(0.5);
+        this._panel(h, { side: 'front', uc, y0, type: front });
+        this._panel(h, { side: 'back', uc, y0, type: back });
       }
-      // sides: two panels each
-      for (let i = 0; i < 2; i++) {
-        const u0 = sideSplit[i], u1 = sideSplit[i + 1];
-        this._panel(h, { side: 'left', u0, u1, y0, type: r() < 0.6 ? 'window' : 'solid', room: s ? 'up' : 'A' });
-        this._panel(h, { side: 'right', u0, u1, y0, type: r() < 0.6 ? 'window' : 'solid', room: s ? 'up' : 'B' });
+      for (const uc of centers(D)) {
+        // no windows behind the stairs
+        const behindStairs = s === 0 && h.stairs && uc > h.stairs.z0 && uc < h.stairs.z1;
+        this._panel(h, { side: 'left', uc, y0, type: behindStairs ? 'solid' : win(0.55) });
+        this._panel(h, { side: 'right', uc, y0, type: win(0.55) });
       }
     }
-    // ground-floor partition with an interior door
-    h.partDoorZ = stories === 2 ? 1.2 : 0.9;
-    this._panel(h, { side: 'part', u0: -hd + T, u1: hd - T, y0: 0, type: 'door', uc: h.partDoorZ, room: 'A' });
+    // ground-floor partition (along x at z = pz) with an interior door; the kit pieces are
+    // squeezed to fit between the side walls
+    const inner = W - 2 * T, n = W / 2, sx = inner / W;
+    for (let i = 0; i < n; i++) {
+      const uc = -inner / 2 + (i + 0.5) * (inner / n);
+      const isDoor = Math.abs(uc - K.partDoor) < 0.5;
+      this._panel(h, { side: 'part', uc, y0: 0, type: isDoor ? 'door' : 'solid', sx });
+    }
 
     // portals between regions (for bot routing): [regionA, pointA, regionB, pointB]
-    h.portals.push(['out', [0, hd + 1.3], 'A', [0, hd - 1.4]]);
-    h.portals.push(['A', [h.px - 1.1, h.partDoorZ], 'B', [h.px + 1.1, h.partDoorZ]]);
-    if (stories === 2) {
-      h.portals.push(['out', [hw - W / 6, -hd - 1.3], 'B', [hw - W / 6, -hd + 1.4]]);
-      // stairs along the back wall of room A, climbing toward +x
-      const sx0 = -hw + T + 0.05, sx1 = sx0 + 4.7, sz0 = -hd + T, sz1 = sz0 + 1.3;
-      h.stairs = { x0: sx0, x1: sx1, z0: sz0, z1: sz1 };
-      const zc = (sz0 + sz1) / 2;
-      h.portals.push(['A', [sx0 + 0.5, sz1 + 1.0], 'stair', [sx0 + 0.5, zc]]);
-      h.portals.push(['stair', [sx1 - 0.3, zc], 'up', [sx1 + 1.0, zc]]);
+    const fd = K.frontDoor, pd = K.partDoor;
+    h.portals.push(['out', [fd, hd + 1.3], 'A', [fd, hd - 1.4]]);
+    h.portals.push(['A', [pd, h.pz + 1.2], 'B', [pd, h.pz - 1.2]]);
+    if (K.backDoor !== undefined) h.portals.push(['out', [K.backDoor, -hd - 1.3], 'B', [K.backDoor, -hd + 1.4]]);
+    if (h.stairs) {
+      const s = h.stairs;
+      h.portals.push(['A', [s.cx, hd - 0.9], 'stair', [s.cx, s.z1 - 0.6]]);
+      h.portals.push(['stair', [s.cx, s.z0 + 1.3], 'up', [s.cx, s.z0 - 1.0]]);
     }
   }
 
-  // One wall panel with its rects (local boxes), opening, glass and door.
-  _panel(h, { side, u0, u1, y0, type, room, uc = (u0 + u1) / 2 }) {
-    const H = STORY;
+  // One 2 m wall panel: its collider rects (u along the wall, v up), opening, glass and door.
+  _panel(h, { side, uc, y0, type, sx = 1 }) {
+    const H = STORY, half = sx;
+    const u0 = uc - half, u1 = uc + half;
     const rects = [];
-    const ow = type === 'door' ? DOOR_W : WIN_W;
+    const ow = (type === 'door' ? DOOR_W : WIN_W) * sx;
     if (type === 'solid') rects.push([u0, u1, 0, H]);
     else {
       rects.push([u0, uc - ow / 2, 0, H], [uc + ow / 2, u1, 0, H]);
       if (type === 'window') rects.push([uc - ow / 2, uc + ow / 2, 0, WIN_Y0], [uc - ow / 2, uc + ow / 2, WIN_Y1, H]);
       else rects.push([uc - ow / 2, uc + ow / 2, DOOR_H, H]);
     }
-    const p = { house: h, side, u0, u1, y0, type, uc, room, rects, hp: PANEL_HP, maxHp: PANEL_HP, broken: false, cols: [], mat: 'wood' };
+    const p = { house: h, side, u0, u1, y0, type, uc, sx, rects, hp: PANEL_HP, maxHp: PANEL_HP, broken: false, cols: [], mat: h.brick && y0 === 0 && side !== 'part' ? 'stone' : 'wood', handles: [] };
     p.damage = (amount) => this.damagePanel(p, amount);
     if (type === 'window') {
-      const g = { house: h, panel: p, hp: 1, broken: false, mat: 'glass' };
-      g.box = this._wallBox(h, side, uc - ow / 2, uc + ow / 2, y0 + WIN_Y0, y0 + WIN_Y1, 0.03);
+      const g = { house: h, panel: p, hp: 1, broken: false, mat: 'glass', handles: [] };
+      g.box = this._wallBox(h, side, uc - GLASS_W / 2, uc + GLASS_W / 2, y0 + GLASS_Y0, y0 + GLASS_Y1, 0.03);
       g.damage = () => this.breakGlass(g);
       p.glass = g;
       h.glass.push(g);
     }
     if (type === 'door') {
-      const d = { house: h, panel: p, side, uc, y0, hp: DOOR_HP, maxHp: DOOR_HP, open: false, angle: 0, broken: false, mat: 'wood' };
+      const d = { house: h, panel: p, side, uc, y0, w: DOOR_W * sx, hp: DOOR_HP, maxHp: DOOR_HP, open: false, angle: 0, broken: false, mat: 'wood' };
       d.damage = (amount) => this.damageDoor(d, amount);
       p.door = d;
       h.doors.push(d);
@@ -236,61 +305,84 @@ export class Houses {
     const hw = h.W / 2, hd = h.D / 2;
     const mid = (x) => [x - thick / 2, x + thick / 2];
     switch (side) {
-      case 'front': { const [z0, z1] = thick === T ? [hd - T, hd] : mid(hd - T / 2); return [a0, a1, v0, v1, z0, z1]; }
-      case 'back': { const [z0, z1] = thick === T ? [-hd, -hd + T] : mid(-hd + T / 2); return [a0, a1, v0, v1, z0, z1]; }
-      case 'left': { const [x0, x1] = thick === T ? [-hw, -hw + T] : mid(-hw + T / 2); return [x0, x1, v0, v1, a0, a1]; }
-      case 'right': { const [x0, x1] = thick === T ? [hw - T, hw] : mid(hw - T / 2); return [x0, x1, v0, v1, a0, a1]; }
-      default: { const [x0, x1] = mid(h.px); return [x0, x1, v0, v1, a0, a1]; }
+      case 'front': { const [z0, z1] = mid(hd - T / 2); return [a0, a1, v0, v1, z0, z1]; }
+      case 'back': { const [z0, z1] = mid(-hd + T / 2); return [a0, a1, v0, v1, z0, z1]; }
+      case 'left': { const [x0, x1] = mid(-hw + T / 2); return [x0, x1, v0, v1, a0, a1]; }
+      case 'right': { const [x0, x1] = mid(hw - T / 2); return [x0, x1, v0, v1, a0, a1]; }
+      default: { const [z0, z1] = mid(h.pz); return [a0, a1, v0, v1, z0, z1]; }
     }
   }
 
-  // Which face of a wall box points outside (for siding) — null for the partition.
-  static outFace(side) { return { front: 'pz', back: 'nz', left: 'nx', right: 'px' }[side] || null; }
+  // Kit transform of a wall piece on a side: [lx, lz, lrot] (the piece's outer face is local +z).
+  _wallFrame(h, side, uc) {
+    const hw = h.W / 2, hd = h.D / 2, o = 0.09;
+    switch (side) {
+      case 'front': return [uc, hd - o, 0];
+      case 'back': return [uc, -hd + o, Math.PI];
+      case 'left': return [-hw + o, uc, -Math.PI / 2];
+      case 'right': return [hw - o, uc, Math.PI / 2];
+      default: return [uc, h.pz + 0.11, 0];
+    }
+  }
 
   _staticColliders(h) {
-    const { W, D } = h;
+    const { W, D, K } = h;
     const hw = W / 2, hd = D / 2;
     const add = (c) => { c.house = true; c.mat ||= 'wood'; this.colliders.add(c); h.cols.push(c); return c; };
     // ground floor / foundation
     add(this.wbox(h, -hw, hw, -3, 0, -hd, hd, { mat: 'stone' }));
     // upper floor with the stair hole
-    if (h.stories === 2) {
+    if (h.stairs) {
       const s = h.stairs, yb = STORY - SLAB, yt = STORY;
-      add(this.wbox(h, -hw + T, hw - T, yb, yt, s.z1 + 0.05, hd - T));
-      add(this.wbox(h, s.x1, hw - T, yb, yt, -hd + T, s.z1 + 0.05));
-      add(this.wramp(h, s.x0, s.x1, 0, STORY, s.z0, s.z1, 1, 0));
+      const ix0 = -hw + T, ix1 = hw - T, iz0 = -hd + T, iz1 = hd - T;
+      add(this.wbox(h, s.x1, ix1, yb, yt, iz0, iz1));
+      add(this.wbox(h, ix0, s.x1, yb, yt, iz0, s.z0));
+      add(this.wbox(h, ix0, s.x1, yb, yt, s.z1 - 0.35, iz1));
+      add(this.wramp(h, s.x0, s.x1, 0, STORY, s.z0, s.z1, 0, -1));
       // closet under the high half of the stairs (so nobody walks under them)
-      const xb = s.x0 + (s.x1 - s.x0) * (1 / STORY);
-      add(this.wbox(h, xb, s.x1, 0, 0.95, s.z0, s.z1));
+      add(this.wbox(h, s.x0, s.x1, 0, 0.95, s.z0, s.z1 - (s.z1 - s.z0) / STORY));
       // railing around the stair hole upstairs
-      add(this.wbox(h, s.x0, s.x1 - 0.2, STORY, STORY + 1.0, s.z1, s.z1 + 0.08));
+      add(this.wbox(h, s.x1, s.x1 + 0.08, STORY, STORY + 1.0, s.z0 + 0.5, s.z1 - 0.35));
+      add(this.wbox(h, ix0, s.x1 + 0.08, STORY, STORY + 1.0, s.z1 - 0.43, s.z1 - 0.35));
     }
     // ceiling under the roof
     add(this.wbox(h, -hw, hw, h.top - SLAB, h.top, -hd, hd));
-    // roof: two slopes meeting at the ridge (walkable from outside)
-    const ey = h.top - 0.3, ry = h.top + h.ridge;
-    add(this.wramp(h, -hw - OVERHANG, hw + OVERHANG, ey, ry, 0, hd + OVERHANG, 0, -1));
-    add(this.wramp(h, -hw - OVERHANG, hw + OVERHANG, ey, ry, -hd - OVERHANG, 0, 0, 1));
-    // chimney
-    h.chimney = [hw * 0.45, hw * 0.45 + 0.8, -hd * 0.35, -hd * 0.35 + 0.8];
-    const [cx0, cx1, cz0, cz1] = h.chimney;
-    add(this.wbox(h, cx0, cx1, h.top, h.top + h.ridge + 0.9, cz0, cz1, { mat: 'stone' }));
+    // roof: two steep slopes meeting at the ridge (which runs front to back)
+    const ey = h.top + K.eave, ry = h.top + K.ridge;
+    add(this.wramp(h, 0, K.rx, ey, ry, -K.rz, K.rz, -1, 0));
+    add(this.wramp(h, -K.rx, 0, ey, ry, -K.rz, K.rz, 1, 0));
+    // brick gable ends (stepped)
+    for (const zs of [1, -1]) {
+      const z0 = zs > 0 ? hd - T : -hd, z1 = z0 + T;
+      for (let k = 0; k < 3; k++) {
+        const a = hw * (1 - k / 3);
+        add(this.wbox(h, -a, a, h.top + (K.gH * k) / 3, h.top + (K.gH * (k + 1)) / 3, z0, z1, { mat: 'stone' }));
+      }
+    }
+    // chimney on the right slope
+    const cx = hw * 0.5, cz = -hd * 0.45;
+    const surf = (x) => h.top + K.ridge - ((K.ridge - K.eave) / K.rx) * Math.abs(x);
+    h.chimney = { x: cx, z: cz, y: surf(cx + 0.5) - 0.25 };
+    add(this.wbox(h, cx - 0.5, cx + 0.5, h.chimney.y, h.chimney.y + 3.1, cz - 0.5, cz + 0.5, { mat: 'stone' }));
     // panels
     for (const p of h.panels) this._panelColliders(p);
-    for (const g of h.glass) { g.col = { ...this.wbox(h, ...this._glassWorld(g)), house: true, mat: 'glass', part: g }; this.colliders.add(g.col); }
+    for (const g of h.glass) this._glassCollider(g);
     for (const d of h.doors) this._doorCollider(d, true);
-    // front step
-    add(this.wbox(h, -1.1, 1.1, -3, -0.12, hd, hd + 0.9, { mat: 'stone' }));
-    if (h.stories === 2) add(this.wbox(h, hw - W / 6 - 0.9, hw - W / 6 + 0.9, -3, -0.12, -hd - 0.9, -hd, { mat: 'stone' }));
+    // door steps
+    add(this.wbox(h, K.frontDoor - 1.0, K.frontDoor + 1.0, -3, -0.12, hd, hd + 0.9, { mat: 'stone' }));
+    if (K.backDoor !== undefined) add(this.wbox(h, K.backDoor - 0.9, K.backDoor + 0.9, -3, -0.12, -hd - 0.9, -hd, { mat: 'stone' }));
   }
 
-  _glassWorld(g) { const b = g.box; return [b[0], b[1], b[2], b[3], b[4], b[5]]; }
+  _glassCollider(g) {
+    g.col = { ...this.wbox(g.house, ...g.box), house: true, mat: 'glass', part: g };
+    this.colliders.add(g.col);
+  }
 
   _panelColliders(p) {
     const h = p.house;
     for (const [a0, a1, v0, v1] of p.rects) {
       const b = this._wallBox(h, p.side, a0, a1, p.y0 + v0, p.y0 + v1);
-      const c = { ...this.wbox(h, ...b), house: true, mat: 'wood', part: p };
+      const c = { ...this.wbox(h, ...b), house: true, mat: p.mat, part: p };
       this.colliders.add(c);
       p.cols.push(c);
     }
@@ -300,9 +392,107 @@ export class Houses {
   _doorCollider(d, on) {
     if (d.col) { this.colliders.remove(d.col); d.col = null; }
     if (!on || d.broken) return;
-    const b = this._wallBox(d.house, d.side, d.uc - DOOR_W / 2, d.uc + DOOR_W / 2, d.y0, d.y0 + DOOR_H, 0.1);
+    const b = this._wallBox(d.house, d.side, d.uc - d.w / 2, d.uc + d.w / 2, d.y0, d.y0 + DOOR_H, 0.12);
     d.col = { ...this.wbox(d.house, ...b), house: true, mat: 'wood', part: d };
     this.colliders.add(d.col);
+  }
+
+  // ---------- kit visuals ----------
+
+  _shell(h, r) {
+    const { W, D, K } = h;
+    const hw = W / 2, hd = D / 2;
+    const P = (n) => `village/${n}`;
+    // walls
+    for (const p of h.panels) {
+      const brick = h.brick && p.y0 === 0 && p.side !== 'part';
+      const [lx, lz, lr] = this._wallFrame(h, p.side, p.uc);
+      let type;
+      if (p.type === 'door') type = brick ? 'Wall_UnevenBrick_Door_Round' : 'Wall_Plaster_Door_Round';
+      else if (p.type === 'window') type = brick ? 'Wall_UnevenBrick_Window_Wide_Round' : 'Wall_Plaster_Window_Wide_Round';
+      else type = brick ? 'Wall_UnevenBrick_Straight' : 'Wall_Plaster_Straight';
+      p.handles.push(...this._piece(h, P(type), lx, p.y0, lz, lr, p.sx));
+      if (p.type === 'window') {
+        p.handles.push(...this._piece(h, P('Window_Wide_Round1'), lx, p.y0, lz, lr, 1, 1, 1, { filter: (n) => !/Glass/.test(n) }));
+        p.glass.handles = this._piece(h, P('Window_Wide_Round1'), lx, p.y0, lz, lr, 1, 1, 1, { filter: (n) => /Glass/.test(n) });
+        if (p.y0 === 0 && r() < 0.45) p.handles.push(...this._piece(h, P('WindowShutters_Wide_Round_Open'), lx, p.y0, lz, lr));
+      }
+      // ivy on some outside walls
+      if (p.side !== 'part' && p.type === 'solid' && r() < 0.18) p.handles.push(...this._piece(h, P(r() < 0.5 ? 'Prop_Vine1' : 'Prop_Vine4'), lx, p.y0 + STORY - 0.4, lz, lr));
+    }
+    // corner posts
+    for (let s = 0; s < h.stories; s++) {
+      for (const [cx, cz] of [[-hw, -hd], [hw, -hd], [-hw, hd], [hw, hd]]) h.handles.push(...this._piece(h, P('Corner_Exterior_Wood'), cx - Math.sign(cx) * 0.02, s * STORY, cz - Math.sign(cz) * 0.02, 0, 1, STORY / 3));
+    }
+    // floors
+    const tile = (type, y, skip) => {
+      for (let ix = -hw + 1; ix < hw; ix += 2) for (let iz = -hd + 1; iz < hd; iz += 2) {
+        if (skip?.(ix, iz)) continue;
+        h.handles.push(...this._piece(h, P(type), ix, y, iz));
+      }
+    };
+    tile('Floor_WoodDark', 0.005);
+    if (h.stairs) {
+      const s = h.stairs;
+      tile('Floor_WoodDark', STORY + 0.005, (ix, iz) => ix < s.x1 && iz > s.z0 && iz < s.z1 - 0.35);
+      h.handles.push(...this._piece(h, P('Stair_Interior_Rails'), s.cx, 0, s.z1, 0, 0.95, STORY / 3.03, 1));
+    }
+    // roof, gables, chimney
+    h.handles.push(...this._piece(h, K.roof, 0, h.top, 0));
+    h.handles.push(...this._piece(h, K.gable, 0, h.top, hd - 0.09, 0));
+    h.handles.push(...this._piece(h, K.gable, 0, h.top, -hd + 0.09, Math.PI));
+    h.handles.push(...this._piece(h, P('Prop_Chimney'), h.chimney.x, h.chimney.y, h.chimney.z));
+
+    // static vertex-coloured bits: foundation, eave fill, ceilings, railings, steps
+    const g = new Geo();
+    g.box(-hw - 0.06, hw + 0.06, -1.6, 0.02, -hd - 0.06, hd + 0.06, (f) => (f === 'ny' || f === 'py' ? null : FOUND));
+    // the kit roof sits a little above the long walls: close that gap
+    for (const sx of [-1, 1]) g.box(sx > 0 ? hw - T : -hw, sx > 0 ? hw : -hw + T, h.top, h.top + 0.5, -hd, hd, (f) => (f === 'ny' ? null : BEAM));
+    if (h.stairs) {
+      const s = h.stairs, yb = STORY - SLAB;
+      const ix0 = -hw + T, ix1 = hw - T, iz0 = -hd + T, iz1 = hd - T;
+      const ceil = (f) => (f === 'ny' ? CEIL : f === 'py' ? null : BEAM);
+      g.box(s.x1, ix1, yb, STORY, iz0, iz1, ceil);
+      g.box(ix0, s.x1, yb, STORY, iz0, s.z0, ceil);
+      g.box(ix0, s.x1, yb, STORY, s.z1 - 0.35, iz1, ceil);
+      // railing around the hole
+      g.box(s.x1, s.x1 + 0.08, STORY + 0.92, STORY + 1.0, s.z0 + 0.5, s.z1 - 0.35, RAIL);
+      g.box(ix0, s.x1 + 0.08, STORY + 0.92, STORY + 1.0, s.z1 - 0.43, s.z1 - 0.35, RAIL);
+      for (let z = s.z0 + 0.5; z < s.z1 - 0.4; z += 0.5) g.box(s.x1 + 0.01, s.x1 + 0.07, STORY, STORY + 0.92, z, z + 0.06, RAIL);
+      for (let x = ix0 + 0.3; x < s.x1; x += 0.5) g.box(x, x + 0.06, STORY, STORY + 0.92, s.z1 - 0.42, s.z1 - 0.36, RAIL);
+    }
+    // door steps
+    g.box(K.frontDoor - 1.0, K.frontDoor + 1.0, -0.45, -0.12, hd, hd + 0.9, (f) => (f === 'ny' ? null : FOUND));
+    if (K.backDoor !== undefined) g.box(K.backDoor - 0.9, K.backDoor + 0.9, -0.45, -0.12, -hd - 0.9, -hd, (f) => (f === 'ny' ? null : FOUND));
+    for (const [x0, x1, y0, y1, z0, z1, st] of h.rugs || []) g.box(x0, x1, y0, y1, z0, z1, st);
+    h.mesh = new THREE.Mesh(g.geometry(), this.mat);
+    h.mesh.castShadow = true;
+    h.mesh.receiveShadow = true;
+    h.group.add(h.mesh);
+  }
+
+  // Door leaves: a kit door per opening, on its own pivot so it can swing.
+  _buildDoors(h) {
+    const m = this.models.get('village/Door_1_Round');
+    const hd = h.D / 2;
+    for (const d of h.doors) {
+      const pivot = new THREE.Group();
+      if (m) for (const part of m.parts) {
+        const mesh = new THREE.Mesh(part.geometry, part.material);
+        mesh.castShadow = !/Glass/.test(part.name);
+        pivot.add(mesh);
+      }
+      const sx = d.w / DOOR_W;
+      pivot.scale.set(sx, 1, 1);
+      // hinge at the low-u end of the opening, leaf along +x
+      const zc = d.side === 'front' ? hd - 0.2 : d.side === 'back' ? -hd + 0.2 : h.pz;
+      pivot.position.set(d.uc - d.w / 2 + 0.01, d.y0, zc);
+      d.baseRot = 0;
+      // front doors and the partition door swing inward (-z), back doors inward (+z)
+      d.openDelta = d.side === 'back' ? -Math.PI / 2 : Math.PI / 2;
+      d.pivot = pivot;
+      h.group.add(pivot);
+    }
   }
 
   // ---------- furniture & loot ----------
@@ -310,304 +500,80 @@ export class Houses {
   _furnish(h, r) {
     const { W, D } = h;
     const hw = W / 2, hd = D / 2;
-    const deco = h.deco; // [x0,x1,y0,y1,z0,z1, style] boxes added to the static mesh
-    const solid = (x0, x1, y0, y1, z0, z1, style) => {
-      deco.push([x0, x1, y0, y1, z0, z1, style]);
-      const c = this.wbox(h, x0, x1, y0, y1, z0, z1, { crate: true, mat: 'wood' });
-      this.colliders.add(c); h.cols.push(c);
-    };
-    const put = (type, lx, ly, lz, height, lrot, colR) => {
+    h.rugs = [];
+    // kit prop at real scale; col: true adds a breakable box collider sized from the model
+    const put = (name, lx, ly, lz, lrot = 0, { col = true, hp = 90, loot = 0.35, scale = 1 } = {}) => {
+      const type = `props/${name}`;
+      const info = this.models.get(type);
+      if (!info) return;
       const [x, z] = this.w(h, lx, lz);
-      this.placeProp(type, x, h.y + ly, z, height, h.rot + lrot, colR);
+      const idx = this.placeProp(type, x, h.y + ly, z, info.size.y * scale, h.rot + lrot, 0);
+      if (!col || idx === undefined) return;
+      const q = Math.round(lrot / (Math.PI / 2)) % 2 !== 0;
+      const ex = ((q ? info.size.z : info.size.x) * scale) / 2 - 0.05, ez = ((q ? info.size.x : info.size.z) * scale) / 2 - 0.05;
+      const c = this.wbox(h, lx - ex, lx + ex, ly, ly + info.size.y * scale, lz - ez, lz + ez, { crate: true, mat: 'wood', breakable: { type, idx: [idx], hp, loot } });
+      this.colliders.add(c);
     };
     const spot = (lx, ly, lz, list, extra = {}) => { const [x, z] = this.w(h, lx, lz); list.push({ x, y: h.y + ly, z, ...extra }); };
     const rug = (x0, x1, z0, z1, c1, c2, y = 0) => {
-      deco.push([x0, x1, y + 0.005, y + 0.02, z0, z1, (f) => (f === 'py' ? { c: c1, c2, step: 0.45, axis: 'x' } : null)]);
-      deco.push([x0 + 0.15, x1 - 0.15, y + 0.02, y + 0.03, z0 + 0.15, z1 - 0.15, (f) => (f === 'py' ? c2 : null)]);
+      h.rugs.push([x0, x1, y + 0.012, y + 0.025, z0, z1, (f) => (f === 'py' ? c1 : f === 'ny' ? null : c2)]);
+      h.rugs.push([x0 + 0.18, x1 - 0.18, y + 0.025, y + 0.032, z0 + 0.18, z1 - 0.18, (f) => (f === 'py' ? c2 : null)]);
     };
-    const bed = (x0, z0, alongZ, y = 0) => {
-      const L = 2.1, Wd = 1.4, [x1, z1] = alongZ ? [x0 + Wd, z0 + L] : [x0 + L, z0 + Wd];
-      solid(x0, x1, y, y + 0.45, z0, z1, '#7b5230');
-      deco.push([x0 + 0.05, x1 - 0.05, y + 0.45, y + 0.62, z0 + 0.05, z1 - 0.05, '#f3f1ea']);
-      const blanket = ['#4f7fc9', '#c95b5b', '#5aa06b', '#d6a13c'][Math.floor(r() * 4)];
-      if (alongZ) {
-        deco.push([x0 + 0.04, x1 - 0.04, y + 0.5, y + 0.66, z0 + 0.7, z1 - 0.04, blanket]);
-        deco.push([x0 + 0.2, x1 - 0.2, y + 0.62, y + 0.76, z0 + 0.12, z0 + 0.5, '#ffffff']);
-        deco.push([x0, x1, y, y + 1.0, z0 - 0.08, z0, '#6a4428']);
-      } else {
-        deco.push([x0 + 0.7, x1 - 0.04, y + 0.5, y + 0.66, z0 + 0.04, z1 - 0.04, blanket]);
-        deco.push([x0 + 0.12, x0 + 0.5, y + 0.62, y + 0.76, z0 + 0.2, z1 - 0.2, '#ffffff']);
-        deco.push([x0 - 0.08, x0, y, y + 1.0, z0, z1, '#6a4428']);
-      }
-    };
-    const shelf = (x0, x1, z0, z1, y = 0) => {
-      solid(x0, x1, y, y + 1.9, z0, z1, '#8a5a34');
-      const books = ['#c94f4f', '#4f7fc9', '#5aa06b', '#e0b84a', '#8e5fc0'];
-      for (const sy of [0.45, 1.05, 1.6]) {
-        const along = x1 - x0 > z1 - z0;
-        for (let k = 0; k < 6; k++) {
-          const t0 = k / 6 + 0.01, t1 = (k + 0.8) / 6;
-          const col = books[Math.floor(r() * books.length)], hh = 0.25 + r() * 0.12;
-          if (along) deco.push([x0 + (x1 - x0) * t0, x0 + (x1 - x0) * t1, y + sy, y + sy + hh, z0 - 0.02, z1 + 0.02, col]);
-          else deco.push([x0 - 0.02, x1 + 0.02, y + sy, y + sy + hh, z0 + (z1 - z0) * t0, z0 + (z1 - z0) * t1, col]);
-        }
-      }
-    };
-    const ix0 = -hw + T, ix1 = hw - T, iz0 = -hd + T, iz1 = hd - T;
-    const px = h.px;
+    const rugCols = [['#8e3b33', '#b5654e'], ['#2f4f7a', '#577bb0'], ['#4f6b35', '#7d9c55'], ['#7a5a2a', '#b08a4a']];
+    const rc = () => rugCols[Math.floor(r() * rugCols.length)];
+    const PI = Math.PI;
 
-    // --- room A: living room ---
-    rug(-hw + 1.4, px - 1.6, -0.2, hd - 2.0, '#b4574a', '#c96d5e');
-    put('kk/furn_couch_pillows', ix0 + 0.55, 0, 0.6, 0.95, Math.PI / 2, 0.8);
-    put('kk/furn_table_small', ix0 + 1.9, 0, 0.6, 0.55, 0, 0.45);
-    put('kk/furn_lamp_standing', ix0 + 0.4, 0, iz1 - 0.45, 1.9, 0, 0.25);
-    put('kk/furn_armchair', px - 0.9, 0, -1.6, 0.95, Math.PI / 2 + 0.4, 0.55);
-    if (h.stories === 2) {
-      shelf(ix0, ix0 + 0.4, 1.6, 2.9);
-      spot(px - 1.2, 0.02, -0.8, this.lootSpots);
-      spot(-1.6, 0.02, h.stairs.z1 + 0.7, this.chestSpots, { rot: h.rot });
+    if (h.kind === 'one') {
+      // front room: dining table, bookcase, barrels
+      put('Table_Large', -1.85, 0, 1.9, PI / 2);
+      put('Chair_1', -0.95, 0, 1.3, -PI / 2);
+      put('Chair_1', -0.95, 0, 2.5, -PI / 2);
+      put('Chandelier', -1.85, STORY - 0.02, 1.9, 0, { col: false });
+      put('Bookcase_2', 2.35, 0, 1.6, -PI / 2);
+      put(r() < 0.5 ? 'Barrel' : 'Barrel_Apples', 2.1, 0, 3.1, r() * 6);
+      rug(-0.7, 0.7, 0.6, 3.2, ...rc());
+      spot(1.1, 0.02, 2.9, this.lootSpots);
+      // back room: bedroom
+      put(r() < 0.5 ? 'Bed_Twin1' : 'Bed_Twin2', -1.5, 0, -2.35, 0);
+      put('Nightstand_Shelf', -0.2, 0, -3.3, 0);
+      put('Cabinet', 2.3, 0, -1.2, -PI / 2);
+      put('CandleStick_Stand', 2.2, 0, -3.2, 0, { col: false });
+      rug(0.2, 1.8, -3.0, -0.8, ...rc());
+      spot(0.9, 0.02, -1.4, this.lootSpots);
+      spot(1.5, 0.02, -3.0, this.chestSpots, { rot: h.rot });
     } else {
-      shelf(ix0 + 1.2, ix0 + 2.8, iz0, iz0 + 0.4);
-      spot(ix0 + 0.8, 0.02, iz0 + 0.8, this.chestSpots, { rot: h.rot + Math.PI / 2 });
-      spot(-0.8, 0.02, -0.6, this.lootSpots);
-    }
-
-    // --- room B: kitchen (two stories) or bedroom ---
-    if (h.stories === 2) {
-      // counter along the right wall with a sink, and a fridge
-      solid(ix1 - 0.65, ix1, 0, 0.95, iz0 + 0.1, iz0 + 3.2, (f) => (f === 'py' ? '#e9e4da' : '#f2eee6'));
-      deco.push([ix1 - 0.6, ix1 - 0.1, 0.95, 0.98, iz0 + 1.4, iz0 + 2.0, '#9aa5b1']);
-      for (let k = 0; k < 4; k++) deco.push([ix1 - 0.67, ix1 - 0.65, 0.2, 0.85, iz0 + 0.2 + k * 0.75, iz0 + 0.85 + k * 0.75, '#dcd5c8']);
-      solid(ix1 - 0.8, ix1, 0, 2.0, iz0 + 3.35, iz0 + 4.1, '#f7f7f4');
-      deco.push([ix1 - 0.82, ix1 - 0.8, 1.2, 1.7, iz0 + 3.45, iz0 + 3.5, '#9aa5b1']);
-      put('kk/furn_table_medium', px + 1.8, 0, hd - 1.5, 0.8, 0, 0.7);
-      put('kk/furn_chair_A_wood', px + 1.0, 0, hd - 1.5, 0.95, Math.PI / 2, 0.3);
-      put('kk/furn_chair_B_wood', px + 2.6, 0, hd - 1.5, 0.95, -Math.PI / 2, 0.3);
-      spot(px + 1.5, 0.02, -0.4, this.lootSpots);
-
-      // --- upstairs: bedroom + study ---
+      // front room: table by the right wall, storage under the stairs
+      put('Table_Large', 2.85, 0, 1.6, PI / 2);
+      put('Chair_1', 2.0, 0, 1.0, -PI / 2);
+      put('Chair_1', 2.0, 0, 2.2, -PI / 2);
+      put('Chandelier', 2.85, STORY - 0.02, 1.6, 0, { col: false });
+      put('Barrel_Apples', -1.35, 0, -0.3, r() * 6);
+      put('Crate_Wooden', -1.35, 0, 0.75, 0);
+      put('WeaponStand', -0.3, 0, -0.45, 0);
+      rug(-1.2, 0.3, 1.5, 3.4, ...rc());
+      spot(-0.5, 0.02, 2.4, this.lootSpots);
+      spot(3.0, 0.02, 4.0, this.chestSpots, { rot: h.rot + PI });
+      // back room: workshop
+      put('Workbench', -2.4, 0, -4.05, 0);
+      put('Cauldron', -0.4, 0, -3.95, 0);
+      put('Stool', -2.4, 0, -2.9, 0);
+      put('Barrel', -3.15, 0, -1.75, r() * 6);
+      put('Shelf_Small_Bottles', 1.6, 0, -4.4, 0, { col: false });
+      spot(1.6, 0.02, -2.6, this.lootSpots);
+      // upstairs: bedroom
       const y = STORY;
-      bed(ix1 - 1.5, iz0 + 0.05, true, y);
-      bed(1.2, iz0 + 0.05, true, y);
-      rug(-2.2, 1.0, 0.6, iz1 - 0.6, '#3f6fb0', '#5584c4', y);
-      shelf(ix0, ix0 + 0.4, 0.8, 2.4, y);
-      put('kk/furn_armchair', -3.6, y, iz1 - 0.9, 0.95, Math.PI, 0.55);
-      put('kk/furn_lamp_standing', ix1 - 0.4, y, iz1 - 0.4, 1.9, 0, 0.25);
-      solid(ix1 - 0.6, ix1, y, y + 2.1, 1.4, 2.8, '#7b5230'); // wardrobe
-      deco.push([ix1 - 0.62, ix1 - 0.6, y + 0.1, y + 2.0, 2.08, 2.12, '#5a3a20']);
-      spot(0, y + 0.02, iz1 - 1.0, this.lootSpots);
-      if (r() < 0.5) spot(-2.5, y + 0.02, 0.2, this.chestSpots, { rot: h.rot + Math.PI });
-    } else {
-      bed(ix1 - 1.5, iz0 + 0.05, true);
-      solid(px + 0.2, px + 0.7, 0, 0.6, iz0 + 0.1, iz0 + 0.6, '#7b5230'); // nightstand
-      put('kk/furn_lamp_standing', ix1 - 0.4, 0, iz1 - 0.4, 1.9, 0, 0.25);
-      rug(px + 0.5, ix1 - 0.3, 1.0, iz1 - 0.5, '#5aa06b', '#6cb57d');
-      spot(px + 1.4, 0.02, 1.8, this.lootSpots);
+      put('Bed_Twin1', 2.4, y, -3.4, 0);
+      put('Bed_Twin2', -0.1, y, -3.4, 0);
+      put('Nightstand_Shelf', 1.18, y, -4.3, 0);
+      put('Bookcase_2', 0.8, y, 4.35, PI);
+      put('BookStand', 2.8, y, 2.6, -PI / 2);
+      put('CandleStick_Stand', 3.2, y, 4.2, 0, { col: false });
+      rug(-0.6, 2.4, -1.4, 1.8, ...rc(), y);
+      spot(1.4, y + 0.02, 0.2, this.lootSpots);
+      if (r() < 0.6) spot(-1.2, y + 0.02, 4.0, this.chestSpots, { rot: h.rot + PI });
     }
-  }
-
-  // ---------- visuals ----------
-
-  rebuild(h) {
-    const g = new Geo();
-    const { W, D, pal } = h;
-    const hw = W / 2, hd = D / 2;
-    const siding = { c: pal.ext, c2: shade(pal.ext, 0.9), step: 0.4, axis: 'y' };
-    const trimStyle = TRIM;
-    // foundation band
-    g.box(-hw - 0.08, hw + 0.08, -1.6, 0.02, -hd - 0.08, hd + 0.08, (f) => (f === 'ny' ? null : f === 'py' ? null : FOUND));
-    // floors (planks on top, ceiling paint below)
-    const planks = { c: FLOOR_A, c2: FLOOR_B, step: 0.32, axis: 'x' };
-    g.box(-hw + T, hw - T, -0.02, 0.0, -hd + T, hd - T, (f) => (f === 'py' ? planks : null));
-    if (h.stories === 2) {
-      const s = h.stairs, yb = STORY - SLAB;
-      const floorStyle = (f) => (f === 'py' ? planks : f === 'ny' ? CEIL : TRIM);
-      g.box(-hw + T, hw - T, yb, STORY, s.z1 + 0.05, hd - T, floorStyle);
-      g.box(s.x1, hw - T, yb, STORY, -hd + T, s.z1 + 0.05, floorStyle);
-      // stairs: steps + side stringer
-      const n = 13, run = (s.x1 - s.x0) / n, rise = STORY / n;
-      for (let k = 0; k < n; k++) g.box(s.x0 + k * run, s.x0 + (k + 1) * run + 0.02, 0, (k + 1) * rise, s.z0, s.z1, (f) => (f === 'py' ? STAIR : f === 'ny' ? null : shade(STAIR, 0.8)));
-      // railing upstairs
-      g.box(s.x0, s.x1 - 0.2, STORY + 0.95, STORY + 1.05, s.z1, s.z1 + 0.08, TRIM);
-      for (let x = s.x0 + 0.1; x < s.x1 - 0.2; x += 0.45) g.box(x, x + 0.05, STORY, STORY + 0.95, s.z1 + 0.015, s.z1 + 0.065, TRIM);
-    }
-    // ceiling of the top story
-    g.box(-hw + T, hw - T, h.top - SLAB, h.top, -hd + T, hd - T, (f) => (f === 'ny' ? CEIL : null));
-
-    // walls
-    for (const p of h.panels) {
-      if (p.broken) continue;
-      const out = Houses.outFace(p.side);
-      const inCol = p.side === 'part' ? pal.inA : p.room === 'B' ? pal.inB : pal.inA;
-      const inColB = pal.inB;
-      for (const [a0, a1, v0, v1] of p.rects) {
-        const b = this._wallBox(h, p.side, a0, a1, p.y0 + v0, p.y0 + v1);
-        g.box(...b, (f) => {
-          if (f === 'py' || f === 'ny') return v1 >= STORY - 0.01 && f === 'py' ? null : TRIM;
-          if (p.side === 'part') return f === 'px' ? inColB : f === 'nx' ? inCol : TRIM;
-          if (f === out) return siding;
-          const inner = { front: 'nz', back: 'pz', left: 'px', right: 'nx' }[p.side];
-          return f === inner ? inCol : TRIM;
-        });
-      }
-      // frames around openings (both faces), shutters outside
-      if (p.type !== 'solid') {
-        const ow = p.type === 'door' ? DOOR_W : WIN_W, v0 = p.type === 'door' ? 0 : WIN_Y0, v1 = p.type === 'door' ? DOOR_H : WIN_Y1;
-        const fr = 0.1, pr = 0.05;
-        {
-          const bands = [
-            [p.uc - ow / 2 - fr, p.uc - ow / 2, v0, v1 + fr],
-            [p.uc + ow / 2, p.uc + ow / 2 + fr, v0, v1 + fr],
-            [p.uc - ow / 2 - fr, p.uc + ow / 2 + fr, v1, v1 + fr],
-          ];
-          if (p.type === 'window') bands.push([p.uc - ow / 2 - fr, p.uc + ow / 2 + fr, v0 - fr, v0]);
-          for (const [a0, a1, b0, b1] of bands) {
-            const bx = this._wallBox(h, p.side, a0, a1, p.y0 + b0, p.y0 + b1, T + pr * 2);
-            g.box(...bx, trimStyle);
-          }
-        }
-        if (p.type === 'window' && p.side !== 'part') {
-          // shutters on the outside face
-          for (const s of [-1, 1]) {
-            const a0 = s < 0 ? p.uc - ow / 2 - 0.62 : p.uc + ow / 2 + 0.12, a1 = a0 + 0.5;
-            const bx = this._wallBox(h, p.side, a0, a1, p.y0 + WIN_Y0, p.y0 + WIN_Y1, T + 0.12);
-            // keep only the outer half: shift so it sits on the outside
-            g.box(...this._outerSkin(h, p.side, bx), { c: pal.shutter, c2: shade(pal.shutter, 0.85), step: 0.18, axis: 'y' });
-          }
-          // flower box under ground-floor windows
-          if (p.y0 === 0) {
-            const bx = this._outerSkin(h, p.side, this._wallBox(h, p.side, p.uc - 0.7, p.uc + 0.7, WIN_Y0 - 0.35, WIN_Y0 - 0.05, T + 0.5));
-            g.box(...bx, '#8a5a34');
-            const fl = this._outerSkin(h, p.side, this._wallBox(h, p.side, p.uc - 0.6, p.uc + 0.6, WIN_Y0 - 0.05, WIN_Y0 + 0.12, T + 0.4));
-            g.box(...fl, { c: '#e0566f', c2: '#f2c14e', step: 0.2, axis: p.side === 'left' || p.side === 'right' ? 'z' : 'x' });
-          }
-        }
-      }
-    }
-    // corner posts and the band between stories
-    for (const [cx, cz] of [[-hw, -hd], [hw, -hd], [-hw, hd], [hw, hd]]) g.box(cx - 0.14, cx + 0.14, -0.1, h.top, cz - 0.14, cz + 0.14, TRIM);
-    if (h.stories === 2) {
-      g.box(-hw - 0.05, hw + 0.05, STORY - 0.15, STORY + 0.05, hd - 0.02, hd + 0.05, TRIM);
-      g.box(-hw - 0.05, hw + 0.05, STORY - 0.15, STORY + 0.05, -hd - 0.05, -hd + 0.02, TRIM);
-      g.box(-hw - 0.05, -hw + 0.02, STORY - 0.15, STORY + 0.05, -hd, hd, TRIM);
-      g.box(hw - 0.02, hw + 0.05, STORY - 0.15, STORY + 0.05, -hd, hd, TRIM);
-    }
-    // front step(s)
-    g.box(-1.1, 1.1, -0.45, -0.12, hd, hd + 0.9, (f) => (f === 'ny' ? null : FOUND));
-    if (h.stories === 2) g.box(hw - W / 6 - 0.9, hw - W / 6 + 0.9, -0.45, -0.12, -hd - 0.9, -hd, (f) => (f === 'ny' ? null : FOUND));
-
-    // roof
-    this._roof(g, h);
-    // furniture
-    for (const [x0, x1, y0, y1, z0, z1, st] of h.deco) g.box(x0, x1, y0, y1, z0, z1, st);
-
-    if (h.mesh) { h.group.remove(h.mesh); h.mesh.geometry.dispose(); }
-    h.mesh = new THREE.Mesh(g.geometry(), this.mat);
-    h.mesh.castShadow = true;
-    h.mesh.receiveShadow = true;
-    h.group.add(h.mesh);
-    this._rebuildGlass(h);
-    this._rebuildDoors(h);
-  }
-
-  // Shift a thickened wall box so it only sticks out on the outside of the wall.
-  _outerSkin(h, side, b) {
-    const hw = h.W / 2, hd = h.D / 2;
-    const [x0, x1, y0, y1, z0, z1] = b;
-    const t = side === 'front' || side === 'back' ? (z1 - z0) : (x1 - x0);
-    const skin = (t - T) / 2;
-    switch (side) {
-      case 'front': return [x0, x1, y0, y1, hd, hd + skin];
-      case 'back': return [x0, x1, y0, y1, -hd - skin, -hd];
-      case 'left': return [-hw - skin, -hw, y0, y1, z0, z1];
-      case 'right': return [hw, hw + skin, y0, y1, z0, z1];
-      default: return b;
-    }
-  }
-
-  _roof(g, h) {
-    const hw = h.W / 2 + OVERHANG, hd = h.D / 2 + OVERHANG;
-    const ey = h.top - 0.3, ry = h.top + h.ridge;
-    const roof = h.pal.roof, roof2 = shade(h.pal.roof, 0.82), under = shade(h.pal.roof, 0.55);
-    const rows = 8;
-    for (const s of [1, -1]) {
-      // shingle rows from the eave up to the ridge, each with a small lip
-      for (let k = 0; k < rows; k++) {
-        const t0 = k / rows, t1 = (k + 1) / rows;
-        const z0 = s * hd * (1 - t0), z1 = s * hd * (1 - t1);
-        const y0 = ey + (ry - ey) * t0, y1 = ey + (ry - ey) * t1;
-        const n = [0, hd, s * (ry - ey)];
-        const l = Math.hypot(n[1], n[2]); n[1] /= l; n[2] /= l;
-        const col = k % 2 ? roof : roof2;
-        g.quad([-hw, y0 + 0.08, z0], [hw, y0 + 0.08, z0], [hw, y1 + 0.08, z1], [-hw, y1 + 0.08, z1], n, col);
-        g.quad([-hw, y0 - 0.02, z0], [hw, y0 - 0.02, z0], [hw, y0 + 0.08, z0], [-hw, y0 + 0.08, z0], [0, 0, s], shade(col, 0.7));
-      }
-      // underside
-      const nd = [0, -hd, -s * (ry - ey)]; const l = Math.hypot(nd[1], nd[2]); nd[1] /= l; nd[2] /= l;
-      g.quad([-hw, ey - 0.02, s * hd], [hw, ey - 0.02, s * hd], [hw, ry - 0.02, 0], [-hw, ry - 0.02, 0], nd, under);
-      // gable-end edge of the roof slab
-      for (const e of [-1, 1]) g.quad([e * hw, ey - 0.02, s * hd], [e * hw, ey + 0.08, s * hd], [e * hw, ry + 0.08, 0], [e * hw, ry - 0.02, 0], [e, 0, 0], under);
-    }
-    // ridge cap
-    g.box(-hw, hw, ry, ry + 0.14, -0.14, 0.14, shade(roof, 0.7));
-    // gable triangles on both ends
-    const gw = h.W / 2, gd = h.D / 2;
-    for (const e of [-1, 1]) {
-      const x = e * gw;
-      g.tri([x, h.top, -gd], [x, h.top, gd], [x, h.top + h.ridge - 0.03, 0], [e, 0, 0], h.pal.ext);
-      // small round attic window
-      g.box(x - (e > 0 ? 0 : 0.03), x + (e > 0 ? 0.03 : 0), h.top + 0.5, h.top + 1.1, -0.35, 0.35, '#2c3a4d');
-      g.box(x - (e > 0 ? 0 : 0.05), x + (e > 0 ? 0.05 : 0), h.top + 0.45, h.top + 1.15, -0.42, -0.35, TRIM);
-      g.box(x - (e > 0 ? 0 : 0.05), x + (e > 0 ? 0.05 : 0), h.top + 0.45, h.top + 1.15, 0.35, 0.42, TRIM);
-    }
-    // chimney
-    const [cx0, cx1, cz0, cz1] = h.chimney;
-    g.box(cx0, cx1, h.top, h.top + h.ridge + 0.9, cz0, cz1, { c: '#b0654a', c2: '#9c5a42', step: 0.3, axis: 'y' });
-    g.box(cx0 - 0.08, cx1 + 0.08, h.top + h.ridge + 0.9, h.top + h.ridge + 1.05, cz0 - 0.08, cz1 + 0.08, '#6b6b6b');
-  }
-
-  _rebuildGlass(h) {
-    const g = new Geo();
-    for (const gl of h.glass) {
-      if (gl.broken || gl.panel.broken) continue;
-      g.box(...gl.box, (f) => (f === 'py' || f === 'ny' ? null : '#ffffff'));
-    }
-    if (h.glassMesh) { h.group.remove(h.glassMesh); h.glassMesh.geometry.dispose(); h.glassMesh = null; }
-    if (!g.p.length) return;
-    h.glassMesh = new THREE.Mesh(g.geometry(), this.glassMat);
-    h.glassMesh.renderOrder = 2;
-    h.group.add(h.glassMesh);
-  }
-
-  _rebuildDoors(h) {
-    for (const d of h.doors) {
-      if (d.pivot) { h.group.remove(d.pivot); d.pivot.traverse((o) => o.geometry?.dispose()); d.pivot = null; }
-      if (d.broken || d.panel.broken) continue;
-      const g = new Geo();
-      const wd = DOOR_W - 0.04, th = 0.07;
-      // leaf built along +x from the hinge, centred on z = 0
-      g.box(0, wd, 0.02, DOOR_H - 0.02, -th / 2, th / 2, DOOR);
-      for (const zs of [1, -1]) {
-        for (const [y0, y1] of [[0.25, 1.05], [1.3, 2.05]]) g.box(0.15, wd - 0.15, y0, y1, zs > 0 ? th / 2 : -th / 2 - 0.02, zs > 0 ? th / 2 + 0.02 : -th / 2, DOOR_DARK);
-        g.box(wd - 0.18, wd - 0.1, 1.0, 1.1, zs > 0 ? th / 2 : -th / 2 - 0.06, zs > 0 ? th / 2 + 0.06 : -th / 2, KNOB);
-      }
-      const mesh = new THREE.Mesh(g.geometry(), this.mat);
-      mesh.castShadow = true;
-      const pivot = new THREE.Group();
-      pivot.add(mesh);
-      // hinge at the left end of the opening (in wall-u terms); wall direction decides the frame
-      const u = d.uc - DOOR_W / 2 + 0.02;
-      const hw = h.W / 2, hd = h.D / 2;
-      if (d.side === 'front') { pivot.position.set(u, d.y0, hd - T / 2); pivot.rotation.y = 0; }
-      else if (d.side === 'back') { pivot.position.set(u, d.y0, -hd + T / 2); pivot.rotation.y = 0; }
-      else { pivot.position.set(d.side === 'part' ? h.px : d.side === 'left' ? -hw + T / 2 : hw - T / 2, d.y0, u); pivot.rotation.y = -Math.PI / 2; }
-      d.baseRot = pivot.rotation.y;
-      // front doors swing inward (-z), back doors inward (+z), the partition door into room B (+x)
-      d.openDelta = d.side === 'back' ? -Math.PI / 2 : Math.PI / 2;
-      pivot.rotation.y = d.baseRot + d.openDelta * d.angle;
-      d.pivot = pivot;
-      h.group.add(pivot);
-    }
+    // a lantern by the front door
+    put('Lantern_Wall', h.K.frontDoor + 1.0, 1.1, hd, 0, { col: false });
   }
 
   // ---------- damage ----------
@@ -619,11 +585,11 @@ export class Houses {
     p.broken = true;
     for (const c of p.cols) this.colliders.remove(c);
     p.cols = [];
-    if (p.glass && !p.glass.broken) { p.glass.broken = true; if (p.glass.col) this.colliders.remove(p.glass.col); }
-    if (p.door && !p.door.broken) { p.door.broken = true; this._doorCollider(p.door, false); }
-    this._debris(p.house, this._panelCenter(p), '#c9a06a', 30);
+    this.kit.set(p.handles, false);
+    if (p.glass && !p.glass.broken) { p.glass.broken = true; if (p.glass.col) this.colliders.remove(p.glass.col); p.glass.col = null; this.kit.set(p.glass.handles, false); }
+    if (p.door && !p.door.broken) { p.door.broken = true; this._doorCollider(p.door, false); p.door.pivot.visible = false; }
+    this._debris(p.house, this._panelCenter(p), p.mat === 'stone' ? '#a39a8c' : '#e8dcc4', 30);
     this.game?.sound.play('break', this._panelCenter(p));
-    this.rebuild(p.house);
   }
 
   breakGlass(gl) {
@@ -631,12 +597,10 @@ export class Houses {
     gl.broken = true;
     if (gl.col) this.colliders.remove(gl.col);
     gl.col = null;
-    const b = gl.box;
-    const [x, z] = this.w(gl.house, (b[0] + b[1]) / 2, (b[4] + b[5]) / 2);
-    const pos = new THREE.Vector3(x, gl.house.y + (b[2] + b[3]) / 2, z);
+    this.kit.set(gl.handles, false);
+    const pos = this._center(gl.house, gl.box);
     this._debris(gl.house, pos, '#d9f3ff', 22, 0.12);
     this.game?.sound.play('glass', pos);
-    this._rebuildGlass(gl.house);
   }
 
   damageDoor(d, amount) {
@@ -645,9 +609,9 @@ export class Houses {
     if (d.hp > 0) return;
     d.broken = true;
     this._doorCollider(d, false);
-    this._debris(d.house, this._doorCenter(d), DOOR, 24);
+    d.pivot.visible = false;
+    this._debris(d.house, this._doorCenter(d), '#7a4f2c', 24);
     this.game?.sound.play('break', this._doorCenter(d));
-    this._rebuildDoors(d.house);
   }
 
   // Grenades / rockets: damage panels, doors and windows nearby.
@@ -716,9 +680,9 @@ export class Houses {
     if (Math.abs(lx) >= h.W / 2 || Math.abs(lz) >= h.D / 2) return 'out';
     if (y - h.y > h.top - 0.5) return 'roof';
     const s = h.stairs;
-    if (s && lx > s.x0 - 0.1 && lx < s.x1 && lz > s.z0 - 0.1 && lz < s.z1 + 0.05 && y - h.y < STORY - 0.3) return 'stair';
+    if (s && lx > s.x0 - 0.1 && lx < s.x1 + 0.05 && lz > s.z0 - 0.05 && lz < s.z1 + 0.1 && y - h.y < STORY - 0.15) return 'stair';
     if (h.stories === 2 && y - h.y > STORY - 1.0) return 'up';
-    return lx < h.px ? 'A' : 'B';
+    return lz > h.pz ? 'A' : 'B';
   }
 
   // Next waypoint {x, z} on the way from `from` to (tx, tz, ty) through doors and stairs,
@@ -732,8 +696,8 @@ export class Houses {
     const [tlx, tlz] = loc(tx, tz);
     const rFrom = this._region(h, flx, flz, from.y);
     const rTo = b && b.h === h ? this._region(h, tlx, tlz, ty ?? h.y) : 'out';
-    // up on the roof (landed there): walk off the nearest eave and drop down
-    if (rFrom === 'roof') { const [x, z] = this.w(h, flx, Math.sign(flz || 1) * (h.D / 2 + 2.5)); return { x, z }; }
+    // up on the roof (landed there): slide off the nearest eave and drop down
+    if (rFrom === 'roof') { const [x, z] = this.w(h, Math.sign(flx || 1) * (h.W / 2 + 2.5), flz); return { x, z }; }
     if (rFrom === rTo) return null;
     // BFS over portals
     const prev = new Map([[rFrom, null]]);
@@ -744,7 +708,6 @@ export class Houses {
       for (const p of h.portals) {
         for (const [ra, pa, rb, pb] of [[p[0], p[1], p[2], p[3]], [p[2], p[3], p[0], p[1]]]) {
           if (ra !== r || prev.has(rb)) continue;
-          if (!this._portalOpen(h, p)) continue;
           prev.set(rb, { from: r, near: pa, far: pb });
           q.push(rb);
         }
@@ -772,8 +735,9 @@ export class Houses {
   }
 
   // Does the local segment p->q cross the house (grown by m)? Liang-Barsky clip.
-  static _cross(h, px, pz, qx, qz, m) {
-    const x0 = -h.W / 2 - m, x1 = h.W / 2 + m, z0 = -h.D / 2 - m, z1 = h.D / 2 + m;
+  static _cross(h, px, pz, qx, qz, m, front = 0) {
+    const side = front ? 0.6 : 0; // a fenced yard is a little wider than the house
+    const x0 = -h.W / 2 - side - m, x1 = h.W / 2 + side + m, z0 = -h.D / 2 - m, z1 = h.D / 2 + front + m;
     let t0 = 0, t1 = 1;
     const dx = qx - px, dz = qz - pz;
     for (const [p, q] of [[-dx, px - x0], [dx, x1 - px], [-dz, pz - z0], [dz, z1 - pz]]) {
@@ -784,18 +748,44 @@ export class Houses {
     return t0 < t1;
   }
 
-  // Corner waypoint (local) to get from p to q without cutting through the house, or null.
+  // Corner waypoint (local) to get from p to q without cutting through the house (and its
+  // fenced front yard, whose gate lines up with the front door), or null.
   _around(h, px, pz, qx, qz) {
-    if (!Houses._cross(h, px, pz, qx, qz, 0.3)) return null;
-    const m = 1.4, cx = h.W / 2 + m, cz = h.D / 2 + m;
+    if (h.fence) {
+      const hd = h.D / 2;
+      const inYard = (x, z) => Math.abs(x) < h.W / 2 + 0.9 && z > hd - 0.1 && z < hd + YARD + 0.4;
+      const gate = h.gate;
+      const a = inYard(px, pz), b = inYard(qx, qz);
+      if (a !== b && Math.hypot(px - gate[0], pz - gate[1]) > 0.7) {
+        if (a) return gate;
+        return this._aroundBox(h, px, pz, gate[0], gate[1]) || gate;
+      }
+      if (a && b) return null;
+    }
+    return this._aroundBox(h, px, pz, qx, qz);
+  }
+
+  _aroundBox(h, px, pz, qx, qz) {
+    const front = h.fence ? YARD + 0.3 : 0;
+    if (!Houses._cross(h, px, pz, qx, qz, 0.3, front)) return null;
+    // standing right against the house (just out of a door): only the house itself blocks
+    const m0 = Houses._cross(h, px, pz, px, pz, 0.3, front) ? 0 : 0.3;
+    const cx = h.W / 2 + 2.1, czB = h.D / 2 + 2.1, czF = h.D / 2 + (h.fence ? YARD + 1.3 : 2.1);
     let best = null, bd = Infinity;
-    for (const [x, z] of [[-cx, -cz], [cx, -cz], [cx, cz], [-cx, cz]]) {
+    for (const [x, z] of [[-cx, -czB], [cx, -czB], [cx, czF], [-cx, czF]]) {
       if (Math.hypot(px - x, pz - z) < 0.8) continue;
-      if (Houses._cross(h, px, pz, x, z, 0.3)) continue;
-      const d = Math.hypot(px - x, pz - z) + Math.hypot(x - qx, z - qz) + (Houses._cross(h, x, z, qx, qz, 0.3) ? 8 : 0);
+      if (Houses._cross(h, px, pz, x, z, m0, front)) continue;
+      const d = Math.hypot(px - x, pz - z) + Math.hypot(x - qx, z - qz) + (Houses._cross(h, x, z, qx, qz, 0.3, front) ? 8 : 0);
       if (d < bd) { bd = d; best = [x, z]; }
     }
     return best;
+  }
+
+  // A picket fence encloses the front yard: route through its gate (in front of the door).
+  setFence(h) {
+    h.fence = true;
+    h.gate = [h.K.frontDoor, h.D / 2 + YARD + 1.3];
+    h.portals[0][1] = h.gate;
   }
 
   // Both ends outside any house: steer around a house that sits in the way nearby.
@@ -811,16 +801,13 @@ export class Houses {
     return null;
   }
 
-  // Doors can be opened by bots, so only a broken-away wall or a door counts; always open.
-  _portalOpen() { return true; }
-
   // ---------- per-frame ----------
 
   update(dt, actors, camPos) {
     // door animation
     for (const d of this.doors) {
       const want = d.open ? 1 : 0;
-      if (d.angle === want || !d.pivot) { d.angle = want; continue; }
+      if (d.angle === want) continue;
       d.angle += Math.sign(want - d.angle) * Math.min(Math.abs(want - d.angle), dt * 4);
       d.pivot.rotation.y = d.baseRot + d.openDelta * d.angle;
     }
@@ -836,39 +823,38 @@ export class Houses {
         const d = this.nearestDoor(a.pos, 1.6);
         if (d && !d.open) this.setDoor(d, true);
       }
-      // hide far-away doors and glass
+      // hide far-away doors and house interiors
       if (camPos) for (const h of this.list) {
         const far = (h.x - camPos.x) ** 2 + (h.z - camPos.z) ** 2 > 140 * 140;
-        if (h.glassMesh) h.glassMesh.visible = !far;
-        for (const d of h.doors) if (d.pivot) d.pivot.visible = !far;
+        h.mesh.visible = !far;
+        for (const d of h.doors) d.pivot.visible = !far && !d.broken;
       }
     }
   }
 
   _nearHouse(pos) {
-    for (const h of this.list) if (Math.abs(h.x - pos.x) < h.W / 2 + 2.5 && Math.abs(h.z - pos.z) < h.W / 2 + 2.5) return h;
+    for (const h of this.list) if (Math.abs(h.x - pos.x) < h.D / 2 + 2.5 && Math.abs(h.z - pos.z) < h.D / 2 + 2.5) return h;
     return null;
   }
 
   // New match: every wall, window and door back in place, doors shut.
   reset() {
     for (const h of this.list) {
-      let dirty = false;
       for (const p of h.panels) {
-        if (p.broken) { p.broken = false; this._panelColliders(p); dirty = true; }
+        if (p.broken) { p.broken = false; this._panelColliders(p); this.kit.set(p.handles, true); }
         p.hp = p.maxHp;
       }
       for (const gl of h.glass) {
-        if (gl.broken) { gl.broken = false; gl.col = { ...this.wbox(h, ...this._glassWorld(gl)), house: true, mat: 'glass', part: gl }; this.colliders.add(gl.col); dirty = true; }
+        if (gl.broken) { gl.broken = false; this._glassCollider(gl); this.kit.set(gl.handles, true); }
       }
       for (const d of h.doors) {
         d.hp = DOOR_HP;
-        if (d.broken) { d.broken = false; dirty = true; }
+        d.broken = false;
         d.open = false; d.angle = 0;
+        d.pivot.visible = true;
+        d.pivot.rotation.y = d.baseRot;
         this._doorCollider(d, true);
       }
-      if (dirty) this.rebuild(h);
-      else for (const d of h.doors) if (d.pivot) d.pivot.rotation.y = d.baseRot;
     }
   }
 }

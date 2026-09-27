@@ -61,7 +61,7 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 - **Slots 2–6** hold guns or stacks of heals: Bandages (+15 up to 75), Medkit (full health), Small Shield (+25 up to 50), Shield Potion (+50), **Med-Mist** (+30, use it on the move), **Slurp Juice** (+75 over time: health, then shield), **Chug Jug** (full health and shield, 15 s). **Spike Traps** (place on a floor, wall or ceiling you aim at; spikes hit anyone else who walks in for 75, re-arming after 3 s, and go away with the surface they're on). Placeables: **Shield Keg** (shields everyone nearby up to 100) and **Campfire** (heals everyone nearby over time). Hold still-ish while the ring fills.
 - **Mobility:** **Shockwave Grenade** (goes off on impact and launches everyone nearby, you too, ~40 m with no fall damage), **Grappler** (10 charges: pulls you to where you aim, up to 60 m), **Rift-to-Go** (warps you into the sky to glide).
 - **Upgrade benches** in six towns (orange on the map): hold a gun and interact to raise its rarity for gold.
-- **Houses you can go into:** the village homes are one- or two-story houses with furnished rooms: living room, kitchen or bedroom downstairs, and stairs up to a bedroom floor in the two-story ones. Chests and floor loot are inside. Doors open and close with interact (bots open them as they walk up) and break if you shoot or hit them. Windows shatter. Walls are panels that break under bullets, the axe and explosions and give wood when harvested. Everything is repaired at the start of the next match. You can also land and walk on the roofs.
+- **Houses you can go into:** the village homes are medieval plaster-and-brick houses with tiled roofs, one or two stories, with furnished rooms: a dining room and a bedroom or workshop downstairs, and stairs up to a bedroom floor in the two-story ones. Chests and floor loot are inside. Doors open and close with interact (bots open them as they walk up) and break if you shoot or hit them. Windows shatter. Walls are panels that break under bullets, the axe and explosions and give wood when harvested. Everything is repaired at the start of the next match. You can also land and walk on the roofs.
 - **Hiding spots:** jump into haystacks and dumpsters (interact); bots can't see you inside. Jump or interact to pop out.
 - Crates, barrels, furniture and street clutter **break** from the axe, bullets and explosions and sometimes drop loot.
 - **Swimming:** deep water is swimmable (slower, and no shooting or building while swimming).
@@ -87,7 +87,7 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 - **Results screen:** medals (First Blood, Sharpshooter, Headhunter, Marksman, Rampage, Demolition, Lumberjack, Boss Slayer…, each worth XP) and match stats (accuracy, headshots, damage to players and builds, longest elimination).
 - **Career:** matches, wins, top 5/10, eliminations, K/D, damage, chests, builds, harvest, time alive, best placement.
 - **Settings:** mouse sensitivity, field of view, master/music volume, HUD scale, graphics, sound visualizer and full **key rebinding**. Everything (progress, locker, settings) is saved in your browser.
-- **Music:** a relaxed procedural lobby theme, a sting when the bus takes off, victory/defeat jingles.
+- **Music:** a rotating lobby playlist, a guitar battle theme on the Battle Bus, a boss theme for the final circles and victory / defeat jingles.
 
 ## Loot & world events
 
@@ -164,7 +164,7 @@ src/
   weapons/   Weapon stats & rarities, weapon instances, procedural gun models, hitscan combat
   effects/   Pooled muzzle flashes, tracers, particles, damage numbers, elimination bursts
   ui/        HUD, minimap, menus, touch controls
-public/models/        models: chars/ (KayKit heroes), kk/ (KayKit world), env/ (Kenney), nature/ (Quaternius), guns/ (Styloo), trees/ (Elijah Cobden)
+public/models/        models: chars/ (KayKit heroes), kk/ (KayKit world), env/ (Kenney), nature/ village/ props/ outfits/ anims/ (Quaternius), guns/ (Styloo), trees/ (Elijah Cobden)
 ```
 
 ## Tech notes
@@ -174,7 +174,7 @@ public/models/        models: chars/ (KayKit heroes), kk/ (KayKit world), env/ (
 - **Terrain:** a 460 m height grid from fbm noise. `heightAt(x, z)` is bilinear, and everything (movement, grass, bullets, camera) uses it. Towns are flattened plateaus.
 - **Foliage:** instanced trees (round, pine, some autumn), rocks and bushes. Grass is one instanced draw call with a wind-sway vertex shader that samples a height texture and wraps around the player.
 - **Characters:** KayKit Adventurers (Knight, Barbarian, Mage, Rogue, Hooded Rogue). Each player/bot is a `SkeletonUtils.clone` with a subtle color tint; you are the teal hooded rogue with a glowing backpack antenna. Animation runs on two layers: the legs play run / strafe / backpedal / jump while the upper body plays aim / shoot / reload. Crossfades take 0.2 s and running speed follows movement speed.
-- **Houses:** built procedurally from vertex-colored boxes (one draw call per house, plus glass and doors) in local space, then placed with a 90° rotation so every collider stays an axis-aligned box. Stairs and roofs use ramp colliders. Bots route through the house with a small portal graph (outside ↔ front door ↔ room A ↔ interior door ↔ room B, and room A ↔ stairs ↔ upstairs), walk around corners when the door is on the far side, and walk off roofs they land on.
+- **Houses:** built from Medieval Village MegaKit pieces on the kit's 2 m grid (all houses share one instanced mesh per piece; a broken wall panel just hides its instances) in local space, then placed with a 90° rotation so every collider stays an axis-aligned box. Stairs and roofs use ramp colliders. Bots route through the house with a small portal graph (outside ↔ front door ↔ room A ↔ interior door ↔ room B, and room A ↔ stairs ↔ upstairs), walk around corners when the door is on the far side, and walk off roofs they land on.
 - **Performance:** instancing, object pools for effects, bot "think" every ~0.3 s, animation LOD for far characters, and lower pixel ratio / shadows / grass on mobile.
 - **Post-processing:** [`postprocessing`](https://github.com/pmndrs/postprocessing) + [`n8ao`](https://github.com/N8python/n8ao): ambient occlusion, bloom on glowing things (loot beams, chests, muzzle flashes, sun), a warm/cool color grade and SMAA.
 - **Baked lighting:** at load the game traces sun rays from every terrain point against houses, tree canopies, rocks and the mountain. That gives soft shadows and ambient occlusion across the whole island. Near the player they fade into the real shadow map.
@@ -186,6 +186,7 @@ public/models/        models: chars/ (KayKit heroes), kk/ (KayKit world), env/ (
   - **Styloo Guns Asset Pack** (provided by the project owner; see its itch.io page for the license): every gun, the grenades, ammo boxes and rounds, and the vault's weapon board. See `public/models/guns/CREDITS.md`.
   - **Elijah Cobden Stylized Trees Pack** (provided by the project owner; see its itch.io page for the license): detailed oaks, columnar trees and pines near the camera, willows, swiggly trees and dead trees. See `public/models/trees/CREDITS.md`.
   - **Quaternius Stylized Nature:** painted leafy trees (shown near the camera; cheaper trees stand in far away), flowering bushes and clover. See `public/models/nature/CREDITS.md`.
+  - **Quaternius Medieval Village MegaKit and Fantasy Props MegaKit** (CC0): the village houses (walls, doors, windows, stairs, roofs) and their furniture. See `public/models/village/CREDITS.md` and `public/models/props/CREDITS.md`. The **Universal Animation Library** (CC0) is in `public/models/anims/`, for the upcoming characters.
   - **Procedural:** far-away round/autumn trees, bushes, grass, the bus, fences, fountains and lamps are built from low-poly shapes.
-  - **Audio:** CC0 Kenney sound samples plus synthesized effects (see `public/audio/CREDITS.md`), and CC0 music for the lobby, the Storm Bus, the final circles and the victory / defeat jingles (see `public/audio/music/CREDITS.md`).
+  - **Audio:** CC0 Kenney sound samples plus synthesized effects (see `public/audio/CREDITS.md`), music from the Sitting on Clouds OST by Rom Di Prisco for the lobby and the Battle Bus (provided by the project owner, not CC0), and CC0 music for the final circles and the victory / defeat jingles (see `public/audio/music/CREDITS.md`).
 
