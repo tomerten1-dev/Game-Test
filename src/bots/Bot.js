@@ -62,6 +62,8 @@ export class Bot extends Actor {
     this.aimHead = false;
     this.rushT = 0;         // ramp-rushing a higher / weak enemy
     this.rushN = 0;
+    this.coverWall = null;  // our own wall we fight behind (edit-peeking through it)
+    this.coverT = 0;
   }
 
   get smartLoot() { return true; }
@@ -70,7 +72,7 @@ export class Bot extends Actor {
   resetAI() {
     this.climb = null; this.ninetyCd = 0; this.tunnelCd = 0; this.coneCd = 0; this.rushT = 0; this.rushN = 0;
     this.target = null; this.mode = 'idle'; this.hasGoal = false;
-    this.boxed = false; this.retreatT = 0; this.exitT = 0; this.peekT = 0; this.peekWall = null;
+    this.boxed = false; this.retreatT = 0; this.exitT = 0; this.peekT = 0; this.peekWall = null; this.coverWall = null;
     this.lootChest = null; this.pickup = null; this.tree = null; this.huntT = 0;
     this.landTime = undefined; this.useT = 0; this.shootWall = false; this.targetVisible = false;
   }
@@ -113,7 +115,7 @@ export class Bot extends Actor {
     if (r < wallChance * 0.35 && this.skill > 0.4 && this.matTotal >= 50 && this.buildCooldown <= 0 && attacker && b) this._boxUp();
     else if (r < wallChance && this.buildCooldown <= 0 && b?.canAfford(this) && attacker) {
       this.buildCooldown = 3.5;
-      this.game.building.buildWallFacing(this, Math.atan2(attacker.pos.x - this.pos.x, attacker.pos.z - this.pos.z));
+      this._takeCover(b.buildPiece(this, 'wall', Math.atan2(attacker.pos.x - this.pos.x, attacker.pos.z - this.pos.z)));
     } else if (r < wallChance + 0.2 && this.onGround) this.wantJump = true;
   }
 
@@ -138,13 +140,59 @@ export class Bot extends Actor {
 
   _yawTo(p) { return Math.atan2(p.x - this.pos.x, p.z - this.pos.z); }
 
-  // Edit a window toward the target to shoot through, then close it again.
-  _openPeek() {
-    const w = this.target && this.game.building.wallAt(this, this._yawTo(this.target.pos));
-    if (!w || w.owner !== this) return false;
-    this.game.building.edit(w, 'window');
+  // Edit our wall toward the target to shoot through, then close it again. The edit fits the fight:
+  // a half wall to shoot up at a higher enemy, a wide arch for close shotgun shots, else a window.
+  _openPeek(wall) {
+    const t = this.target;
+    const w = wall || (t && this.game.building.wallAt(this, this._yawTo(t.pos)));
+    if (!t || !w || w.owner !== this || w.hp <= 0) return false;
+    const kind = this._peekKind(t);
+    this.game.building.edit(w, kind);
     this.peekWall = w;
-    this.peekT = 1.2 + this.skill * 1.2;
+    this.peekT = (kind === 'arch' ? 0.8 : 1.2) + this.skill * 1.1;
+    this._chooseWeapon(this.pos.distanceTo(t.pos));
+    return true;
+  }
+
+  _peekKind(t) {
+    const above = t.pos.y - this.pos.y, d = this.pos.distanceTo(t.pos);
+    if (above > 2.2) return 'half';
+    if (d < 9 && this.items.some((it) => it?.isGun && (it.def.key === 'pump' || it.def.key === 'shotgun'))) return 'arch';
+    return 'window';
+  }
+
+  // Fight from behind a wall we just built (skilled bots): hold behind it and edit-peek.
+  _takeCover(s) {
+    if (!s || this.skill < 0.3 || this.boxed) return;
+    this.coverWall = s;
+    this.coverT = 5 + this.skill * 4;
+    this.peekCd = 0.5 + Math.random() * 0.6;
+  }
+
+  _dropCover() {
+    if (this.peekT > 0 && this.peekWall === this.coverWall) this._closePeek();
+    this.coverWall = null;
+  }
+
+  // Steer behind the cover wall and run the peek cycle. False when the cover no longer applies.
+  _holdCover(tgt, dt) {
+    const w = this.coverWall;
+    if (!w) return false;
+    if (w.hp <= 0 || w.falling || !this.game.building.structures.includes(w)) { this.coverWall = null; return false; }
+    this.coverT -= dt;
+    const d = this.pos.distanceTo(tgt.pos);
+    if (this.coverT <= 0 || this.push || this.rushT > 0 || this.retreatT > 0 || d < 5 || this.zoneUrgent) { this._dropCover(); return false; }
+    const nx = w.alongX ? 0 : 1, nz = w.alongX ? 1 : 0; // wall normal
+    const sMe = (this.pos.x - w.cx) * nx + (this.pos.z - w.cz) * nz;
+    const sT = (tgt.pos.x - w.cx) * nx + (tgt.pos.z - w.cz) * nz;
+    if (Math.sign(sMe) === Math.sign(sT) || Math.abs(sMe) > 4.6 || Math.abs(this.pos.y - w.y0) > 2.5) { this._dropCover(); return false; }
+    // stand 1.2 m behind the middle of the wall
+    const side = Math.sign(sMe) || 1;
+    const ox = w.cx + nx * side * 1.2 - this.pos.x, oz = w.cz + nz * side * 1.2 - this.pos.z, ol = Math.hypot(ox, oz);
+    this._hx = ol > 0.3 ? ox / ol : 0; this._hz = ol > 0.3 ? oz / ol : 0;
+    this.peekCd -= dt;
+    if (this.peekT > 0) { this.peekT -= dt; if (this.peekT <= 0) this._closePeek(); }
+    else if (this.armed && this.useT <= 0 && this.peekCd <= 0 && !this.weapon?.reloading) { if (!this._openPeek(w)) this.peekCd = 1; }
     return true;
   }
 
@@ -291,7 +339,7 @@ export class Bot extends Actor {
         const tc = this.target.chest(_tp);
         _dir.copy(tc).sub(eye).normalize();
         const hit = g.world.raycast(eye, _dir, dd, _hit);
-        this.shootWall = !!hit?.collider?.structure && hit.t > 1.2;
+        this.shootWall = !!hit?.collider?.structure && hit.collider.structure.owner !== this && hit.t > 1.2;
         if (this.shootWall) { this.lastSeenPos.copy(this.target.pos); this.lastSeenT = g.time; }
       }
     }
@@ -596,7 +644,7 @@ export class Bot extends Actor {
     if (loaded) { this._chooseWeapon(d); return; }
     if (d < 25 && this.buildCooldown <= 0 && g.building?.canAfford(this) && this.onGround) {
       this.buildCooldown = 2.5;
-      g.building.buildWallFacing(this, this._yawTo(tgt.pos));
+      this._takeCover(g.building.buildPiece(this, 'wall', this._yawTo(tgt.pos)));
     }
     g.combat.reload(this);
   }
@@ -687,6 +735,8 @@ export class Bot extends Actor {
         if (!this._openPeek()) this.peekCd = 2;
         else this._chooseWeapon(this.pos.distanceTo(tgt.pos));
       }
+    } else if (this.mode === 'engage' && tgt && this._holdCover(tgt, dt)) {
+      mx = this._hx; mz = this._hz;
     } else if (this.mode === 'engage' && tgt) {
       const dx = tgt.pos.x - this.pos.x, dz = tgt.pos.z - this.pos.z;
       const d = Math.hypot(dx, dz) || 1;
