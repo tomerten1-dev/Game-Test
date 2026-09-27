@@ -44,6 +44,7 @@ export class HUD {
         <div id="banner"></div>
         <div id="prompt" class="hidden"><span class="key">E</span><span id="prompt-text"></span></div>
         <div id="loot-card" class="hidden"></div>
+        <div id="obj-hp" class="hidden"><div class="oh-bar"><div class="oh-fill"></div></div><span class="oh-num"></span></div>
         <div id="toast"></div>
         <div id="reload-ring" class="hidden"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16"/></svg><span id="ring-label">RELOADING</span></div>
         <div id="pickup-notes"></div>
@@ -192,6 +193,32 @@ export class HUD {
       this.el.promptText.textContent = text;
       this.el.promptText.style.color = rarity !== undefined ? RARITIES[rarity].color : '#fff';
     }
+  }
+
+  // Fortnite-style health bar on whatever you just hit (builds, house walls and doors, trees, rocks,
+  // furniture); it follows the hit point on screen and fades out after a moment.
+  objHp(c, pos) {
+    if (!c) return;
+    const src = c.structure || (c.part && c.part.maxHp ? c.part : null) || c.obj || (c.breakable ? c.breakable : null);
+    if (!src) return;
+    this._oh = { src, max: src.maxHp || 90, pos: pos.clone(), t: 1.8, mat: c.structure?.mat || src.mat || c.mat || 'wood' };
+  }
+
+  _updateObjHp(dt) {
+    const o = this._oh, el = this.el.objHp || (this.el.objHp = document.getElementById('obj-hp'));
+    if (!o) { if (!el.classList.contains('hidden')) el.classList.add('hidden'); return; }
+    o.t -= dt;
+    const cam = this.game.camera;
+    const v = this._ohV || (this._ohV = o.pos.clone());
+    v.copy(o.pos).project(cam);
+    if (o.t <= 0 || v.z > 1) { this._oh = null; el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    const hp = Math.max(0, Math.ceil(o.src.hp)), max = Math.round(o.max);
+    el.style.transform = `translate(${((v.x + 1) / 2) * window.innerWidth}px, ${((1 - v.y) / 2) * window.innerHeight - 46}px) translate(-50%, -100%)`;
+    el.style.opacity = String(Math.min(1, o.t * 2.5));
+    el.dataset.mat = o.mat;
+    el.querySelector('.oh-fill').style.width = `${Math.min(100, (hp / max) * 100)}%`;
+    el.querySelector('.oh-num').textContent = `${hp} / ${max}`;
   }
 
   // Stat card for the weapon you're looking at on the floor, compared with the gun you hold
@@ -442,6 +469,7 @@ export class HUD {
     const p = g.player;
     if (!p) return;
     if (this.hitT > 0) { this.hitT -= dt; if (this.hitT <= 0) this.el.hitmarker.className = ''; }
+    this._updateObjHp(dt);
     this._drawCompass();
     if (this.vig > 0) {
       this.vig = Math.max(0, this.vig - dt * 0.35);

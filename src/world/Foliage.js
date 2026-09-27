@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Destructibles } from './Destructible.js';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { addWind, WIND } from '../effects/Shaders.js';
 import { mulberry32, smoothstep } from '../core/noise.js';
@@ -57,6 +58,10 @@ export class Foliage {
     if (this.nature && !this.nature.ready) this.nature = null;
     this.roundTrees = [];
     this.pineTrees = [];
+    // trees and rocks can be cut down / broken (HP, falling stand-ins, regrow next match)
+    this.destr = new Destructibles(scene, colliders);
+    this.destr.onLodChange = (reset) => { this._lodT = 0; if (reset) { this._shown = new Set(); this._pShown = new Set(); } };
+    if (this.nature) this.nature.destr = this.destr;
     this._trees();
     this._rocks();
     if (models) { this._palms(); this._spires(); if (VARIANT.cacti) this._cacti(); }
@@ -122,6 +127,7 @@ export class Foliage {
     const rounds = new THREE.InstancedMesh(roundCanopyGeo(r), canopyMat, count);
     const pines = new THREE.InstancedMesh(pineCanopyGeo(), pineMat, count);
     let nT = 0, nR = 0, nP = 0, nK = 0;
+    const pendingPines = [];
     const kkPines = { 'kk/tree_single_A': [], 'kk/tree_single_B': [] };
     const useKK = !!this.models?.get('kk/tree_single_A');
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
@@ -149,7 +155,9 @@ export class Foliage {
           color: PINE_GREENS[Math.floor(r() * PINE_GREENS.length)].clone().multiplyScalar(shade * 1.25),
           mat: new THREE.Matrix4().compose(new THREE.Vector3(c.x, c.h - 0.2, c.z), new THREE.Quaternion().setFromAxisAngle(up, yaw), new THREE.Vector3(ks, ks, ks)) });
         kkPines[type].push({ x: c.x, y: c.h - 0.2, z: c.z, rot: yaw, scale: ks, colors: { hexagons_medieval: new THREE.Color(shade, shade * (0.95 + r() * 0.1), shade) } });
-        this.colliders.add({ kind: 'circle', x: c.x, z: c.z, r: 0.45, y0: c.h - 2, y1: c.h + H, tree: true });
+        const hcol = { kind: 'circle', x: c.x, z: c.z, r: 0.45, y0: c.h - 2, y1: c.h + H, tree: true };
+        this.colliders.add(hcol);
+        pendingPines.push({ col: hcol, type, idx: kkPines[type].length - 1, rec: this.pineTrees[this.pineTrees.length - 1], hp: Math.round(200 + H * 15) });
         this.occluders.push({ x: c.x, y: c.h + H * 0.45, z: c.z, r: info.size.x * ks * 0.42 });
         nK++;
         continue;
@@ -177,7 +185,17 @@ export class Foliage {
         this.roundTrees[this.roundTrees.length - 1].color = col.clone();
         nR++;
       }
-      this.colliders.add({ kind: 'circle', x: c.x, z: c.z, r: 0.38 * sc, y0: c.h - 2, y1: c.h + trunkH + 4 * sc, tree: true });
+      const hcol = { kind: 'circle', x: c.x, z: c.z, r: 0.38 * sc, y0: c.h - 2, y1: c.h + trunkH + 4 * sc, tree: true };
+      this.colliders.add(hcol);
+      const hp = Math.round(180 + sc * 90);
+      if (pine) this.destr.register(hcol, [{ im: trunks, idx: nT - 1 }, { im: pines, idx: nP - 1 }], { kind: 'tree', hp });
+      else {
+        const rec = this.roundTrees[this.roundTrees.length - 1], ri = this.roundTrees.length - 1;
+        this.destr.register(hcol, [{ im: trunks, idx: nT - 1 }, { im: rounds, idx: nR - 1 }], {
+          kind: 'tree', hp,
+          lod: this.nature ? { rec, shown: () => !!this._shown?.has(ri), detail: () => this.nature.detailParts(rec) } : null,
+        });
+      }
     }
     this.trunkIM = trunks;
     this.roundIM = rounds;
@@ -196,6 +214,13 @@ export class Foliage {
       const mat = (part) => { const mm = part.material.clone(); mm.roughness = 0.8; addWind(mm, { amount: 0.04, pivot: 0.15, speed: 1.1 }); return mm; };
       this.kkPineGroups = {};
       for (const [type, list] of Object.entries(kkPines)) if (list.length) this.scene.add(this.kkPineGroups[type] = this.models.instanced(type, list, { material: mat }));
+      for (const p of pendingPines) {
+        const ri = this.pineTrees.indexOf(p.rec);
+        this.destr.register(p.col, this.kkPineGroups[p.type].children.map((im) => ({ im, idx: p.idx })), {
+          kind: 'tree', hp: p.hp,
+          lod: this.nature?.pineDetail.length ? { rec: p.rec, shown: () => !!this._pShown?.has(ri), detail: () => this.nature.detailParts(p.rec, this.nature.pineDetail) } : null,
+        });
+      }
     }
   }
 
@@ -226,8 +251,10 @@ export class Foliage {
       im.setMatrixAt(n, m);
       const g = 0.75 + r() * 0.35;
       im.setColorAt(n, col.set(PALETTE.rock).multiplyScalar(g).lerp(new THREE.Color('#a39e93'), r() * 0.3));
+      const hcol = { kind: 'circle', x: c.x, z: c.z, r: Math.max(s.x, s.z) * 0.85, y0: c.h - 3, y1: c.h + s.y * 0.8, rock: true };
+      this.colliders.add(hcol);
+      this.destr.register(hcol, [{ im, idx: n }], { kind: 'rock', hp: Math.round(250 + base * 150) });
       n++;
-      this.colliders.add({ kind: 'circle', x: c.x, z: c.z, r: Math.max(s.x, s.z) * 0.85, y0: c.h - 3, y1: c.h + s.y * 0.8, rock: true });
     }
     im.count = n;
     im.castShadow = true;
@@ -241,6 +268,7 @@ export class Foliage {
     const r = this.rand;
     const types = ['kk/rock_single_A', 'kk/rock_single_B', 'kk/rock_single_C', 'kk/rock_single_D', 'kk/rock_single_E'];
     const pl = Object.fromEntries(types.map((t) => [t, []]));
+    const pending = [];
     let n = 0;
     for (let i = 0; i < 1200 * AREA_SCALE && n < 160 * AREA_SCALE; i++) {
       const mountainBias = r() < 0.4;
@@ -254,10 +282,14 @@ export class Foliage {
       const H = info.size.y * s;
       const g = 0.85 + r() * 0.25;
       pl[type].push({ x: c.x, y: c.h - 0.15, z: c.z, rot: r() * Math.PI * 2, scale: s, colors: { hexagons_medieval: new THREE.Color(g, g, g * 1.02) } });
-      this.colliders.add({ kind: 'circle', x: c.x, z: c.z, r: W * 0.42, y0: c.h - 3, y1: c.h + H, rock: true });
+      const hcol = { kind: 'circle', x: c.x, z: c.z, r: W * 0.42, y0: c.h - 3, y1: c.h + H, rock: true };
+      this.colliders.add(hcol);
+      pending.push({ col: hcol, type, idx: pl[type].length - 1, hp: Math.round(200 + W * 110) });
       n++;
     }
-    for (const [type, list] of Object.entries(pl)) if (list.length) this.scene.add(this.models.instanced(type, list));
+    const groups = {};
+    for (const [type, list] of Object.entries(pl)) if (list.length) this.scene.add(groups[type] = this.models.instanced(type, list));
+    for (const p of pending) this.destr.register(p.col, groups[p.type].children.map((im) => ({ im, idx: p.idx })), { kind: 'rock', hp: p.hp });
   }
 
   // Kenney palms along the beaches.
@@ -292,7 +324,10 @@ export class Foliage {
       m.compose(p.set(c.x, c.h - 0.1, c.z), q, sc.set(H * 0.55, H, H * 0.55));
       im.setMatrixAt(n, m);
       im.setColorAt(n, col.set(green).multiplyScalar(0.85 + r() * 0.3));
-      this.colliders.add({ kind: 'circle', x: c.x, z: c.z, r: 0.3 * H * 0.55 + 0.1, y0: c.h - 1, y1: c.h + H, tree: true });
+      const hcol = { kind: 'circle', x: c.x, z: c.z, r: 0.3 * H * 0.55 + 0.1, y0: c.h - 1, y1: c.h + H, tree: true };
+      this.colliders.add(hcol);
+      im.setMatrixAt(n, m);
+      this.destr.register(hcol, [{ im, idx: n }], { kind: 'tree', hp: Math.round(80 + H * 25) });
       n++;
     }
     im.count = n;
@@ -305,6 +340,7 @@ export class Foliage {
   _palms() {
     const r = this.rand;
     const pl = { 'palm-long': [], 'palm-short': [] };
+    const pending = [];
     for (let i = 0; i < 900 * AREA_SCALE && pl['palm-long'].length + pl['palm-short'].length < 46 * AREA_SCALE; i++) {
       const a = r() * Math.PI * 2, d = ISLAND_RADIUS * 0.72 + r() * ISLAND_RADIUS * 0.45;
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
@@ -314,11 +350,15 @@ export class Foliage {
       const type = r() < 0.5 ? 'palm-long' : 'palm-short';
       const s = (7 + r() * 4) / this.models.get(type).size.y;
       pl[type].push({ x, y: h - 0.2, z, rot: r() * Math.PI * 2, scale: s });
-      this.colliders.add({ kind: 'circle', x, z, r: 0.35, y0: h - 2, y1: h + 8, tree: true });
+      const hcol = { kind: 'circle', x, z, r: 0.35, y0: h - 2, y1: h + 8, tree: true };
+      this.colliders.add(hcol);
+      pending.push({ col: hcol, type, idx: pl[type].length - 1 });
       this.occluders.push({ x, y: h + (7 + 2) * 0.8, z, r: 2.6 });
     }
     const palmMat = (p) => { const m = p.material.clone(); m.roughness = 0.8; addWind(m, { amount: 0.035, pivot: 0.5, speed: 1.2 }); return m; };
-    for (const [type, list] of Object.entries(pl)) if (list.length) this.scene.add(this.models.instanced(type, list, { material: palmMat }));
+    const groups = {};
+    for (const [type, list] of Object.entries(pl)) if (list.length) this.scene.add(groups[type] = this.models.instanced(type, list, { material: palmMat }));
+    for (const p of pending) this.destr.register(p.col, groups[p.type].children.map((im) => ({ im, idx: p.idx })), { kind: 'tree', hp: 220 });
   }
 
   // Tall Kenney rock spires on the mountain and a few on the coast.
@@ -492,7 +532,7 @@ export class Foliage {
     const shown = this.nature.updateLOD(this.roundTrees, cam);
     const zero = this._zero || (this._zero = new THREE.Matrix4().makeScale(0, 0, 0));
     const prev = this._shown || new Set();
-    for (const i of prev) if (!shown.has(i)) { const t = this.roundTrees[i]; this.trunkIM.setMatrixAt(t.trunkIdx, t.trunkMat); this.roundIM.setMatrixAt(t.canopyIdx, t.canopyMat); }
+    for (const i of prev) if (!shown.has(i) && !this.roundTrees[i].removed) { const t = this.roundTrees[i]; this.trunkIM.setMatrixAt(t.trunkIdx, t.trunkMat); this.roundIM.setMatrixAt(t.canopyIdx, t.canopyMat); }
     for (const i of shown) if (!prev.has(i)) { const t = this.roundTrees[i]; this.trunkIM.setMatrixAt(t.trunkIdx, zero); this.roundIM.setMatrixAt(t.canopyIdx, zero); }
     this.trunkIM.instanceMatrix.needsUpdate = true;
     this.roundIM.instanceMatrix.needsUpdate = true;
@@ -502,7 +542,7 @@ export class Foliage {
     const pShown = this.nature.updateLOD(this.pineTrees, cam, this.nature.pineDetail);
     const pPrev = this._pShown || new Set();
     const set = (t, mat) => { for (const im of this.kkPineGroups[t.type].children) { im.setMatrixAt(t.idx, mat); im.instanceMatrix.needsUpdate = true; } };
-    for (const i of pPrev) if (!pShown.has(i)) set(this.pineTrees[i], this.pineTrees[i].mat);
+    for (const i of pPrev) if (!pShown.has(i) && !this.pineTrees[i].removed) set(this.pineTrees[i], this.pineTrees[i].mat);
     for (const i of pShown) if (!pPrev.has(i)) set(this.pineTrees[i], zero);
     this._pShown = pShown;
   }

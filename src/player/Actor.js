@@ -205,7 +205,8 @@ export class Actor {
     const top = w.groundAt(px, pz, this.pos.y + 2.2, 0.25);
     const rise = top - this.pos.y;
     const min = this.onGround ? 0.85 : -0.2;
-    if (rise < min || rise > 2.6) return false;
+    // in the air you can catch a ledge up to arm's reach above your head (and hang off it)
+    if (rise < min || rise > (this.onGround ? 2.6 : 3.2)) return false;
     // something must actually block us at knee height, and there must be headroom on top
     const list = w.colliders.query(px - 0.4, px + 0.4, pz - 0.4, pz + 0.4, _mq);
     let blocked = w.heightAt(px, pz) > this.pos.y + 0.8;
@@ -215,13 +216,45 @@ export class Actor {
       if (c.y1 > this.pos.y + (this.onGround ? 0.5 : 0.1)) blocked = true;
     }
     if (!blocked) return false;
-    this.mantleT = 0.32;
-    this.mantleFrom.copy(this.pos);
+    // a ledge high above us mid-air: grab it, hang a moment, then pull up
+    this.mantleHang = !this.onGround && rise > 1.7 ? 0.3 : 0;
+    this.mantleDur = this.mantleHang ? 0.75 : 0.34;
+    this.mantleT = this.mantleDur;
+    this.mantleFrom.set(px - dx * (reach - 0.1), top - 1.9, pz - dz * (reach - 0.1));
+    if (!this.mantleHang) this.mantleFrom.copy(this.pos);
     this.mantleTo.set(px + dx * 0.25, top + 0.02, pz + dz * 0.25);
     this.vel.set(0, 0, 0);
     this.crouched = false;
+    this.character.setPose(this.mantleHang ? 'Spellcast_Raise' : 'Jump_Start', null, 0.05, this.mantleHang ? 1 : 1.8);
+    this.game.sound?.play('jump', this.isPlayer ? null : this.pos);
+    return true;
+  }
+
+  // Kick off a wall you're touching mid-air (twice before you land).
+  _tryWallJump(it) {
+    if ((this.wallJumps || 0) >= 2 || this.game.time - (this.lastWallJump || -9) < 0.3) return false;
+    const w = this.game.world, r = this.radius + 0.4, y = this.pos.y + 1.0;
+    let best = null, bd = r;
+    for (const c of w.colliders.query(this.pos.x - r - 1, this.pos.x + r + 1, this.pos.z - r - 1, this.pos.z + r + 1, _mq)) {
+      if (c.kind === 'ramp' || c.kind === 'cone' || c.y1 < y || c.y0 > y) continue;
+      let nx, nz, d;
+      if (c.kind === 'circle') { nx = this.pos.x - c.x; nz = this.pos.z - c.z; d = Math.hypot(nx, nz) - c.r; }
+      else {
+        const cx = Math.max(c.minX, Math.min(this.pos.x, c.maxX)), cz = Math.max(c.minZ, Math.min(this.pos.z, c.maxZ));
+        nx = this.pos.x - cx; nz = this.pos.z - cz; d = Math.hypot(nx, nz);
+      }
+      if (d < bd && d > 1e-4) { bd = d; const l = Math.hypot(nx, nz); best = [nx / l, nz / l]; }
+    }
+    if (!best) return false;
+    this.wallJumps = (this.wallJumps || 0) + 1;
+    this.lastWallJump = this.game.time;
+    const mlen = Math.hypot(it.mx, it.mz);
+    const along = mlen > 0.2 ? 3.5 : 0;
+    this.vel.set(best[0] * 7 + (mlen > 0.2 ? (it.mx / mlen) * along : 0), JUMP_VEL * 0.95, best[1] * 7 + (mlen > 0.2 ? (it.mz / mlen) * along : 0));
+    this.flungT = 0.35; // keep the push-off momentum for a moment
     this.character.setPose('Jump_Start', null, 0.05, 1.8);
     this.game.sound?.play('jump', this.isPlayer ? null : this.pos);
+    if (this.distToCam < 40) this.game.effects.dust(this.pos, 5, 0.8);
     return true;
   }
 
@@ -257,15 +290,24 @@ export class Actor {
 
   _updateMantle(dt) {
     this.mantleT -= dt;
-    const k = 1 - Math.max(0, this.mantleT) / 0.32;
-    // up first, then over
-    const up = Math.min(1, k * 1.6), over = Math.max(0, (k - 0.35) / 0.65);
+    const dur = this.mantleDur || 0.34, hang = this.mantleHang || 0;
+    const el = dur - Math.max(0, this.mantleT);
+    if (el < hang) { this.pos.copy(this.mantleFrom); this.vel.set(0, 0, 0); return; } // hanging off the ledge
+    if (hang && !this._pulling) { this._pulling = true; this.character.setPose('Jump_Start', null, 0.06, 1.6); }
+    const k = Math.min(1, (el - hang) / (dur - hang));
+    // up first, then over, eased so it reads as a push-up rather than a slide
+    const e = (x) => x * x * (3 - 2 * x);
+    const up = e(Math.min(1, k * 1.5)), over = e(Math.max(0, (k - 0.3) / 0.7));
     this.pos.set(
       this.mantleFrom.x + (this.mantleTo.x - this.mantleFrom.x) * over,
       this.mantleFrom.y + (this.mantleTo.y - this.mantleFrom.y) * up,
       this.mantleFrom.z + (this.mantleTo.z - this.mantleFrom.z) * over,
     );
-    if (this.mantleT <= 0) { this.pos.copy(this.mantleTo); this.onGround = true; this.vel.set(0, 0, 0); }
+    if (this.mantleT <= 0) {
+      this.pos.copy(this.mantleTo); this.onGround = true; this.vel.set(0, 0, 0);
+      this._pulling = false; this.mantleHang = 0;
+      this.character.setPose('Jump_Land', null, 0.08, 1.8);
+    }
   }
 
   // Rift-to-Go: warp up into the sky and skydive / glide from there.
@@ -323,11 +365,42 @@ export class Actor {
     this.pos.y += 0.3;
   }
 
+  // Sliding into someone kicks them off their feet: knockback + a little damage.
+  _slideKick() {
+    for (const a of this.game.actors) {
+      if (a === this || !a.alive || a.state !== 'ground' || a.hiddenIn) continue;
+      const dx = a.pos.x - this.pos.x, dz = a.pos.z - this.pos.z, dy = a.pos.y - this.pos.y;
+      const d = Math.hypot(dx, dz);
+      if (d > 1.4 || Math.abs(dy) > 1.2 || (dx * this.slideDir.x + dz * this.slideDir.z) / (d || 1) < 0.3) continue;
+      this.slideKicked = true;
+      const kx = this.slideDir.x * 0.8 + (dx / (d || 1)) * 0.4, kz = this.slideDir.z * 0.8 + (dz / (d || 1)) * 0.4, kl = Math.hypot(kx, kz) || 1;
+      a.vel.set((kx / kl) * 11, 5.5, (kz / kl) * 11);
+      a.onGround = false;
+      a.flungT = 0.6;
+      a.slideT = 0;
+      a.character?.setPose('Hit_A', null, 0.05, 1.4);
+      const dealt = a.takeDamage(15, this, false);
+      this.character.setPose('Unarmed_Melee_Attack_Kick', null, 0.05, 1.6);
+      this.game.sound?.play('kick', a.pos, { range: 50 });
+      if (this.isPlayer) {
+        this.game.effects.damageNumber(a.chest(new THREE.Vector3()), dealt, false, false, a);
+        this.game.hud?.hitMarker(false, !a.alive);
+        this.game.rig.shake = Math.min(1, this.game.rig.shake + 0.35);
+      }
+      if (a.isPlayer) this.game.rig.shake = Math.min(1.2, this.game.rig.shake + 0.7);
+      if (this.distToCam < 50) this.game.effects.dust(a.pos, 8, 1.4);
+      // the kicker slows down on impact
+      this.slideT = Math.min(this.slideT, 0.15);
+      return;
+    }
+  }
+
   startSlide() {
     if (this.slideT > 0 || !this.onGround) return;
     const hs = Math.hypot(this.vel.x, this.vel.z);
     if (hs < 5) return;
     this.slideT = SLIDE_TIME;
+    this.slideKicked = false;
     this.slideDir.set(this.vel.x / hs, 0, this.vel.z / hs);
     this.crouched = true;
     this.game.sound?.play('slide', this.isPlayer ? null : this.pos);
@@ -423,12 +496,16 @@ export class Actor {
         this.vel.x = this.slideDir.x * sp;
         this.vel.z = this.slideDir.z * sp;
         if (this.slideT <= 0 && !this.crouchHeld) this.crouched = false;
+        if (!this.slideKicked && sp > 6) this._slideKick();
       } else {
         this.vel.x = damp(this.vel.x, it.mx * speed, k, dt);
         this.vel.z = damp(this.vel.z, it.mz * speed, k, dt);
       }
       // mantle onto ledges: jumping into something waist-to-head high, or reaching one mid-air
       if (mlen > 0.3 && this.slideT <= 0 && ((it.jump && this.onGround) || (!this.onGround && this.vel.y < 4)) && this._tryMantle(it.mx / mlen, it.mz / mlen)) return;
+      // mid-air jump press next to a wall: kick off it
+      if (this.onGround) this.wallJumps = 0;
+      else if (it.jumpPress && !this.swimming && !(it.redeploy && this.canRedeploy()) && this._tryWallJump(it)) return;
       if (it.jump && this.onGround) {
         this.crouched = false;
         this.crouchHeld = false;
@@ -440,6 +517,7 @@ export class Actor {
         this.game.sound?.play('jump', this.pos);
       }
       if (it.redeploy && this.canRedeploy()) { this.setState('glide'); this.game.sound?.play('glider', this.isPlayer ? null : this.pos); return; }
+
       const wasGround = this.onGround;
       world.moveBody(this, dt);
       if (this.onGround && !wasGround && this.landSpeed > 7) {

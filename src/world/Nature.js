@@ -126,6 +126,7 @@ export class Nature {
     order.sort((a, b) => near[a + 1] - near[b + 1]);
     for (const j of order) {
       const i = near[j], t = trees[i];
+      if (t.removed) continue; // cut down
       const k = t.variant % detail.length;
       const d = detail[k];
       if (counts[k] >= d.cap) continue;
@@ -148,6 +149,16 @@ export class Nature {
     return shown;
   }
 
+  // Detailed parts (geometry, material, world matrix, color) for one LOD tree — used for the
+  // falling stand-in when it's cut down while shown up close.
+  detailParts(t, detail = this.detail) {
+    const d = detail[t.variant % detail.length];
+    const m = new THREE.Matrix4().compose(new THREE.Vector3(t.x, t.y - 0.15, t.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), t.yaw), new THREE.Vector3().setScalar(t.height / d.height));
+    const out = [{ geometry: d.bark.geometry, material: d.bark.material, matrix: m, color: null }];
+    if (d.leaves) out.push({ geometry: d.leaves.geometry, material: d.leaves.material, matrix: m, color: t.color });
+    return out;
+  }
+
   // Always-visible feature trees: willows by the lake and low coast, swiggly trees in meadows,
   // dead trees on the mountain and around Rusty Works (lots more on the desert island).
   scatterFeatureTrees(candidate, free, rand, colliders, greens) {
@@ -156,8 +167,9 @@ export class Nature {
       const info = this.models.get(name);
       if (!info) return;
       const sc = height / info.size.y;
-      (place[name] || (place[name] = [])).push({ x, y: y - 0.2, z, yaw: rand() * Math.PI * 2, sc, color });
-      colliders.add({ kind: 'circle', x, z, r: colR, y0: y - 2, y1: y + height * 0.7, tree: true });
+      const col = { kind: 'circle', x, z, r: colR, y0: y - 2, y1: y + height * 0.7, tree: true };
+      (place[name] || (place[name] = [])).push({ x, y: y - 0.2, z, yaw: rand() * Math.PI * 2, sc, color, col, hp: Math.round(120 + height * 28) });
+      colliders.add(col);
       this.occluders?.push({ x, y: y + height * 0.55, z, r: info.size.x * sc * 0.35 });
     };
     const green = () => greens[Math.floor(rand() * greens.length)].clone().multiplyScalar(0.9 + rand() * 0.2);
@@ -222,6 +234,7 @@ export class Nature {
         im.computeBoundingSphere();
         this.scene.add(im);
       }
+      list.forEach((pl, i) => this.destr?.register(pl.col, [{ im: bark, idx: i }, { im: leaves, idx: i }], { kind: 'tree', hp: pl.hp }));
     }
     return Object.fromEntries(Object.entries(place).map(([k, v]) => [k, v.length]));
   }

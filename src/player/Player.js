@@ -78,5 +78,6 @@ export class Player extends Actor {
     this.intent.deploy = this.state === 'skydive' && input.pressed('jump');
     // glider redeploy: jump while falling from high up
     this.intent.redeploy = this.state === 'ground' && !this.onGround && input.pressed('jump');
+    this.intent.jumpPress = input.pressed('jump');
   }
 }

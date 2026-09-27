@@ -45,6 +45,7 @@ export class World {
     this.clouds = new Clouds(scene, 26, models);
     this.towns = new Towns(scene, this.terrain, this.colliders, models);
     this.foliage = new Foliage(scene, this.terrain, this.colliders, models, this.heightTex);
+    this.destructibles = this.foliage.destr;
     const t0 = performance.now();
     const { shade, ao } = bakeLighting(this.terrain, this.colliders, this.foliage.occluders, SUN_DIR);
     this.terrain.applyBake(shade, ao);

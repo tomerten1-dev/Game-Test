@@ -120,6 +120,8 @@ export class Combat {
         if (r.collider?.structure) r.collider.structure.damage(w.damage * 0.9, shooter);
         else if (r.collider?.breakable) this.damageProp(r.collider, w.damage);
         else if (r.collider?.part) r.collider.part.damage(w.damage, shooter); // house walls, doors, windows
+        else if (r.collider?.obj) g.world.destructibles.damage(r.collider, w.damage, shooter); // trees, rocks
+        if (shooter.isPlayer && i < 1) g.hud?.objHp?.(r.collider, _end);
       }
     }
     for (const [target, e] of perTarget) {
@@ -203,6 +205,7 @@ export class Combat {
       return true;
     }
     const c = r.collider;
+    if (actor.isPlayer && c) g.hud?.objHp?.(c, _end);
     if (c?.structure) { const m = c.structure.mat || 'wood'; c.structure.damage(50, actor); g.effects.impact(_end, m === 'wood' ? 'wood' : 'stone'); g.sound.play(`harvest_${m}`, actor.isPlayer ? null : _end); return true; }
     if (c?.breakable) this.damageProp(c, 35);
     if (c?.part) c.part.damage(c.mat === 'glass' ? 1 : 55, actor); // house walls break after a few swings
@@ -214,8 +217,12 @@ export class Combat {
       if (actor.isPlayer && c?.kind === 'circle') {
         const crit = this.weak?.c === c && _end.distanceTo(this.weak.pos) < 0.6;
         if (crit) { amount *= 2; g.sound.play('hit'); g.effects.hitSparks(this.weak.pos, '#6cd8ff'); }
-        this._placeWeak(c, actor, _end.y, crit);
-      }
+        if (c.obj) {
+          // trees and rocks lose HP; the last hit knocks them down for a bonus
+          if (g.world.destructibles.damage(c, crit ? 100 : 50, actor)) { amount += 12; if (this.weak?.c === c) { this.weak = null; this.weakMesh.visible = false; } }
+          else this._placeWeak(c, actor, _end.y, crit);
+        } else this._placeWeak(c, actor, _end.y, crit);
+      } else if (c?.obj) g.world.destructibles.damage(c, 50, actor);
       actor.addMat(mat, amount);
       if (actor.isPlayer) { g.effects.matNumber?.(_end, amount, mat); g.meta?.track('harvest', amount); }
       g.sound.play(`harvest_${mat}`, actor.isPlayer ? null : _end, { range: 50 });

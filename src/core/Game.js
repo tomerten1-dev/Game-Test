@@ -29,6 +29,7 @@ import { Pings } from '../ui/Pings.js';
 import { StormFX } from '../effects/StormFX.js';
 import { Projectiles } from '../weapons/Projectiles.js';
 import { Events } from '../world/Events.js';
+import { Traps } from '../world/Traps.js';
 import { applyMood, DayCycle } from '../world/TimeOfDay.js';
 import { Meta } from '../meta/Meta.js';
 import { LobbyStage } from '../ui/LobbyStage.js';
@@ -94,8 +95,10 @@ export class Game {
     this.building = new Building(this);
     this.projectiles = new Projectiles(this);
     this.events = new Events(this);
+    this.traps = new Traps(this);
     this.homes = this.world.towns.homes;
     this.homes.game = this;
+    this.world.destructibles.game = this;
     this.boss = new BossEvent(this);
     this.dayCycle = new DayCycle(this);
     this.ambient = new Ambient(this);
@@ -330,6 +333,8 @@ export class Game {
     this.projectiles.reset();
     this.events.reset();
     this.homes.reset();
+    this.world.destructibles.reset();
+    this.traps.reset();
     this.mood = applyMood(this, 'day');
     this.dayCycle.stop();
     this.spectating = null;
@@ -389,6 +394,8 @@ export class Game {
     this.storm.reset();
     this.events.reset();
     this.homes.reset();
+    this.world.destructibles.reset();
+    this.traps.reset();
     this.bus.launch();
     for (const a of this.actors) {
       if (!a.alive) a.revive(0, 0);
@@ -532,6 +539,8 @@ export class Game {
     this.loot.update(dt, this.time);
     this.building.update(dt);
     this.homes.update(dt, this.actors, this.camera.position);
+    this.world.destructibles.update(dt);
+    this.traps.update(dt, this.actors);
     this.projectiles.update(dt);
     this.combat.updateBursts(dt);
     if (this.warmup <= 0) this.events.update(dt, this.time);
@@ -656,6 +665,15 @@ export class Game {
     }
     if (held.isConsumable && held.def.grapple) {
       if (input.pressed('fire')) this.fireGrapple(p);
+      return;
+    }
+    if (held.isConsumable && held.def.trap) {
+      const dir = this.camera.getWorldDirection(_dir);
+      const plan = this.traps.preview(p, this.camera.position, dir);
+      if (input.pressed('fire')) {
+        if (plan && this.traps.place(p, plan)) p.consumeHeld();
+        else this.hud.toast?.('Aim at a floor, wall or ceiling nearby');
+      }
       return;
     }
     if (held.isConsumable && held.def.place) {

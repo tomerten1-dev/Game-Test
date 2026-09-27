@@ -515,3 +515,11 @@ body.touch #loot-card { left: auto; right: 12px; top: 30%; width: 160px; font-si
 .bar-row.overshield .bar-ico { font-size: 13px; color: #d6b8ff; }
 .bar-row.overshield .bar-num { font-size: 14px; }
 #os-fill { background: linear-gradient(90deg, #b18cff, #f0e6ff); }
+/* health bar on things you hit (builds, walls, trees, rocks) */
+#obj-hp { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none; will-change: transform; }
+#obj-hp .oh-bar { width: 120px; height: 9px; border-radius: 3px; background: rgba(10,18,40,0.7); border: 2px solid rgba(255,255,255,0.85); overflow: hidden; transform: skewX(-12deg); }
+#obj-hp .oh-fill { height: 100%; background: linear-gradient(90deg, #5dd7ff, #b8f0ff); transition: width 0.12s ease-out; }
+#obj-hp[data-mat="wood"] .oh-fill { background: linear-gradient(90deg, #d9954d, #ffd08a); }
+#obj-hp[data-mat="stone"] .oh-fill { background: linear-gradient(90deg, #9aa3ad, #e7ebef); }
+#obj-hp[data-mat="metal"] .oh-fill { background: linear-gradient(90deg, #6f8fb0, #c9dcef); }
+#obj-hp .oh-num { font-family: var(--num); font-weight: 800; font-size: 14px; color: #fff; -webkit-text-stroke: 1px rgba(20,20,40,0.85); }

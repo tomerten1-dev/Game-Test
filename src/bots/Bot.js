@@ -544,7 +544,7 @@ export class Bot extends Actor {
     // gather wood for building when low
     const matGoal = ((g.storm?.phase || 0) >= 3 ? 150 : 90) * this.matMul;
     if (this.matTotal < (this.mode === 'harvest' ? matGoal : matGoal * 0.5) && g.time - this.landTime > 8) {
-      if (this.tree && Math.hypot(this.tree.x - this.pos.x, this.tree.z - this.pos.z) > 30) this.tree = null;
+      if (this.tree && (this.tree.obj?.dead || Math.hypot(this.tree.x - this.pos.x, this.tree.z - this.pos.z) > 30)) this.tree = null;
       if (!this.tree || this.mode !== 'harvest') this.tree = this._nearestTree(26);
       if (this.tree) {
         this.mode = 'harvest';
@@ -922,7 +922,7 @@ export class Bot extends Actor {
         if (this.held !== this.items[0]) this.switchSlot(0);
         const r = g.combat.melee(this, this.eye(_eye), _dir.set(tx, 0, tz).normalize(), this.tree.r + 2.2);
         if (r) this.tree.hits++;
-        if (this.tree.hits > 6 || this.matTotal >= 160) { this.tree = null; this.mode = 'wander'; this._chooseWeapon(30); }
+        if (this.tree.hits > 6 || this.tree.obj?.dead || this.matTotal >= 160) { this.tree = null; this.mode = 'wander'; this._chooseWeapon(30); }
       }
     }
     if (this.mode !== 'engage' || !tgt) this.crouched = false;

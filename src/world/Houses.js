@@ -222,7 +222,7 @@ export class Houses {
       h.glass.push(g);
     }
     if (type === 'door') {
-      const d = { house: h, panel: p, side, uc, y0, hp: DOOR_HP, open: false, angle: 0, broken: false, mat: 'wood' };
+      const d = { house: h, panel: p, side, uc, y0, hp: DOOR_HP, maxHp: DOOR_HP, open: false, angle: 0, broken: false, mat: 'wood' };
       d.damage = (amount) => this.damageDoor(d, amount);
       p.door = d;
       h.doors.push(d);

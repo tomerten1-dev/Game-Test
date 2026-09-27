@@ -448,6 +448,20 @@ export class Sound {
       case 'click':
         this._tone(t, 0.05, { type: 'triangle', freq: 1200, gain: 0.1 });
         break;
+      case 'kick': // body thump
+        this._noise(t, 0.12, { type: 'lowpass', freq: 700, gain: 0.6 * v });
+        this._tone(t, 0.14, { type: 'sine', freq: 140, freqEnd: 60, gain: 0.4 * v });
+        break;
+      case 'trap': // metal clank + spikes
+        this._noise(t, 0.12, { type: 'highpass', freq: 3000, gain: 0.45 * v });
+        this._tone(t, 0.18, { type: 'square', freq: 320, freqEnd: 120, gain: 0.12 * v });
+        this._noise(t + 0.03, 0.2, { type: 'bandpass', freq: 1500, q: 3, gain: 0.3 * v });
+        break;
+      case 'treeFall': // creak, crack, then a thump
+        this._tone(t, 0.5, { type: 'sawtooth', freq: 120, freqEnd: 70, gain: 0.08 * v, attack: 0.05 });
+        this._noise(t + 0.05, 0.25, { type: 'bandpass', freq: 1800, freqEnd: 600, q: 2, gain: 0.35 * v });
+        this._noise(t + 0.9, 0.4, { type: 'lowpass', freq: 400, freqEnd: 90, gain: 0.7 * v });
+        break;
       case 'door': // wooden creak + latch knock
         this._tone(t, 0.32, { type: 'sawtooth', freq: 190, freqEnd: 260, gain: 0.05 * v, attack: 0.04 });
         this._noise(t, 0.3, { type: 'bandpass', freq: 700, freqEnd: 1100, q: 4, gain: 0.12 * v, attack: 0.05 });

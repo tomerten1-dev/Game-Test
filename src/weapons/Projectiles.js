@@ -221,6 +221,8 @@ export class Projectiles {
       if (c?.structure) c.structure.damage(p.damage, owner);
       else if (c?.breakable) g.combat.damageProp(c, p.damage);
       else if (c?.part) c.part.damage(p.damage, owner);
+      else if (c?.obj) g.world.destructibles.damage(c, p.damage, owner);
+      if (owner?.isPlayer) g.hud?.objHp?.(c, pt);
     }
     this._remove(p);
   }
@@ -277,6 +279,7 @@ export function explode(game, pos, owner, damage, radius, structureDamage) {
   }
   for (const c of game.world.colliders.query(pos.x - radius, pos.x + radius, pos.z - radius, pos.z + radius, [])) {
     if (c.breakable && !c.breakable.broken) game.world.towns.breakProp(c, game);
+    if (c.obj && !c.obj.dead && Math.hypot(c.x - pos.x, c.z - pos.z) < radius + c.r) game.world.destructibles.damage(c, (structureDamage || damage) * 0.6, owner);
   }
   game.homes?.explode(pos, radius, structureDamage || damage);
   for (const s of [...game.building.structures]) {

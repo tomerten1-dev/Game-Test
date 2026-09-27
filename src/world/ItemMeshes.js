@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { itemGeometry, makeThrowableMesh } from '../weapons/WeaponModels.js';
+import { makeTrapMesh } from './Traps.js';
 
 // Detailed models for consumables (pickups on the ground, held items and hotbar icons).
 // Each is built once as a template (a few meshes with proper materials: glass bottles with
@@ -119,6 +120,7 @@ export function makeConsumableMesh(ctype) {
   if (!templates.has(ctype)) {
     let g = null;
     if (BUILDERS[ctype]) { g = new THREE.Group(); BUILDERS[ctype](g); }
+    else if (ctype === 'trap') { g = new THREE.Group(); const t = makeTrapMesh(); t.scale.setScalar(0.42); t.rotation.x = 0.35; t.getObjectByName('spikes').scale.y = 1; g.add(t); }
     else if (['launchpad', 'shockwave', 'grappler', 'rift', 'grenade'].includes(ctype)) {
       g = new THREE.Group();
       const m = mesh(itemGeometry(ctype), vcMat);

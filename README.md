@@ -54,10 +54,11 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 
 ## Inventory & survival
 
-- **Slot 1** is the harvesting axe: hit trees, crates and wooden houses for wood, rocks and walls for stone, cars, lamps and city props for metal. Trees and rocks show a glowing blue **weak point**; hit it for double materials.
+- **Slot 1** is the harvesting axe: hit trees, crates and wooden houses for wood, rocks and walls for stone, cars, lamps and city props for metal. Trees and rocks show a glowing blue **weak point**; hit it for double materials. Trees and rocks have HP: chop a tree down and it **topples over**, and rocks **crumble**. Bullets and explosions wear them down too. Everything grows back next match.
+- **HP bars:** hitting a build, a house wall or door, a tree, a rock or furniture shows a Fortnite-style health bar with its HP (e.g. `150 / 300`).
 - **Picking up:** walking over a gun or heal that fits (a free slot, or room in a stack) picks it up; weapons fill slots from the left and consumables from the right. With full slots, picking something up swaps it with what you're holding. Looking at a gun on the floor shows a **stat card** compared with your gun. Each of these can be turned off in Settings.
 - **Foraging:** red apples under trees (+5 health) and blue mushrooms in the woods (+5 shield).
-- **Slots 2–6** hold guns or stacks of heals: Bandages (+15 up to 75), Medkit (full health), Small Shield (+25 up to 50), Shield Potion (+50), **Med-Mist** (+30, use it on the move), **Slurp Juice** (+75 over time: health, then shield), **Chug Jug** (full health and shield, 15 s). Placeables: **Shield Keg** (shields everyone nearby up to 100) and **Campfire** (heals everyone nearby over time). Hold still-ish while the ring fills.
+- **Slots 2–6** hold guns or stacks of heals: Bandages (+15 up to 75), Medkit (full health), Small Shield (+25 up to 50), Shield Potion (+50), **Med-Mist** (+30, use it on the move), **Slurp Juice** (+75 over time: health, then shield), **Chug Jug** (full health and shield, 15 s). **Spike Traps** (place on a floor, wall or ceiling you aim at; spikes hit anyone else who walks in for 75, re-arming after 3 s, and go away with the surface they're on). Placeables: **Shield Keg** (shields everyone nearby up to 100) and **Campfire** (heals everyone nearby over time). Hold still-ish while the ring fills.
 - **Mobility:** **Shockwave Grenade** (goes off on impact and launches everyone nearby, you too, ~40 m with no fall damage), **Grappler** (10 charges: pulls you to where you aim, up to 60 m), **Rift-to-Go** (warps you into the sky to glide).
 - **Upgrade benches** in six towns (orange on the map): hold a gun and interact to raise its rarity for 100 wood / 150 stone / 200 metal / 300 metal.
 - **Houses you can go into:** the village homes are one- or two-story houses with furnished rooms: living room, kitchen or bedroom downstairs, and stairs up to a bedroom floor in the two-story ones. Chests and floor loot are inside. Doors open and close with interact (bots open them as they walk up) and break if you shoot or hit them. Windows shatter. Walls are panels that break under bullets, the axe and explosions and give wood when harvested. Everything is repaired at the start of the next match. You can also land and walk on the roofs.
@@ -65,6 +66,9 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 - Crates, barrels, furniture and street clutter **break** from the axe, bullets and explosions and sometimes drop loot.
 - **Swimming:** deep water is swimmable (slower, and no shooting or building while swimming).
 - **Movement:** sprint into a low fence or crate to **hurdle** it; land from a big drop while running to **roll**; crouch-walking is almost silent.
+- **Slide kick:** slide into someone to kick them off their feet (knockback + 15 damage).
+- **Wall jump:** press Jump in the air next to a wall to kick off it (twice before you land).
+- **Ledge hang:** reach for a ledge above your head mid-air to grab it, hang for a moment and pull yourself up.
 - Guns use **light / medium / shells** ammo; reserve shows after the slash. Green **ammo boxes** near houses and anything dropped on the ground are picked up by walking over it.
 - Sprinting is fast but inaccurate; standing still gives a perfectly accurate first shot. Falls from high up hurt.
 - Guns take a moment to **draw** before they fire, and swapping straight from one shotgun to another right after a shot adds a delay. Pump and tactical shotguns **reload one shell at a time** and can fire mid-reload. Headshot multipliers differ per gun.
