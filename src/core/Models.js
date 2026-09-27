@@ -31,7 +31,12 @@ export const KIT_PROPS = [
   'Cauldron', 'Anvil', 'BookStand', 'Lantern_Wall', 'Pot_1_Lid', 'Vase_2', 'Stall_Empty', 'Stall_Cart_Empty', 'FarmCrate_Apple',
   'FarmCrate_Carrot', 'Dummy', 'Banner_1', 'Barrel_Holder',
 ].map((n) => `props/${n}`);
-const KEEP_PIVOT = /^(village|props)\//;
+// KayKit Resource Bits (CC0): lumber, stone, fuel and metal piles for village dressing.
+export const RES_PROPS = [
+  'Wood_Log_Stack', 'Wood_Planks_Stack_Medium', 'Stone_Bricks_Stack_Medium', 'Stone_Chunks_Large', 'Pallet_Wood', 'Pallet_Wood_Covered_A',
+  'Fuel_A_Barrel', 'Fuel_A_Barrels', 'Fuel_B_Barrels', 'Parts_Pile_Large', 'Iron_Bars_Stack_Medium', 'Textiles_Stack_Large_Colored', 'Gold_Bars_Stack_Small',
+].map((n) => `res/${n}`);
+const KEEP_PIVOT = /^(village|props|res)\//;
 
 export const ENV_MODELS = [
   'palm-long', 'palm-short', 'formation-large-stone', 'formation-stone',
@@ -41,7 +46,7 @@ export const ENV_MODELS = [
   ...KK,
   // Quaternius "Stylized Nature" (CC0), textures assigned in world/Nature.js
   'nature/CommonTree_1', 'nature/CommonTree_3', 'nature/Bush_Common_Flowers', 'nature/Clover_1', 'nature/Clover_2',
-  ...KIT_PIECES, ...KIT_PROPS,
+  ...KIT_PIECES, ...KIT_PROPS, ...RES_PROPS,
   // Elijah Cobden "Stylized Trees Pack" (user-provided), see public/models/trees/CREDITS.md
   ...['STOak1', 'STOak2', 'STOak3', 'STOak5', 'STColumnar1', 'STColumnar3', 'STColumnar5', 'STPine1', 'STPine2', 'STPine3', 'STPine4', 'STPine5', 'STPine6', 'STPine7',
     'STWillow1', 'STWillow2', 'STWillow3', 'STSwiggly1', 'STSwiggly2', 'STSwiggly3', 'STSwiggly4'].map((n) => `trees/${n}`),
@@ -103,7 +108,7 @@ export class Models {
       p.geometry.computeBoundingSphere();
     }
     const size = box.getSize(new THREE.Vector3());
-    return { parts, size };
+    return { parts, size, center: keepPivot ? c : new THREE.Vector3(0, size.y / 2, 0) };
   }
 
   get(name) { return this.lib.get(name); }

@@ -574,6 +574,9 @@ export class Houses {
     }
     // a lantern by the front door
     put('Lantern_Wall', h.K.frontDoor + 1.0, 1.1, hd, 0, { col: false });
+    // a banner on a plain upper wall
+    const plain = h.panels.find((p) => p.side === 'front' && p.y0 === STORY && p.uc === -3 && p.type === 'solid');
+    if (plain && r() < 0.8) put('Banner_1', -3.8, STORY + 2.55, hd + 0.1, 0, { col: false });
   }
 
   // ---------- damage ----------

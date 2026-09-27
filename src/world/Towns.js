@@ -13,7 +13,9 @@ const WINDMILLS = ['kk/windmill_yellow', 'kk/windmill_green'];
 const FLAGS = ['kk/flag_blue', 'kk/flag_red', 'kk/flag_yellow', 'kk/flag_green'];
 
 // Props that break when hit (and sometimes drop loot).
-const BREAKABLE = /furn_|sack|bucket|wheelbarrow|barrel|crate|city_trash|city_bench|city_firehydrant|city_dumpster|weaponrack/;
+const BREAKABLE = /furn_|sack|bucket|wheelbarrow|barrel|crate|city_trash|city_bench|city_firehydrant|city_dumpster|weaponrack|props\/|Pallet|Fuel_|Textiles|Wood_Planks/i;
+// what the harvesting axe gets from a kit prop
+const KIT_MAT = (type) => (/Stone|Bricks/.test(type) ? 'stone' : /Fuel|Parts|Iron|Gold|Anvil/.test(type) ? 'metal' : undefined);
 
 export class Towns {
   constructor(scene, terrain, colliders, models) {
@@ -156,18 +158,30 @@ export class Towns {
     const k = town.kind;
     if (k === 'city') return this._city(town, crates);
     if (k === 'spires') return this._spires(town, parts, crates);
-    if (k === 'factory') return this._factory(town, parts, crates);
+    if (k === 'factory') {
+      this._factory(town, parts, crates);
+      return this._dress(town, [['res/Fuel_A_Barrels', 2], ['res/Fuel_B_Barrels', 1], ['res/Fuel_A_Barrel', 2], ['res/Pallet_Wood', 2], ['res/Parts_Pile_Large', 2], ['res/Iron_Bars_Stack_Medium', 1]], 18, 0.15, 1.0);
+    }
     if (k === 'lake') { this._village(town, parts, crates, { ring: [0.72, 0.9], count: 7, fountain: false }); return this._lakeDocks(town, parts); }
-    if (k === 'pier') { this._village(town, parts, crates, { count: 5 }); return this._pier(town, parts); }
-    if (k === 'farm') { this._village(town, parts, crates, { count: 4, windmills: 3 }); return this._fields(town, parts); }
-    return this._village(town, parts, crates);
+    if (k === 'pier') {
+      this._village(town, parts, crates, { count: 5 });
+      this._dress(town, [['res/Textiles_Stack_Large_Colored', 2], ['props/Crate_Wooden', 2], ['props/Barrel', 2], ['res/Pallet_Wood', 1]], 8, 0.4, 1.0);
+      return this._pier(town, parts);
+    }
+    if (k === 'farm') {
+      this._village(town, parts, crates, { count: 4, windmills: 3 });
+      this._dress(town, [['props/FarmCrate_Apple', 2], ['props/FarmCrate_Carrot', 2], ['props/Barrel_Apples', 2], ['res/Pallet_Wood_Covered_A', 1], ['village/Prop_Wagon', 1], ['res/Wood_Log_Stack', 1]], 12, 0.4, 1.1);
+      return this._fields(town, parts);
+    }
+    this._village(town, parts, crates);
+    return this._dress(town, [['res/Wood_Log_Stack', 2], ['res/Stone_Bricks_Stack_Medium', 1], ['props/Barrel', 1], ['res/Pallet_Wood_Covered_A', 1], ['props/Barrel_Holder', 1]], 5, 0.75, 1.1);
   }
 
   _village(town, parts, crates, opts = {}) {
     const r = this.rand;
     const ring = opts.ring || [0.5, 0.72];
     if (opts.fountain !== false) this._fountain(town, parts);
-    if (opts.fountain !== false) this._cafe(town);
+    const cafeAt = opts.fountain !== false ? this._cafe(town) : 0;
     const count = opts.count || 6 + Math.floor(r() * 3);
     let placed = 0;
     const specials = [...SPECIALS].sort(() => r() - 0.5).slice(0, 2);
@@ -198,7 +212,8 @@ export class Towns {
       if (r() < 0.4 && home) { this._fence(parts, x, y, z, rot, w, d, Houses.doorX(kind)); this.homes.setFence(homeRec); }
       if (type.includes('home')) this._flowers(parts, x, y, z, rot, w, d);
       if (!home) this.colliders.add({ kind: 'box', ...box, y0: y - 3, y1: y + h, house: true });
-      this.houses.push({ ...box, x, z, y, h, rot, home });
+      const doorPt = [x + Math.sin(rot) * (d / 2 + 2) + Math.cos(rot) * (home ? Houses.doorX(kind) : 0), z + Math.cos(rot) * (d / 2 + 2) - Math.sin(rot) * (home ? Houses.doorX(kind) : 0)];
+      this.houses.push({ ...box, x, z, y, h, rot, home, door: doorPt });
       placed++;
       // chest spot next to the door side, crates at the corner
       const fx = Math.sin(rot), fz = Math.cos(rot);
@@ -216,6 +231,11 @@ export class Towns {
         this._barrel(x - sideX * (w / 2 + 0.65), z - sideZ * (w / 2 + 0.65) + fz * 1.5);
       }
       if (r() < 0.6) this._barrel(x + sideX * (w / 2 + 0.65) + fx * 2.2, z + sideZ * (w / 2 + 0.65) + fz * 2.2);
+      // firewood or lumber against the side of homes
+      if (home && r() < 0.45) {
+        const side = r() < 0.5 ? 1 : -1, pile = ['res/Wood_Log_Stack', 'res/Wood_Planks_Stack_Medium', 'res/Pallet_Wood_Covered_A'][Math.floor(r() * 3)];
+        this._kit(pile, x + sideX * side * (w / 2 + 1.0) - fx * 2.2, z + sideZ * side * (w / 2 + 1.0) - fz * 2.2, rot, { pad: 0.5 });
+      }
       // small props by the door
       if (home && slots.length > 1 && r() < 0.45) { const [qx, qz] = yard(slots.pop(), 1.1); this._porch(qx, qz, rot); }
       const [px, pz] = yard(slots.shift() ?? -w / 2 + 0.8, 1.2);
@@ -238,8 +258,9 @@ export class Towns {
         this.houses.push({ ...box, x: wx, z: wz, y: wy, h: 14, rot: 0 });
       }
     }
-    // tents and flags around the plaza
-    for (let i = 0; i < 2; i++) {
+    // market stalls around the plaza (opposite the café), or tents in the smaller villages
+    if (opts.fountain !== false) this._market(town, cafeAt + Math.PI);
+    else for (let i = 0; i < 2; i++) {
       const a = r() * Math.PI * 2, d2 = town.r * (0.28 + r() * 0.08);
       this._prop('kk/tent', town.x + Math.cos(a) * d2, town.z + Math.sin(a) * d2, 2.6, Math.atan2(town.x - (town.x + Math.cos(a)), town.z - (town.z + Math.sin(a))) + Math.PI, 1.4);
     }
@@ -678,6 +699,74 @@ export class Towns {
         const ca = (c / 4) * Math.PI * 2 + a;
         this._prop(chair, cx + Math.cos(ca) * 0.95, cz + Math.sin(ca) * 0.95, 1.0, Math.atan2(-Math.cos(ca), -Math.sin(ca)), 0);
       }
+    }
+    return a0 + 0.25;
+  }
+
+  // A kit prop at real scale on the ground. Colliders are a row of circles along the prop's long
+  // side (offset for props whose pivot isn't centred). opts: { col: false, pad, mat }
+  _kit(type, x, z, rot = 0, opts = {}) {
+    const info = this.models.get(type);
+    if (!info) return false;
+    const y = this.terrain.heightAt(x, z);
+    if (y < 1) return false;
+    const pad = opts.pad ?? 0.4;
+    for (const h of this.houses) {
+      if (x > h.minX - pad && x < h.maxX + pad && z > h.minZ - pad && z < h.maxZ + pad) return false;
+      if (pad >= 1 && h.door && Math.hypot(x - h.door[0], z - h.door[1]) < 4.5) return false; // keep doorways clear
+    }
+    const idx = this._place(type, x, y - 0.02 + (opts.dy || 0), z, rot, 1);
+    if (opts.col === false) return true;
+    const { x: sx, y: sy, z: sz } = info.size, c = info.center;
+    const cos = Math.cos(rot), sin = Math.sin(rot);
+    const cx = x + c.x * cos + c.z * sin, cz = z - c.x * sin + c.z * cos;
+    const long = Math.max(sx, sz), short = Math.min(sx, sz), n = Math.max(1, Math.round(long / short));
+    const ax = sx >= sz ? [cos, -sin] : [sin, cos];
+    const breakable = BREAKABLE.test(type) ? { type, idx: [idx], hp: 90, loot: 0.3 } : undefined;
+    for (let i = 0; i < n; i++) {
+      const t = n === 1 ? 0 : (i / (n - 1) - 0.5) * (long - short);
+      const col = { kind: 'circle', x: cx + ax[0] * t, z: cz + ax[1] * t, r: short * 0.48, y0: y - 1, y1: y + sy, crate: true, mat: opts.mat ?? KIT_MAT(type) };
+      if (breakable) col.breakable = breakable;
+      this.colliders.add(col);
+    }
+    return true;
+  }
+
+  // Market: stalls and a produce cart facing the fountain, crates of apples and carrots in front,
+  // barrels, and a wagon parked beside them.
+  _market(t, around) {
+    const r = this.rand;
+    const d = t.r * 0.31;
+    const goods = ['props/FarmCrate_Apple', 'props/FarmCrate_Carrot'];
+    for (let k = -1; k <= 1; k++) {
+      const a = around + k * 0.42;
+      const x = t.x + Math.cos(a) * d, z = t.z + Math.sin(a) * d;
+      const face = Math.atan2(t.x - x, t.z - z);
+      const cart = k === 0 && r() < 0.6;
+      if (!this._kit(cart ? 'props/Stall_Cart_Empty' : 'props/Stall_Empty', x, z, face)) continue;
+      // produce on the ground in front of the counter
+      const fx = Math.sin(face), fz = Math.cos(face), sx = Math.cos(face), sz = -Math.sin(face);
+      for (const o of [-0.4, 0.4]) this._kit(goods[Math.floor(r() * 2)], x + fx * 0.95 + sx * o, z + fz * 0.95 + sz * o, face + (r() - 0.5) * 0.2, { col: false });
+      this._kit(r() < 0.5 ? 'props/Barrel_Apples' : 'props/Barrel', x + sx * 1.4 + fx * 0.1, z + sz * 1.4 + fz * 0.1, r() * 6);
+      // wares on the counter
+      const wares = ['props/FarmCrate_Apple', 'props/FarmCrate_Carrot', 'props/Pot_1_Lid', 'props/Vase_2'];
+      for (const o of cart ? [-1.2, -0.45, 0.3] : [-0.45, 0.4]) this._kit(wares[Math.floor(r() * wares.length)], x + sx * o + fx * 0.1, z + sz * o + fz * 0.1, face + (r() - 0.5) * 0.4, { col: false, dy: 0.93, pad: 0 });
+    }
+    const wa = around + 1.05, wx = t.x + Math.cos(wa) * d, wz = t.z + Math.sin(wa) * d;
+    this._kit('village/Prop_Wagon', wx, wz, wa + Math.PI / 2 + (r() - 0.5) * 0.3, { mat: 'wood' });
+  }
+
+  // Scatter dressing props around a town: [type, weight] picks, n tries in the ring [d0, d1] * r.
+  _dress(t, picks, n, d0 = 0.3, d1 = 0.95) {
+    const r = this.rand;
+    const total = picks.reduce((s, [, w]) => s + w, 0);
+    for (let i = 0; i < n; i++) {
+      const a = r() * Math.PI * 2, dd = t.r * (d0 + r() * (d1 - d0));
+      const x = t.x + Math.cos(a) * dd, z = t.z + Math.sin(a) * dd;
+      if (this.terrain.normalAt(x, z).y < 0.9) continue;
+      let q = r() * total, type = picks[0][0];
+      for (const [ty, w] of picks) { q -= w; if (q <= 0) { type = ty; break; } }
+      this._kit(type, x, z, r() * Math.PI * 2, { pad: 1.2 });
     }
   }
 
