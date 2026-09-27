@@ -98,6 +98,47 @@ export class Actor {
     return count;
   }
 
+  // Consumables: channel for def.time seconds, then apply and use one from the stack.
+  startUse() {
+    const h = this.held;
+    if (!h || !h.isConsumable || this.useT > 0 || !h.usableBy(this)) return false;
+    this.useT = h.def.time;
+    this.useItem = h;
+    this.game.sound?.play('use', this.isPlayer ? null : this.pos, { range: 30 });
+    return true;
+  }
+
+  // Returns the finished item when a use completes.
+  tickUse(dt) {
+    if (this.useT <= 0) return null;
+    const it = this.useItem;
+    if (!it || this.held !== it) { this.useT = 0; return null; }
+    this.useT -= dt;
+    if (this.useT > 0) return null;
+    this.useT = 0;
+    it.apply(this);
+    if (--it.count <= 0) {
+      this.items[this.slot] = null;
+      const next = this.items.findIndex((x, i) => i > 0 && x);
+      if (!this.switchSlot(next > 0 ? next : 0)) this._equip();
+    }
+    return it;
+  }
+
+  // Slot of a consumable of the given kind ('heal' / 'shield') that helps right now, best first.
+  findConsumable(kind) {
+    let best = -1, bestV = 0;
+    this.items.forEach((it, i) => {
+      if (!it || !it.isConsumable || !it.usableBy(this)) return;
+      const d = it.def;
+      if (kind === 'heal' && !d.heal) return;
+      if (kind === 'shield' && !d.shield) return;
+      const v = d.heal ? Math.min(d.heal, d.cap - this.health) : Math.min(d.shield, d.cap - this.shield);
+      if (v > bestV) { bestV = v; best = i; }
+    });
+    return best;
+  }
+
   startSlide() {
     if (this.slideT > 0 || !this.onGround) return;
     const hs = Math.hypot(this.vel.x, this.vel.z);

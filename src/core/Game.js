@@ -13,7 +13,6 @@ import { quality } from './device.js';
 import { Sound } from './Audio.js';
 import { Effects } from '../effects/Effects.js';
 import { Combat } from '../weapons/Combat.js';
-import { Weapon } from '../weapons/Weapon.js';
 import { Bot } from '../bots/Bot.js';
 import { BOT_NAMES, botColors } from '../bots/names.js';
 import { Storm } from '../world/Storm.js';
@@ -151,16 +150,11 @@ export class Game {
 
     this.player = new Player(this);
     this.actors.push(this.player);
-    this.player.giveWeapon(new Weapon('pistol', 0), 1);
-    this.player.addAmmo('light', 48);
-    this.player.switchSlot(1);
 
     const colors = botColors(19);
     this.bots = [];
     for (let i = 0; i < 19; i++) {
       const b = new Bot(this, BOT_NAMES[i], colors[i], Math.random(), CHARACTER_TYPES[i % CHARACTER_TYPES.length]);
-      b.giveWeapon(new Weapon('pistol', 0), 1);
-      b.switchSlot(1);
       this.bots.push(b);
       this.actors.push(b);
     }
@@ -300,8 +294,7 @@ export class Game {
     if (!held || p.state !== 'ground') return;
     if (held.isConsumable) {
       if (input.pressed('fire') && p.useT <= 0) {
-        if (held.usableBy(p)) { p.useT = held.def.time; p.useItem = held; this.sound.play('use'); }
-        else this.hud.toast?.(held.def.heal ? 'Health is already full' : 'Shield is already full');
+        if (!p.startUse()) this.hud.toast?.(held.def.heal ? 'Health is already full' : 'Shield is already full');
       }
       return;
     }
@@ -326,19 +319,10 @@ export class Game {
   // Channel the held consumable; finishing applies it and uses up one from the stack.
   updateConsumable(dt) {
     const p = this.player;
-    if (p.useT <= 0) return;
-    const it = p.useItem;
-    if (p.held !== it || !it) { p.useT = 0; return; }
-    p.useT -= dt;
-    if (p.useT > 0) return;
-    p.useT = 0;
-    it.apply(p);
+    const it = p.tickUse(dt);
+    if (!it) return;
     this.sound.play(it.def.heal ? 'heal' : 'shield');
-    if (--it.count <= 0) {
-      p.items[p.slot] = null;
-      const next = p.items.findIndex((x, i) => i > 0 && x);
-      p.switchSlot(next > 0 ? next : 0);
-    } else if (it.usableBy(p) && this.input.down('fire')) { p.useT = it.def.time; this.sound.play('use'); }
+    if (it.count > 0 && p.held === it && this.input.down('fire')) p.startUse();
   }
 
   updateStorm(dt) {

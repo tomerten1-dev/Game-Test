@@ -138,7 +138,7 @@ export class Combat {
     _end.copy(origin).addScaledVector(dir, r.t);
     if (r.actor) {
       const shieldBefore = r.actor.shield;
-      const dealt = r.actor.takeDamage(20, actor, false);
+      const dealt = r.actor.takeDamage(!actor.isPlayer && !r.actor.isPlayer ? 9 : 20, actor, false);
       g.effects.hitSparks(_end, '#ffffff');
       if (actor.isPlayer) { g.effects.damageNumber(_end, dealt, false, shieldBefore > 0); g.hud?.hitMarker(false, !r.actor.alive); g.sound.play('hit'); }
       return true;
@@ -147,12 +147,12 @@ export class Combat {
     if (c?.structure) { c.structure.damage(50, actor); g.effects.impact(_end, 'wood'); g.sound.play('harvest_wood', actor.isPlayer ? null : _end); return true; }
     const mat = r.terrain ? null : c?.mat || (c?.tree || c?.crate ? 'wood' : c?.rock || c?.stone ? 'stone' : c?.house ? 'wood' : null);
     g.effects.impact(_end, mat === 'wood' ? 'wood' : 'stone', _n.copy(dir).negate());
-    if (mat && actor.isPlayer) {
+    if (mat) {
       const amount = 7 + Math.floor(Math.random() * 4);
       actor.addMat(mat, amount);
-      g.effects.matNumber?.(_end, amount, mat);
-      g.sound.play(`harvest_${mat}`);
+      if (actor.isPlayer) g.effects.matNumber?.(_end, amount, mat);
+      g.sound.play(`harvest_${mat}`, actor.isPlayer ? null : _end, { range: 50 });
     } else if (actor.isPlayer) g.sound.play('impact');
-    return true;
+    return mat || true;
   }
 }

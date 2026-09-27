@@ -5,7 +5,7 @@ import { Weapon } from '../weapons/Weapon.js';
 import { LOOT_WEAPONS, RARITIES, rollRarity } from '../weapons/WeaponDefs.js';
 import { makeWeaponMesh } from '../weapons/WeaponModels.js';
 import { mulberry32 } from '../core/noise.js';
-import { AMMO, MATS, CONSUMABLES, Consumable } from '../weapons/Items.js';
+import { AMMO, MATS, CONSUMABLES } from '../weapons/Items.js';
 
 const GOLD = '#ffc233', GOLD_DARK = '#c17d11', TRIM = '#6b3f16';
 
@@ -360,17 +360,10 @@ export class Loot {
       }
       if (actor.isPlayer) g.sound.play('pickup');
     } else if (p.type === 'consumable') {
-      if (!actor.isPlayer) {
-        // bots drink/heal right away
-        const c = new Consumable(p.ctype, 1);
-        if (!c.usableBy(actor)) return 'full';
-        c.apply(actor);
-      } else {
-        const left = actor.addConsumable(p.ctype, p.count);
-        if (left === p.count) return 'Inventory full';
-        g.sound.play('pickup');
-        if (left > 0) { p.count = left; return null; }
-      }
+      const left = actor.addConsumable(p.ctype, p.count);
+      if (left === p.count) return 'Inventory full';
+      if (actor.isPlayer) g.sound.play('pickup');
+      if (left > 0) { p.count = left; return null; }
     } else if (p.type === 'ammo') {
       actor.addAmmo(p.ammoType, p.amount);
       if (actor.isPlayer) g.sound.play('ammo');
@@ -449,9 +442,14 @@ export class Loot {
         if (guns.some((w) => w.type === p.weapon.type && w.rarity >= p.weapon.rarity)) s = 0;
         else s = p.weapon.score > worst * 1.1 ? 2 : 0;
       } else if (p.type === 'consumable') {
+        // carry heals for later if there's room (stack or free slot)
         const d2 = CONSUMABLES[p.ctype];
-        s = d2.heal ? (actor.health < Math.min(70, d2.cap) ? 1.8 : 0) : (actor.shield < d2.cap - 10 ? 1.5 : 0);
+        const room = hasFree || actor.items.some((it) => it?.isConsumable && it.type === p.ctype && it.count < d2.max);
+        const carried = actor.items.reduce((n, it) => n + (it?.isConsumable ? 1 : 0), 0);
+        s = !room ? 0 : (d2.heal ? (actor.health < 70 ? 1.8 : 0.9) : 1.2) - carried * 0.25;
+        if (guns.length === 0) s *= 0.5; // a gun first
       } else if (p.type === 'mat') s = actor.wood < 60 && p.matType === 'wood' ? 0.6 : 0;
+      if (p.type === 'weapon' && guns.length === 0) s = 3;
       s -= d / 40;
       if (s > bestScore) { bestScore = s; best = p; }
     }

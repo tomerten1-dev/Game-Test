@@ -9,6 +9,7 @@ const _eye = new THREE.Vector3();
 const _tp = new THREE.Vector3();
 const _dir = new THREE.Vector3();
 const _muzzle = new THREE.Vector3();
+const _cols = [];
 
 // AI bot: a slow "think" picks goals/targets; a per-frame update steers, aims and shoots.
 export class Bot extends Actor {
@@ -37,7 +38,16 @@ export class Bot extends Actor {
     this.jumpAt = 0;
     this.lootChest = null;
     this.pickup = null;
+    this.tree = null;       // collider being harvested
+    this.retreatT = 0;      // backing off to heal
+    this.hideYaw = 0;
+    this.noHealT = 0;       // time since last seen an enemy (for safe healing)
+    this.huntPos = new THREE.Vector3();
+    this.huntT = 0;
+    this.rampCooldown = 0;
   }
+
+  get armed() { return this.items.some((it) => it && it.isGun); }
 
   onDamaged(amount, attacker) {
     if (!this.alive) return;
@@ -50,12 +60,24 @@ export class Bot extends Actor {
       }
     }
     if (this.state !== 'ground') return;
+    this.noHealT = 0;
+    if (this.useT > 0) { this.useT = 0; this._chooseWeapon(attacker ? this.pos.distanceTo(attacker.pos) : 20); }
+    const hp = this.health + this.shield;
     const r = Math.random();
-    if (r < 0.25 && this.onGround) this.wantJump = true;
-    else if (r < 0.45 && this.buildCooldown <= 0 && this.wood >= 10 && attacker && this.game.building) {
-      this.buildCooldown = 5;
-      this.game.building.buildWallFacing(this, Math.atan2(attacker.pos.x - this.pos.x, attacker.pos.z - this.pos.z));
+    // badly hurt: throw up a wall and back off to heal
+    const canHeal = this.findConsumable('heal') > 0 || this.findConsumable('shield') > 0;
+    if (hp < 45 && canHeal && this.retreatT <= 0 && attacker) {
+      this.retreatT = 2.5 + Math.random();
+      this.hideYaw = Math.atan2(this.pos.x - attacker.pos.x, this.pos.z - attacker.pos.z);
+      if (this.wood >= 10 && this.game.building) this.game.building.buildWallFacing(this, this.hideYaw + Math.PI);
+      return;
     }
+    // under fire: box up with a wall (skilled bots do it more), or hop
+    const wallChance = 0.2 + this.skill * 0.35;
+    if (r < wallChance && this.buildCooldown <= 0 && this.wood >= 10 && attacker && this.game.building) {
+      this.buildCooldown = 3.5;
+      this.game.building.buildWallFacing(this, Math.atan2(attacker.pos.x - this.pos.x, attacker.pos.z - this.pos.z));
+    } else if (r < wallChance + 0.2 && this.onGround) this.wantJump = true;
   }
 
   setGoal(x, z) { this.goal.set(x, 0, z); this.hasGoal = true; }
@@ -111,35 +133,59 @@ export class Bot extends Actor {
       if (this.target && g.time - this.lastSeenT > 4) this.target = null;
     }
 
-    // pick best weapon for the range
-    if (this.target) this._chooseWeapon(this.pos.distanceTo(this.target.pos));
-    else this._chooseWeapon(30);
+    if (!this.targetVisible) this.noHealT += THINK; else this.noHealT = 0;
+    const armed = this.armed;
+    // unarmed: only fight back up close, otherwise go find a gun
+    if (this.target && !armed) {
+      const hitBack = this.lastAttacker === this.target && g.time - this.lastHurtTime < 2.5;
+      if (!hitBack || this.pos.distanceTo(this.target.pos) > 6) this.target = null;
+    }
+
+    // pick best weapon for the range (never interrupt a heal)
+    if (this.useT <= 0) {
+      if (this.target) this._chooseWeapon(this.pos.distanceTo(this.target.pos));
+      else if (this.mode !== 'harvest') this._chooseWeapon(30);
+    }
     if (this.weapon && this.weapon.ammo < this.weapon.def.mag * 0.4 && !this.targetVisible) g.combat.reload(this);
 
     // refresh aim error
     const d = this.target ? this.pos.distanceTo(this.target.pos) : 10;
-    const err = (0.3 + d * 0.026) * (1.45 - this.skill * 0.6);
+    const err = (0.28 + d * 0.024) * (1.45 - this.skill * 0.65);
     this.aimErr.set(Math.random() - 0.5, (Math.random() - 0.5) * 0.8, Math.random() - 0.5).multiplyScalar(err * 2);
 
     const storm = g.storm;
-    const inZone = !storm || storm.isSafe(this.pos.x, this.pos.z, -6);
+    const zoneGoal = this._zoneGoal();
+    this.zoneUrgent = !!zoneGoal?.urgent;
+
+    // retreating to heal
+    if (this.retreatT > 0) { this.mode = 'retreat'; return; }
+
+    // heal / shield up when nobody is shooting at us
+    if (this.useT > 0) { this.mode = 'heal'; return; }
+    if (this.noHealT > 1.2 && !zoneGoal?.urgent) {
+      let slot = this.health < 75 ? this.findConsumable('heal') : -1;
+      if (slot < 0 && this.shield < 75) slot = this.findConsumable('shield');
+      if (slot > 0) {
+        this.switchSlot(slot);
+        if (this.startUse()) { this.mode = 'heal'; return; }
+      }
+    }
 
     if (this.target) {
       this.mode = 'engage';
-      if (!inZone && storm) { this.mode = 'zone'; const c = storm.safeCenter(); this.setGoal(c.x, c.z); }
+      if (zoneGoal?.urgent) { this.mode = 'zone'; this.setGoal(zoneGoal.x, zoneGoal.z); }
       return;
     }
-    if (!inZone) {
+    if (zoneGoal) {
+      if (this.mode !== 'zone' || !this.hasGoal) this.setGoal(zoneGoal.x, zoneGoal.z);
       this.mode = 'zone';
-      const c = storm.safeCenter();
-      this.setGoal(c.x + (Math.random() - 0.5) * 10, c.z + (Math.random() - 0.5) * 10);
       return;
     }
-    // loot
+    // loot (search further when unarmed)
     const loot = g.loot;
     if (loot) {
       if (this.lootChest && this.lootChest.opened) this.lootChest = null;
-      if (!this.lootChest) this.lootChest = loot.nearestChest(this.pos, 45, storm);
+      if (!this.lootChest) this.lootChest = loot.nearestChest(this.pos, armed ? 45 : 90, storm);
       if (this.lootChest) {
         this.mode = 'loot';
         this.setGoal(this.lootChest.x, this.lootChest.z);
@@ -147,11 +193,48 @@ export class Bot extends Actor {
         return;
       }
       if (this.pickup && !this.pickup.alive) this.pickup = null;
-      if (!this.pickup) this.pickup = loot.bestPickupFor(this, 30);
+      if (!this.pickup) this.pickup = loot.bestPickupFor(this, armed ? 30 : 70);
       if (this.pickup) {
         this.mode = 'pickup';
         this.setGoal(this.pickup.pos.x, this.pickup.pos.z);
         if (Math.hypot(this.pickup.pos.x - this.pos.x, this.pickup.pos.z - this.pos.z) < 2) { loot.collect(this.pickup, this); this.pickup = null; }
+        return;
+      }
+      // ammo boxes on the way
+      if (armed && this.weapons.length < 3) {
+        const box = loot.ammoBoxes.find((bx) => !bx.opened && Math.hypot(bx.x - this.pos.x, bx.z - this.pos.z) < 3);
+        if (box) loot.openAmmoBox(box, this);
+      }
+    }
+    // third-party: go where the shooting is
+    if (armed) {
+      if (this.huntT > 0 && Math.hypot(this.huntPos.x - this.pos.x, this.huntPos.z - this.pos.z) > 6) {
+        this.huntT -= THINK;
+        this.mode = 'hunt';
+        this.setGoal(this.huntPos.x, this.huntPos.z);
+        return;
+      }
+      const calm = Math.min(1, (g.time - this.landTime) / 140);
+      for (const a of g.actors) {
+        if (a === this || !a.alive || g.time - a.lastFireTime > 0.6) continue;
+        const dd = a.pos.distanceTo(this.pos);
+        if (dd < 25 + 60 * calm && Math.random() < 0.15 + this.skill * 0.25 && (!storm || storm.isSafe(a.pos.x, a.pos.z, 10))) {
+          this.huntPos.copy(a.pos);
+          this.huntT = 12;
+          this.mode = 'hunt';
+          this.setGoal(a.pos.x, a.pos.z);
+          return;
+        }
+      }
+    }
+    // gather wood for building when low
+    if (this.wood < 40 && g.time - this.landTime > 8) {
+      if (this.tree && Math.hypot(this.tree.x - this.pos.x, this.tree.z - this.pos.z) > 30) this.tree = null;
+      if (!this.tree || this.mode !== 'harvest') this.tree = this._nearestTree(26);
+      if (this.tree) {
+        this.mode = 'harvest';
+        const dx = this.pos.x - this.tree.x, dz = this.pos.z - this.tree.z, dl = Math.hypot(dx, dz) || 1;
+        this.setGoal(this.tree.x + (dx / dl) * (this.tree.r + 0.9), this.tree.z + (dz / dl) * (this.tree.r + 0.9));
         return;
       }
     }
@@ -163,7 +246,7 @@ export class Bot extends Actor {
         if (storm) {
           const c = storm.safeCenter(), r = storm.safeRadius() * 0.8;
           const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * r;
-          x = c.x + Math.cos(a) * rr; z = c.z + Math.sin(a) * rr;
+          x = c.x + Math.cos(a) * rr; z = c.y + Math.sin(a) * rr;
           // stay local-ish
           x = this.pos.x + clamp(x - this.pos.x, -45, 45); z = this.pos.z + clamp(z - this.pos.z, -45, 45);
         } else {
@@ -172,6 +255,40 @@ export class Bot extends Actor {
         if (g.world.heightAt(x, z) > 1.5) { this.setGoal(x, z); break; }
       }
     }
+  }
+
+  // Where to go for the zone, or null when there's no need to move yet.
+  // Rotates early: leaves once the time left is close to the time needed to get in.
+  _zoneGoal() {
+    const storm = this.game.storm;
+    if (!storm) return null;
+    const c = storm.safeCenter(), r = storm.safeRadius();
+    const dx = this.pos.x - c.x, dz = this.pos.z - c.y;
+    const d = Math.hypot(dx, dz);
+    const outsideNow = !storm.isInside(this.pos.x, this.pos.z, -3);
+    const margin = Math.min(12, r * 0.3);
+    if (d < r - margin * 0.5 && !outsideNow) return null;
+    const travel = Math.max(0, d - (r - margin)) / 8.5; // seconds at sprint-ish speed
+    const timeLeft = storm.stage === 'wait' ? storm.timer + 12 : 0; // the shrink itself buys a little time
+    const urgent = outsideNow || storm.stage !== 'wait' || timeLeft < travel + 10;
+    if (!urgent && timeLeft > travel + 25) return null;
+    // aim for a point just inside the circle edge, on our side (less walking, avoids the center crowd)
+    const k = d > 0.1 ? Math.max(0, r - margin - 4) / d : 0;
+    const jitter = (this.skill - 0.5) * 4;
+    return { x: c.x + dx * k + jitter, z: c.y + dz * k - jitter, urgent };
+  }
+
+  _nearestTree(maxD) {
+    const cols = this.game.world.colliders.query(this.pos.x - maxD, this.pos.x + maxD, this.pos.z - maxD, this.pos.z + maxD, _cols);
+    let best = null, bd = maxD;
+    for (const c of cols) {
+      if (!c.tree && !c.crate) continue;
+      if (c.kind !== 'circle' && c.kind !== 'box') continue;
+      const cx = c.kind === 'circle' ? c.x : (c.minX + c.maxX) / 2, cz = c.kind === 'circle' ? c.z : (c.minZ + c.maxZ) / 2;
+      const d = Math.hypot(cx - this.pos.x, cz - this.pos.z);
+      if (d < bd && this.game.world.heightAt(cx, cz) > 1) { bd = d; best = { x: cx, z: cz, r: c.kind === 'circle' ? c.r : Math.max(c.maxX - c.minX, c.maxZ - c.minZ) / 2, y: c.y0 + 2, hits: 0 }; }
+    }
+    return best;
   }
 
   _chooseWeapon(d) {
@@ -187,7 +304,8 @@ export class Bot extends Actor {
       if (w.ammo === 0 && w.reloading) s *= 0.3;
       if (s > bestS) { bestS = s; bestI = i; }
     }
-    if (bestI >= 0 && bestI !== this.slot) this.switchSlot(bestI);
+    if (bestI < 0) bestI = 0;
+    if (bestI !== this.slot) this.switchSlot(bestI);
   }
 
   update(dt) {
@@ -216,29 +334,77 @@ export class Bot extends Actor {
     // --- movement ---
     let mx = 0, mz = 0;
     const tgt = this.target;
-    if (this.mode === 'engage' && tgt) {
+    let wantSprint = false;
+    this.rampCooldown -= dt;
+    // heals tick while standing still-ish
+    if (this.useT > 0) {
+      const done = this.tickUse(dt);
+      if (done && this.distToCam < 40) g.sound.play(done.def.heal ? 'heal' : 'shield', this.pos, { range: 30 });
+    }
+    if (this.retreatT > 0) {
+      // run away from the threat, then heal behind cover
+      this.retreatT -= dt;
+      mx = Math.sin(this.hideYaw); mz = Math.cos(this.hideYaw);
+      wantSprint = true;
+      if (this.retreatT <= 0) this.noHealT = 2;
+    } else if (this.mode === 'heal') {
+      mx = mz = 0;
+    } else if (this.mode === 'engage' && tgt) {
       const dx = tgt.pos.x - this.pos.x, dz = tgt.pos.z - this.pos.z;
       const d = Math.hypot(dx, dz) || 1;
-      const ideal = this.weapon ? this.weapon.def.idealRange : 10;
+      const melee = !this.weapon;
+      const ideal = melee ? 1.6 : this.weapon.def.idealRange;
       let fwd = 0;
       if (!this.targetVisible) { // chase last seen spot
         const lx = this.lastSeenPos.x - this.pos.x, lz = this.lastSeenPos.z - this.pos.z;
         const ld = Math.hypot(lx, lz);
         if (ld > 2) { mx = lx / ld; mz = lz / ld; }
+        wantSprint = ld > 12;
       } else {
         if (d > ideal * 1.3) fwd = 1; else if (d < ideal * 0.6) fwd = -0.8;
         this.strafeT -= dt;
-        if (this.strafeT <= 0) { this.strafeT = 0.7 + Math.random() * 1.3; this.strafeDir = Math.random() < 0.5 ? -1 : 1; }
+        if (this.strafeT <= 0) { this.strafeT = 0.5 + Math.random() * (1.4 - this.skill * 0.6); this.strafeDir = Math.random() < 0.5 ? -1 : 1; }
         const sx = -dz / d, sz = dx / d;
-        mx = (dx / d) * fwd + sx * this.strafeDir * 0.85;
-        mz = (dz / d) * fwd + sz * this.strafeDir * 0.85;
-        if (Math.random() < dt * 0.25 && this.onGround) this.wantJump = true;
+        const strafe = melee ? 0.3 : 0.85;
+        mx = (dx / d) * fwd + sx * this.strafeDir * strafe;
+        mz = (dz / d) * fwd + sz * this.strafeDir * strafe;
+        if (Math.random() < dt * (0.15 + this.skill * 0.25) && this.onGround) this.wantJump = true;
+        wantSprint = melee && d > 4;
+        // crouch-peek at long range for accuracy
+        this.crouched = !melee && this.skill > 0.35 && d > 25 && fwd === 0 && this.onGround && this.slideT <= 0;
+        // take the high ground with a ramp when the enemy is above us
+        if (tgt.pos.y - this.pos.y > 2.5 && d < 20 && this.wood >= 10 && this.rampCooldown <= 0 && this.onGround && g.building) {
+          this.rampCooldown = 3 - this.skill;
+          const yaw = this.aimYaw;
+          this.aimYaw = Math.atan2(dx, dz);
+          g.building.buildRamp(this);
+          this.aimYaw = yaw;
+        }
+        // swing at close enemies when all we have is the axe
+        if (melee && d < 2.6) {
+          this.aimYaw = this.bodyYaw = Math.atan2(dx, dz);
+          _dir.set(dx / d, (tgt.pos.y - this.pos.y) / d, dz / d).normalize();
+          if (this.reactionT <= 0) g.combat.melee(this, this.eye(_eye), _dir, 2.8);
+        }
       }
     } else if (this.hasGoal) {
       const dx = this.goal.x - this.pos.x, dz = this.goal.z - this.pos.z;
       const d = Math.hypot(dx, dz);
       if (d > 1.2) { mx = dx / d; mz = dz / d; }
+      wantSprint = d > 10 && (this.mode !== 'wander' || this.zoneUrgent);
+      // chop the tree we walked up to
+      if (this.mode === 'harvest' && this.tree && d < 1.6) {
+        mx = mz = 0;
+        const tx = this.tree.x - this.pos.x, tz = this.tree.z - this.pos.z;
+        this.aimYaw = this.bodyYaw = Math.atan2(tx, tz);
+        if (this.held !== this.items[0]) this.switchSlot(0);
+        const r = g.combat.melee(this, this.eye(_eye), _dir.set(tx, 0, tz).normalize(), this.tree.r + 2.2);
+        if (r) this.tree.hits++;
+        if (this.tree.hits > 6 || this.wood >= 60) { this.tree = null; this.mode = 'wander'; this._chooseWeapon(30); }
+      }
     }
+    if (this.mode !== 'engage' || !tgt) this.crouched = false;
+    it.sprint = wantSprint;
     // obstacle handling: detour sideways when blocked
     const ml = Math.hypot(mx, mz);
     if (ml > 0.1) {
