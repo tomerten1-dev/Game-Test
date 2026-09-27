@@ -578,6 +578,15 @@ export class Sound {
       case 'supply':
         [392, 523, 659, 784].forEach((f, i) => this._tone(t + i * 0.12, 0.5, { type: 'triangle', freq: f, gain: 0.16 }));
         break;
+      case 'headshotLegacy':
+        // the older, sharper "ding" some players prefer
+        this._tone(t, 0.12, { type: 'square', freq: 2400, gain: 0.08 });
+        this._tone(t + 0.02, 0.22, { type: 'sine', freq: 3200, freqEnd: 2900, gain: 0.16 });
+        break;
+      case 'heartbeat':
+        this._tone(t, 0.12, { type: 'sine', freq: 62, freqEnd: 40, gain: 0.5 });
+        this._tone(t + 0.22, 0.14, { type: 'sine', freq: 55, freqEnd: 36, gain: 0.38 });
+        break;
       case 'shieldBreak':
         this._noise(t, 0.35, { type: 'highpass', freq: 3500, gain: 0.5, attack: 0.002 });
         [1760, 1318, 988].forEach((f, i) => this._tone(t + i * 0.04, 0.25, { type: 'triangle', freq: f, freqEnd: f * 0.7, gain: 0.12 }));

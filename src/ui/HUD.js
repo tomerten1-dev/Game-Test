@@ -1,5 +1,6 @@
 import { itemIcon } from './ItemIcons.js';
 import { keyLabel } from '../core/Input.js';
+import { setting } from './Settings.js';
 import { RARITIES } from '../weapons/WeaponDefs.js';
 import { Minimap } from './Minimap.js';
 import { TOWNS } from '../world/Terrain.js';
@@ -27,7 +28,7 @@ export class HUD {
         <div id="shield-flash"></div>
         <div id="dmg-dir"><i></i></div>
         <div id="crosshair">
-          <i class="ch t"></i><i class="ch b"></i><i class="ch l"></i><i class="ch r"></i><i class="dot"></i>
+          <i class="ch t"></i><i class="ch b"></i><i class="ch l"></i><i class="ch r"></i><i class="dot"></i><i class="circ"></i><i class="drop d1"></i><i class="drop d2"></i><i class="drop d3"></i>
           <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
         </div>
         <div id="scope" class="hidden"><i class="sc-h"></i><i class="sc-v"></i></div>
@@ -145,9 +146,9 @@ export class HUD {
     el[prop] = value;
   }
 
-  hitMarker(head, kill) {
+  hitMarker(head, kill, shield = false) {
     const hm = this.el.hitmarker;
-    hm.className = 'show' + (head ? ' head' : '') + (kill ? ' kill' : '');
+    hm.className = 'show' + (head ? ' head' : '') + (kill ? ' kill' : shield ? ' shield' : '');
     this.hitT = kill ? 0.35 : head ? 0.28 : 0.18;
     if (head || kill) {
       // crosshair pops on headshots / eliminations
@@ -158,6 +159,9 @@ export class HUD {
   // Persistent red edges that grow with recent damage (and fade as you recover).
   damageTaken(amount, shieldBroke) {
     this.vig = Math.min(1, (this.vig || 0) + amount / 60);
+    // the health / shield bars shake when you get hit
+    const v = this.el.vitals || (this.el.vitals = this.el.healthFill.closest('.bars') || this.el.healthFill.closest('.bar-row')?.parentElement);
+    if (v && amount >= 3) { v.classList.remove('shake'); void v.offsetWidth; v.classList.add('shake'); }
     if (shieldBroke) {
       const f = this.root.querySelector('#shield-flash');
       f.classList.remove('on'); void f.offsetWidth; f.classList.add('on');
@@ -524,6 +528,11 @@ export class HUD {
       const low = p.alive ? Math.max(0, (40 - p.health) / 40) * 0.5 : 0; // low health keeps a faint pulse
       this.root.querySelector('#dmg-vignette').style.opacity = String(Math.max(this.vig, low * (0.7 + 0.3 * Math.sin(g.time * 4))));
     }
+    // heartbeat at low health
+    if (p.alive && g.state === 'playing' && p.health < 30) {
+      this._beatT = (this._beatT || 0) - dt;
+      if (this._beatT <= 0) { this._beatT = 0.6 + (p.health / 30) * 0.5; g.sound.play('heartbeat'); }
+    }
     const boss = g.boss?.boss;
     const showBoss = !!boss && boss.alive && p.alive && p.pos.distanceTo(boss.pos) < 75;
     this.set('bossOn', this.root.querySelector('#bossbar').style, showBoss ? 'flex' : 'none', 'display');
@@ -542,6 +551,14 @@ export class HUD {
     const px = Math.min(90, Math.round(6 + (spread / Math.tan((g.camera.fov * Math.PI) / 360)) * window.innerHeight * 0.5));
     if (this.cache.gap !== px) { this.cache.gap = px; this.el.crosshair.style.setProperty('--gap', `${px}px`); }
     this.set('chVis', this.el.crosshair.style, p.state === 'ground' && p.alive && !p.victory ? 'block' : 'none', 'display');
+    // reticle per weapon: bloom cross (AR/SMG/pistol), circle (shotguns), dot (sniper hip-fire,
+    // pickaxe, building, items), circle with drop marks (rocket)
+    const heldNow = p.held, key = w?.def.key;
+    let mode = 'dot';
+    if (p.buildMode || g.editing) mode = 'dot';
+    else if (w) mode = !setting(g, 'weaponReticles') ? 'cross' : key === 'shotgun' || key === 'pump' ? 'shotgun' : key === 'sniper' ? 'sniper' : key === 'rocket' ? 'rocket' : 'cross';
+    else if (heldNow?.def?.throw) mode = 'throw';
+    this.set('chMode', this.el.crosshair.dataset, mode, 'mode');
 
     const h = p.held;
     if (w) {

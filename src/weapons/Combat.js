@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { setting } from '../ui/Settings.js';
 import { raySphere } from '../world/Colliders.js';
 
 const _dir = new THREE.Vector3();
@@ -94,6 +95,7 @@ export class Combat {
       return true;
     }
     const perTarget = new Map();
+    let buildHits = null;
     for (let i = 0; i < def.pellets; i++) {
       coneDir(aimDir, spread, _dir);
       let r = this.trace(origin, _dir, def.range, shooter);
@@ -118,13 +120,18 @@ export class Combat {
       } else if (r.hit) {
         const kind = r.collider ? (r.collider.structure ? (r.collider.structure.mat === 'wood' ? 'wood' : 'stone') : r.collider.house ? (r.collider.mat === 'wood' ? 'wood' : 'stone') : r.collider.crate ? 'wood' : r.collider.tree ? 'wood' : r.collider.rock ? 'stone' : 'stone') : 'terrain';
         if (i < 4) g.effects.impact(_end.addScaledVector(_dir, -0.05), kind, _n.copy(_dir).negate());
-        if (r.collider?.structure) { r.collider.structure.damage(w.damage * 0.9, shooter); if (shooter.isPlayer && r.collider.structure.owner !== shooter) g.meta?.track('buildDamage', w.damage * 0.9); }
+        if (r.collider?.structure) {
+          r.collider.structure.damage(w.damage * 0.9, shooter);
+          if (shooter.isPlayer && r.collider.structure.owner !== shooter) g.meta?.track('buildDamage', w.damage * 0.9);
+          if (shooter.isPlayer) (buildHits ||= { pos: _end.clone(), dmg: 0 }).dmg += w.damage * 0.9;
+        }
         else if (r.collider?.breakable) this.damageProp(r.collider, w.damage);
         else if (r.collider?.part) r.collider.part.damage(w.damage, shooter); // house walls, doors, windows
         else if (r.collider?.obj) g.world.destructibles.damage(r.collider, w.damage, shooter); // trees, rocks
         if (shooter.isPlayer && i < 1) g.hud?.objHp?.(r.collider, _end);
       }
     }
+    if (buildHits) g.effects.buildNumber(buildHits.pos, buildHits.dmg);
     if (shooter.isPlayer && perTarget.size) g.meta?.track('hit', 1, [...perTarget.values()].some((e) => e.head));
     for (const [target, e] of perTarget) {
       const shieldBefore = target.shield;
@@ -132,8 +139,8 @@ export class Combat {
       g.effects.hitSparks(e.point, e.head ? '#ffd23f' : shieldBefore > 0 ? '#6cc4ff' : '#ffffff');
       if (shooter.isPlayer) {
         g.effects.damageNumber(e.point, dealt, e.head, shieldBefore > 0, target);
-        g.hud?.hitMarker(e.head, !target.alive);
-        g.sound.play(e.head ? 'headshot' : shieldBefore > 0 ? 'shieldHit' : 'hit');
+        g.hud?.hitMarker(e.head, !target.alive, shieldBefore > 0);
+        g.sound.play(e.head ? (setting(g, 'legacyHitSound', false) ? 'headshotLegacy' : 'headshot') : shieldBefore > 0 ? 'shieldHit' : 'hit');
       }
     }
     g.effects.muzzle(muzzle, aimDir, def.pellets > 1 ? 1.5 : 1, shooter.isPlayer || shooter.distToCam < 30);

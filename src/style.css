@@ -69,7 +69,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1830; col
 
 .dmg-layer { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
 .dmg-num { position: absolute; left: 0; top: 0; font-family: var(--num); font-weight: 800; font-size: 30px; color: #fff; -webkit-text-stroke: 1.5px rgba(20,20,40,0.85); text-shadow: 0 3px 0 rgba(0,0,0,0.35); will-change: transform; }
-.dmg-num.shield { color: #d8f0ff; }
+.dmg-num.shield { color: #52b6ff; }
+.dmg-num.build { font-size: 20px; color: #e6e9ef; opacity: 0.9; }
 .dmg-num.head { color: #ffd23f; font-size: 36px; }
 #banner { position: absolute; left: 50%; top: 22%; transform: translate(-50%, -10px); font-family: var(--title); font-size: clamp(20px, 3vw, 32px); text-align: center; white-space: nowrap; color: #fff; text-shadow: 0 3px 0 rgba(20,30,70,0.7), 0 0 20px rgba(0,0,0,0.35); opacity: 0; transition: opacity 0.35s, transform 0.35s; }
 #banner.show { opacity: 1; transform: translate(-50%, 0); }
@@ -703,3 +704,24 @@ body.touch #bottom-left { padding: 6px 8px; }
 #loot-tag .lt-rar { padding: 1px 6px; background: var(--rar); color: #10131c; font-style: italic; letter-spacing: 0.5px; border-radius: 2px; }
 #loot-tag .lt-count { color: #d6dce8; letter-spacing: 0.5px; }
 body.touch #loot-tag .lt-name { font-size: 16px; }
+
+/* per-weapon reticles */
+#crosshair .circ, #crosshair .drop { display: none; position: absolute; }
+#crosshair .circ { left: calc(var(--gap) * -1); top: calc(var(--gap) * -1); width: calc(var(--gap) * 2); height: calc(var(--gap) * 2); border: 2px solid rgba(255,255,255,0.95); border-radius: 50%; box-sizing: border-box; box-shadow: 0 0 0 1px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(0,0,0,0.35); }
+#crosshair[data-mode="shotgun"] .circ { display: block; }
+#crosshair[data-mode="shotgun"] .t, #crosshair[data-mode="shotgun"] .b { height: 7px; }
+#crosshair[data-mode="shotgun"] .l, #crosshair[data-mode="shotgun"] .r { width: 7px; }
+#crosshair[data-mode="shotgun"] .t { bottom: calc(var(--gap) - 5px); }
+#crosshair[data-mode="shotgun"] .b { top: calc(var(--gap) - 5px); }
+#crosshair[data-mode="shotgun"] .l { right: calc(var(--gap) - 5px); }
+#crosshair[data-mode="shotgun"] .r { left: calc(var(--gap) - 5px); }
+#crosshair[data-mode="dot"] .ch, #crosshair[data-mode="throw"] .ch, #crosshair[data-mode="sniper"] .ch, #crosshair[data-mode="rocket"] .ch { display: none; }
+#crosshair[data-mode="sniper"] .circ { display: block; opacity: 0.45; border-width: 1.5px; }
+#crosshair[data-mode="rocket"] .circ { display: block; left: -15px; top: -15px; width: 30px; height: 30px; }
+#crosshair[data-mode="rocket"] .drop { display: block; height: 2px; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.5); left: -6px; width: 12px; }
+#crosshair[data-mode="rocket"] .d1 { top: 22px; } #crosshair[data-mode="rocket"] .d2 { top: 32px; left: -9px; width: 18px; } #crosshair[data-mode="rocket"] .d3 { top: 42px; left: -12px; width: 24px; }
+#crosshair[data-mode="dot"] .dot { width: 6px; height: 6px; left: -3px; top: -3px; }
+#hitmarker.shield i { background: #52b6ff; }
+/* health bars shake on damage */
+.shake { animation: barshake 0.32s ease-out; }
+@keyframes barshake { 0%,100% { transform: translate(0,0); } 20% { transform: translate(-4px,1px); } 40% { transform: translate(4px,-1px); } 60% { transform: translate(-3px,0); } 80% { transform: translate(2px,1px); } }

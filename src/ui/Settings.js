@@ -20,8 +20,11 @@ const SLIDERS = [
 ];
 const keyName = keyLabel;
 // on/off gameplay options (missing from older saves = on)
-const TOGGLES = [['autoPickup', 'Auto pick up weapons'], ['stackDamage', 'Stack damage numbers'], ['autoSort', 'Auto sort consumables right']];
-export const setting = (game, k) => game.meta?.profile?.d?.settings?.[k] !== false;
+const TOGGLES = [['autoPickup', 'Auto pick up weapons'], ['stackDamage', 'Stack damage numbers'], ['autoSort', 'Auto sort consumables right'],
+  ['weaponReticles', 'Crosshair changes per weapon'], ['throwArc', 'Show throw arc'], ['legacyHitSound', 'Legacy headshot sound', false]];
+const TOGGLE_DEFAULT = Object.fromEntries(TOGGLES.map(([k, , d = true]) => [k, d]));
+// A saved on/off setting (missing = its default).
+export const setting = (game, k, def = TOGGLE_DEFAULT[k] ?? true) => { const v = game.meta?.profile?.d?.settings?.[k]; return v === undefined ? def : v !== false; };
 
 // Apply saved settings to the running game.
 export function applySettings(game) {
@@ -59,7 +62,7 @@ export function renderSettings(el, game, { compact = false } = {}) {
     el.querySelectorAll('[data-q]').forEach((b) => b.classList.toggle('on', b.dataset.q === q));
     el.querySelectorAll('[data-sv]').forEach((b) => b.classList.toggle('on', (b.dataset.sv === '1') === !!s.soundViz));
     el.querySelectorAll('[data-island]').forEach((b) => b.classList.toggle('on', b.dataset.island === (s.island || 'auto')));
-    el.querySelectorAll('[data-tog]').forEach((b) => b.classList.toggle('on', (b.dataset.val === '1') === (s[b.dataset.tog] !== false)));
+    el.querySelectorAll('[data-tog]').forEach((b) => b.classList.toggle('on', (b.dataset.val === '1') === (s[b.dataset.tog] === undefined ? TOGGLE_DEFAULT[b.dataset.tog] : s[b.dataset.tog] !== false)));
     const want = s.island && s.island !== 'auto' ? s.island : null;
     el.querySelector('.island-note')?.classList.toggle('hidden', !want || want === VARIANT_KEY);
     el.querySelectorAll('[data-bind]').forEach((b) => { b.textContent = keyName(game.input.keyFor(b.dataset.bind)); b.classList.remove('wait'); });

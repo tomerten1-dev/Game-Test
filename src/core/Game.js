@@ -33,7 +33,7 @@ import { Traps } from '../world/Traps.js';
 import { applyMood, DayCycle } from '../world/TimeOfDay.js';
 import { Meta } from '../meta/Meta.js';
 import { LobbyStage } from '../ui/LobbyStage.js';
-import { applySettings } from '../ui/Settings.js';
+import { applySettings, setting } from '../ui/Settings.js';
 import { Pickaxe } from '../weapons/Items.js';
 import { Weapon } from '../weapons/Weapon.js';
 import { COSMETICS } from '../meta/Cosmetics.js';
@@ -671,6 +671,7 @@ export class Game {
     const held = p.held;
     if (!held || p.state !== 'ground') return;
     if (held.isConsumable && held.def.throw) {
+      if (setting(this, 'throwArc')) this.projectiles.showArc(p, this.camera.getWorldDirection(_dir));
       if (input.down('fire')) {
         const dir = this.camera.getWorldDirection(_dir);
         p.bodyYaw = p.aimYaw;

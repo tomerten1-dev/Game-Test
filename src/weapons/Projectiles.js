@@ -9,6 +9,7 @@ const _n = new THREE.Vector3();
 const _c = new THREE.Color();
 const _q = new THREE.Quaternion();
 const _fwd = new THREE.Vector3(0, 0, 1);
+const _arcP = new THREE.Vector3(), _arcV = new THREE.Vector3();
 
 // Physical projectiles: sniper rounds (with drop), rockets and bouncing throwables
 // (grenade, smoke, impulse, fire flask). Smoke and fire leave lingering areas.
@@ -134,7 +135,56 @@ export class Projectiles {
     if (a.smoke) { const j = this.game.world.smokes.indexOf(a.smoke); if (j >= 0) this.game.world.smokes.splice(j, 1); }
   }
 
+  // Blue arc showing where a held throwable would fly and land (same launch and gravity as
+  // throwGrenade). Call every frame while aiming a throwable; it hides itself when not asked.
+  showArc(owner, dir) {
+    if (!this.arc) {
+      const N = 180;
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(N * 3), 3));
+      // round dots
+      const cv = document.createElement('canvas'); cv.width = cv.height = 32;
+      const cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(16, 16, 13, 0, Math.PI * 2); cx.fill();
+      const line = new THREE.Points(geo, new THREE.PointsMaterial({ color: '#6cc4ff', size: 0.13, sizeAttenuation: true, map: new THREE.CanvasTexture(cv), alphaTest: 0.4, transparent: true, depthWrite: false }));
+      line.frustumCulled = false;
+      line.renderOrder = 5;
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.45, 0.62, 28), new THREE.MeshBasicMaterial({ color: '#58b8ff', transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }));
+      ring.rotation.x = -Math.PI / 2;
+      ring.renderOrder = 5;
+      this.game.scene.add(line, ring);
+      this.arc = { line, ring, N, t: 0 };
+    }
+    const a = this.arc;
+    a.t = 0.12;
+    const pos = owner.chest(_arcP).addScaledVector(dir, 0.6);
+    pos.y += 0.4;
+    const vel = _arcV.copy(dir).multiplyScalar(21);
+    vel.y += 5; vel.x += owner.vel.x * 0.4; vel.z += owner.vel.z * 0.4;
+    const arr = a.line.geometry.attributes.position.array;
+    let n = 0, landed = false;
+    const h = 0.018;
+    arr[0] = pos.x; arr[1] = pos.y; arr[2] = pos.z; n = 1;
+    for (; n < a.N; n++) {
+      _prev.copy(pos);
+      vel.y -= 24 * h;
+      const len = vel.length() * h;
+      _dir.copy(vel).normalize();
+      const r = this.game.combat.trace(_prev, _dir, len, owner, 0);
+      if (r.hit) { pos.copy(_prev).addScaledVector(_dir, r.t); landed = true; }
+      else pos.addScaledVector(_dir, len);
+      arr[n * 3] = pos.x; arr[n * 3 + 1] = pos.y; arr[n * 3 + 2] = pos.z;
+      if (landed) { n++; break; }
+    }
+    const skip = Math.min(8, Math.max(0, n - 2)); // not right at the hand, where the dots would be huge
+    a.line.geometry.setDrawRange(skip, n - skip);
+    a.line.geometry.attributes.position.needsUpdate = true;
+    a.line.visible = true;
+    a.ring.visible = landed;
+    if (landed) a.ring.position.set(pos.x, pos.y + 0.05, pos.z);
+  }
+
   update(dt) {
+    if (this.arc && (this.arc.t -= dt) <= 0) { this.arc.line.visible = false; this.arc.ring.visible = false; }
     const g = this.game;
     this._updateAreas(dt);
     for (const p of [...this.list]) {
