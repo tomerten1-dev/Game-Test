@@ -244,7 +244,8 @@ export class Bot extends Actor {
     if (this.landTime === undefined) this.landTime = g.time;
     const calm = Math.min(1, (g.time - this.landTime) / 140);
     const late = Math.min(1, (g.storm?.phase || 0) / 4); // late game: everyone is hunting
-    const sight = 18 + (SIGHT - 18) * calm + late * 30;
+    // darkness and heavy rain shorten how far bots notice people
+    const sight = (18 + (SIGHT - 18) * calm + late * 30) * (1 - 0.22 * (g.dayCycle?.dark || 0) - 0.1 * (g.weather?.rain || 0));
     const cands = [];
     for (const a of g.actors) {
       if (a === this || !a.alive || a.state === 'bus') continue;

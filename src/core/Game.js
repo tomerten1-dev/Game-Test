@@ -37,8 +37,9 @@ import { applySettings } from '../ui/Settings.js';
 import { Pickaxe } from '../weapons/Items.js';
 import { Weapon } from '../weapons/Weapon.js';
 import { COSMETICS } from '../meta/Cosmetics.js';
-import { VARIANT } from '../world/Variant.js';
+import { VARIANT, VARIANT_KEY } from '../world/Variant.js';
 import { Snowfall } from '../effects/Weather.js';
+import { WeatherSystem } from '../effects/WeatherFX.js';
 import { BossEvent } from '../world/Boss.js';
 
 const WARMUP_TIME = 20;
@@ -101,6 +102,7 @@ export class Game {
     this.world.destructibles.game = this;
     this.boss = new BossEvent(this);
     this.dayCycle = new DayCycle(this);
+    this.weather = new WeatherSystem(this);
     this.ambient = new Ambient(this);
     this._firstMatch = true;
     this.post = new Post(this.renderer, this.scene, this.camera);
@@ -171,6 +173,7 @@ export class Game {
   toLobby(silent = false) {
     this.sound.busEngine(false);
     this.dayCycle.stop();
+    this.weather.stop();
     this.mood = applyMood(this, 'day');
     for (const a of this.actors) a.destroy();
     this.actors = [];
@@ -337,6 +340,7 @@ export class Game {
     this.traps.reset();
     this.mood = applyMood(this, 'day');
     this.dayCycle.stop();
+    this.weather.stop();
     this.spectating = null;
     this.deathInfo = null;
     this.respawns = [];
@@ -414,7 +418,9 @@ export class Game {
     for (const b of this.bots) this._planDrop(b);
     this.boss.reset();
     this.boss.spawn();
-    this.dayCycle.start();
+    const wx = this.weather.roll({ snow: VARIANT.weather === 'snow', desert: VARIANT_KEY === 'desert' });
+    this.dayCycle.start(this.weather.night);
+    if (wx) setTimeout(() => this.state === 'playing' && this.hud.banner(wx, 3), 6500);
     this.rig.yaw = Math.atan2(-this.bus.vel.x, -this.bus.vel.z) + 0.6;
     this.rig.pitch = -0.25;
     this.meta.startMatch();
@@ -546,6 +552,7 @@ export class Game {
     if (this.warmup <= 0) this.events.update(dt, this.time);
     this.boss.update(dt);
     if (this.warmup <= 0) this.dayCycle.update(this.time);
+    this.weather.update(dt);
     this.ambient.update(dt, this.time);
     for (const a of this.actors) {
       a.updateMovement(dt);

@@ -448,6 +448,14 @@ export class Sound {
       case 'click':
         this._tone(t, 0.05, { type: 'triangle', freq: 1200, gain: 0.1 });
         break;
+      case 'thunder': // distant rolling rumble
+        this._noise(t, 3.2, { type: 'lowpass', freq: 260, freqEnd: 60, gain: 0.55, attack: 0.25 });
+        this._noise(t + 0.4, 2.2, { type: 'lowpass', freq: 180, freqEnd: 50, gain: 0.4, attack: 0.3 });
+        break;
+      case 'thunderNear': // sharp crack, then the rumble
+        this._noise(t, 0.35, { type: 'highpass', freq: 900, freqEnd: 300, gain: 0.9 });
+        this._noise(t + 0.05, 3, { type: 'lowpass', freq: 500, freqEnd: 60, gain: 0.8, attack: 0.05 });
+        break;
       case 'kick': // body thump
         this._noise(t, 0.12, { type: 'lowpass', freq: 700, gain: 0.6 * v });
         this._tone(t, 0.14, { type: 'sine', freq: 140, freqEnd: 60, gain: 0.4 * v });
