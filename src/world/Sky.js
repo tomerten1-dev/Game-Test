@@ -18,6 +18,8 @@ const skyFrag = /* glsl */ `
 uniform vec3 uTop;
 uniform vec3 uHorizon;
 uniform vec3 uSunDir;
+uniform float uStars;
+uniform float uSunGlow;
 varying vec3 vDir;
 void main() {
   vec3 d = normalize(vDir);
@@ -25,9 +27,16 @@ void main() {
   vec3 col = mix(uHorizon, uTop, pow(clamp(h, 0.0, 1.0), 0.38));
   col = mix(col, uHorizon * 0.92, smoothstep(0.0, -0.3, h));
   float s = max(dot(d, uSunDir), 0.0);
-  col += vec3(1.0, 0.78, 0.5) * pow(s, 6.0) * 0.22;
-  col += vec3(1.0, 0.9, 0.7) * pow(s, 90.0) * 0.8;
-  col = mix(col, vec3(1.0, 0.97, 0.88) * 4.0, smoothstep(0.99935, 0.99965, s));
+  col += vec3(1.0, 0.78, 0.5) * pow(s, 6.0) * 0.22 * uSunGlow;
+  col += vec3(1.0, 0.9, 0.7) * pow(s, 90.0) * 0.8 * uSunGlow;
+  col = mix(col, mix(vec3(0.85, 0.9, 1.0) * 2.2, vec3(1.0, 0.97, 0.88) * 4.0, uSunGlow), smoothstep(0.99935, 0.99965, s));
+  // stars at night
+  if (uStars > 0.0) {
+    vec3 sp = floor(d * 320.0);
+    float hs = fract(sin(dot(sp, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+    float tw = 0.6 + 0.4 * sin(hs * 800.0);
+    col += vec3(0.9, 0.95, 1.0) * step(0.9982, hs) * tw * uStars * smoothstep(0.02, 0.25, h);
+  }
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -41,6 +50,8 @@ export function createSkyMesh(radius = 950) {
       uTop: { value: SKY_TOP },
       uHorizon: { value: SKY_HORIZON },
       uSunDir: { value: SUN_DIR },
+      uStars: { value: 0 },
+      uSunGlow: { value: 1 },
     },
     side: THREE.BackSide,
     depthWrite: false,

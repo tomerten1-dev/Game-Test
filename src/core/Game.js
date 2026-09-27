@@ -28,7 +28,7 @@ import { Pings } from '../ui/Pings.js';
 import { StormFX } from '../effects/StormFX.js';
 import { Projectiles } from '../weapons/Projectiles.js';
 import { Events } from '../world/Events.js';
-import { applyMood, pickMood } from '../world/TimeOfDay.js';
+import { applyMood, DayCycle } from '../world/TimeOfDay.js';
 import { Meta } from '../meta/Meta.js';
 import { LobbyStage } from '../ui/LobbyStage.js';
 import { applySettings } from '../ui/Settings.js';
@@ -91,6 +91,7 @@ export class Game {
     this.projectiles = new Projectiles(this);
     this.events = new Events(this);
     this.boss = new BossEvent(this);
+    this.dayCycle = new DayCycle(this);
     this.ambient = new Ambient(this);
     this._firstMatch = true;
     this.post = new Post(this.renderer, this.scene, this.camera);
@@ -168,6 +169,8 @@ export class Game {
 
   // Back to the lobby from the results screen (or when starting a new match from it).
   toLobby(silent = false) {
+    this.dayCycle.stop();
+    this.mood = applyMood(this, 'day');
     for (const a of this.actors) a.destroy();
     this.actors = [];
     this.bots = [];
@@ -267,7 +270,8 @@ export class Game {
     this.pings.reset();
     this.projectiles.reset();
     this.events.reset();
-    this.mood = applyMood(this, pickMood());
+    this.mood = applyMood(this, 'day');
+    this.dayCycle.stop();
     this.spectating = null;
     this.deathInfo = null;
     this.respawns = [];
@@ -344,6 +348,7 @@ export class Game {
     for (const b of this.bots) this._planDrop(b);
     this.boss.reset();
     this.boss.spawn();
+    this.dayCycle.start();
     this.rig.yaw = Math.atan2(-this.bus.vel.x, -this.bus.vel.z) + 0.6;
     this.rig.pitch = -0.25;
     this.meta.startMatch();
@@ -440,6 +445,7 @@ export class Game {
     this.combat.updateBursts(dt);
     if (this.warmup <= 0) this.events.update(dt, this.time);
     this.boss.update(dt);
+    if (this.warmup <= 0) this.dayCycle.update(this.time);
     this.ambient.update(dt, this.time);
     for (const a of this.actors) {
       a.updateMovement(dt);
