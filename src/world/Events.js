@@ -8,7 +8,7 @@ import { Loot } from './Loot.js';
 
 const _v = new THREE.Vector3();
 const _c = new THREE.Color();
-const DROP_TIMES = [70, 185, 290]; // seconds after the bus leaves
+const DROP_TIMES = [90, 220, 350, 460]; // seconds after the bus leaves
 const FALL_SPEED = 5.5;
 const VEND_PRICES = [0, 0, 100, 200, 300]; // by rarity (rare+)
 const VEND_MATS = ['wood', 'stone', 'metal'];
@@ -63,8 +63,8 @@ export class Events {
     const topGeo = new THREE.CylinderGeometry(0.95, 0.95, 0.08, 20);
     const arrowGeo = new THREE.ConeGeometry(0.35, 0.5, 3);
     let n = 0;
-    for (let i = 0; i < 200 && n < 10; i++) {
-      const a = r() * Math.PI * 2, d = 30 + r() * 130;
+    for (let i = 0; i < 600 && n < 24; i++) {
+      const a = r() * Math.PI * 2, d = 30 + r() * 250;
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
       if (!this._clearSpot(x, z, 3) || this.pads.some((p) => Math.hypot(p.x - x, p.z - z) < 40)) continue;
       const y = this.world.heightAt(x, z);
@@ -124,7 +124,7 @@ export class Events {
     const bodyMat = new THREE.MeshStandardMaterial({ color: '#e9eef5', roughness: 0.4, metalness: 0.2 });
     const trimMat = new THREE.MeshStandardMaterial({ color: '#2f6bff', roughness: 0.4, emissive: '#2f6bff', emissiveIntensity: 0.35 });
     const screenMat = new THREE.MeshStandardMaterial({ color: '#0d1630', emissive: '#4fd1ff', emissiveIntensity: 0.55, roughness: 0.2 });
-    const towns = [...TOWNS].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 4);
+    const towns = [...TOWNS].filter((t) => t.kind !== 'lake').sort((a, b) => a.name.localeCompare(b.name)).slice(0, 7);
     for (const t of towns) {
       let spot = null;
       for (let i = 0; i < 160 && !spot; i++) {

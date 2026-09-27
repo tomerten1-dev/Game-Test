@@ -5,19 +5,27 @@ import { SHADOW } from './Bake.js';
 // Smooth fbm island. Heights live in a grid; heightAt() is bilinear so gameplay
 // and the rendered mesh always agree.
 
-export const WORLD_HALF = 230;   // grid covers [-230, 230]
-export const CELL = 2;            // meters between samples
-export const ISLAND_RADIUS = 170;
+export const WORLD_HALF = 400;   // grid covers [-400, 400]
+export const CELL = 2.5;          // meters between samples
+export const ISLAND_RADIUS = 300;
+export const AREA_SCALE = (ISLAND_RADIUS / 170) ** 2; // vs. the original 20-player island
 export const WATER_LEVEL = 0;
 
+// Named places. `kind` picks the builder in Towns.js (village by default).
 export const TOWNS = [
-  { name: 'Candy Corners', x: -8, z: 18, r: 27 },
-  { name: 'Breezy Bay', x: 98, z: 38, r: 25 },
-  { name: 'Maple Hollow', x: -92, z: -38, r: 26 },
-  { name: 'Pebble City', x: 14, z: -98, r: 26, city: true },
-  { name: 'Sunset Springs', x: 88, z: -72, r: 23 },
+  { name: 'Candy Corners', x: -14, z: 30, r: 28 },
+  { name: 'Breezy Bay', x: 172, z: 70, r: 26 },
+  { name: 'Maple Hollow', x: -165, z: -62, r: 27 },
+  { name: 'Pebble City', x: 30, z: -178, r: 27, kind: 'city' },
+  { name: 'Sunset Springs', x: 160, z: -118, r: 24 },
+  { name: 'Skyline Spires', x: -72, z: -84, r: 40, kind: 'spires' },
+  { name: 'Rusty Works', x: 215, z: -12, r: 30, kind: 'factory' },
+  { name: 'Lazy Lake', x: 62, z: 128, r: 36, kind: 'lake' },
+  { name: 'Salty Pier', x: -20, z: 238, r: 24, kind: 'pier' },
+  { name: 'Windy Farms', x: 110, z: -238, r: 28, kind: 'farm' },
+  { name: 'Pine Hollow', x: -238, z: 70, r: 24 },
 ];
-export const MOUNTAIN = { x: -62, z: 88, r: 62, h: 48 };
+export const MOUNTAIN = { x: -125, z: 150, r: 85, h: 58 };
 
 const C = (hex) => new THREE.Color(hex);
 export const PALETTE = {
@@ -47,9 +55,9 @@ export class Terrain {
   rawHeight(x, z) {
     const nz = this.noise;
     const d = Math.hypot(x, z);
-    const coast = ISLAND_RADIUS + nz.fbm(x * 0.006 + 11.3, z * 0.006 - 4.1, 3) * 26;
+    const coast = ISLAND_RADIUS + nz.fbm(x * 0.0045 + 11.3, z * 0.0045 - 4.1, 3) * 40;
     const mask = 1 - smoothstep(0.8, 1.03, d / coast);
-    const hills = (nz.fbm(x * 0.0105, z * 0.0105, 4) * 0.5 + 0.5) * 13;
+    const hills = (nz.fbm(x * 0.0085, z * 0.0085, 4) * 0.5 + 0.5) * 15;
     const detail = nz.fbm(x * 0.05, z * 0.05, 3) * 1.1;
     const md = Math.hypot(x - MOUNTAIN.x, z - MOUNTAIN.z) / MOUNTAIN.r;
     let mt = 0;
@@ -79,6 +87,7 @@ export class Terrain {
         sum += this.rawHeight(t.x + Math.cos(ang) * t.r * 0.6, t.z + Math.sin(ang) * t.r * 0.6); cnt++;
       }
       t.y = Math.max(3.2, (t.y + sum / cnt) / 2);
+      if (t.kind === 'lake') t.y = 3.4;
       for (let j = 0; j < n; j++) {
         for (let i = 0; i < n; i++) {
           const x = -WORLD_HALF + i * CELL, z = -WORLD_HALF + j * CELL;
@@ -86,6 +95,8 @@ export class Terrain {
           if (d > t.r * 1.6) continue;
           const w = 1 - smoothstep(t.r * 0.85, t.r * 1.55, d);
           h[j * n + i] = lerp(h[j * n + i], t.y, w);
+          // lake basin: shallow water in the middle of the town ring
+          if (t.kind === 'lake') h[j * n + i] = lerp(h[j * n + i], -1.1, 1 - smoothstep(t.r * 0.32, t.r * 0.56, d));
         }
       }
     }
@@ -101,7 +112,7 @@ export class Terrain {
         let g = smoothstep(2.0, 3.0, y) * smoothstep(0.72, 0.86, ny) * (1 - smoothstep(26, 32, y));
         for (const t of TOWNS) {
           const d = Math.hypot(x - t.x, z - t.z);
-          g *= smoothstep(t.r * 0.72, t.r * 0.95, d);
+          g *= t.kind === 'lake' ? 1 : smoothstep(t.r * 0.72, t.r * 0.95, d);
         }
         // dirt paths from the central town to the others (wobbly)
         let pth = 0;

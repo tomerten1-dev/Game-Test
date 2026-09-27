@@ -56,8 +56,8 @@ export class Menus {
             </div>
             <div class="play-right">
               <div class="modes">
-                <button class="mode" data-mode="solo"><b>Solo</b><span>You vs 19 bots</span></button>
-                <button class="mode" data-mode="quick"><b>Quick Match</b><span>You vs 9 bots · faster storm</span></button>
+                <button class="mode" data-mode="solo"><b>Solo</b><span>You vs 99 bots</span></button>
+                <button class="mode" data-mode="quick"><b>Quick Match</b><span>You vs 29 bots · faster storm</span></button>
               </div>
               <button id="play-btn" class="btn big">PLAY</button>
               <div class="sub">Warm-up island, then the Storm Bus</div>

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Terrain, WATER_LEVEL } from './Terrain.js';
+import { Terrain, WATER_LEVEL, WORLD_HALF } from './Terrain.js';
 import { createSkyMesh, Clouds, SKY_HORIZON, SUN_DIR } from './Sky.js';
 import { bakeLighting, bakeTexture } from './Bake.js';
 import { Water } from './Water.js';
@@ -132,7 +132,7 @@ export class World {
     pos.x = nx; pos.z = nz;
     body.blocked = this.resolveHorizontal(pos, body.radius, body.height);
     // keep inside world bounds
-    const lim = 225;
+    const lim = WORLD_HALF - 12;
     pos.x = Math.max(-lim, Math.min(lim, pos.x));
     pos.z = Math.max(-lim, Math.min(lim, pos.z));
 

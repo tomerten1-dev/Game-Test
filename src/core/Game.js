@@ -96,6 +96,7 @@ export class Game {
     this.quality.apply();
     this.rig = new CameraRig(this.camera, this.world);
     this.focus = new THREE.Vector3();
+    this.frustum = new THREE.Frustum();
     this.pings = new Pings(this, ui);
     this.map = new MapScreen(ui, this);
     this.stormFX = new StormFX(this.scene);
@@ -130,13 +131,13 @@ export class Game {
     this.paused = false;
     if (this.state !== 'menu') this.toLobby(true);
     this.state = 'matchmaking';
-    const total = mode === 'quick' ? 10 : 20;
+    const total = mode === 'quick' ? 30 : 100;
     this.menus.showMatchmaking(true);
     let found = 1;
     this.menus.setMatchmaking(found, total);
     clearInterval(this._mmTimer);
     this._mmTimer = setInterval(() => {
-      found = Math.min(total, found + 1 + Math.floor(Math.random() * 3));
+      found = Math.min(total, found + 3 + Math.floor(Math.random() * (total / 10)));
       this.menus.setMatchmaking(found, total);
       if (found >= total) {
         clearInterval(this._mmTimer);
@@ -274,7 +275,7 @@ export class Game {
 
     this.player = new Player(this);
     this.actors.push(this.player);
-    const n = this.mode === 'quick' ? 9 : 19;
+    const n = this.mode === 'quick' ? 29 : 99;
     const colors = botColors(n);
     this.bots = [];
     for (let i = 0; i < n; i++) {
@@ -293,7 +294,7 @@ export class Game {
 
   _warmupSpot() {
     for (let i = 0; i < 40; i++) {
-      const a = Math.random() * Math.PI * 2, d = 20 + Math.sqrt(Math.random()) * 120;
+      const a = Math.random() * Math.PI * 2, d = 20 + Math.sqrt(Math.random()) * 250;
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
       if (this.world.heightAt(x, z) > 2.5 && this.world.terrain.normalAt(x, z).y > 0.8 && !this.world.colliders.query(x - 4, x + 4, z - 4, z + 4, []).length) return [x, z];
     }
@@ -353,11 +354,11 @@ export class Game {
     const towns = TOWNS;
     let x = 0, z = 0;
     for (let i = 0; i < 30; i++) {
-      if (Math.random() < 0.4) {
+      if (Math.random() < 0.6) {
         const t = towns[Math.floor(Math.random() * towns.length)];
         x = t.x + (Math.random() - 0.5) * t.r * 1.2; z = t.z + (Math.random() - 0.5) * t.r * 1.2;
       } else {
-        const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * 140;
+        const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * 260;
         x = Math.cos(a) * d; z = Math.sin(a) * d;
       }
       if (w.heightAt(x, z) > 2.2) break;
@@ -450,6 +451,10 @@ export class Game {
     this.hud.scope?.(inScope);
     if (p.state === 'ground') p.root.visible = !inScope; // your own hero would block the scope view
     this.rig.update(dt, view.state === 'bus' ? this.bus.mesh.position : view.pos, mode);
+    // one frustum per frame for character culling
+    this.camera.updateMatrixWorld();
+    _projView.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
+    this.frustum.setFromProjectionMatrix(_projView);
     for (const a of this.actors) a.updateVisual(dt, this.camera.position);
     this.focus.copy(view.pos);
     this.pings.update(dt);
@@ -717,5 +722,6 @@ export class Game {
 }
 
 const _dir = new THREE.Vector3(), _origin = new THREE.Vector3(), _muzzle = new THREE.Vector3();
+const _projView = new THREE.Matrix4();
 
 export const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));

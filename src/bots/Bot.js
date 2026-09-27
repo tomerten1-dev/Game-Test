@@ -170,7 +170,8 @@ export class Bot extends Actor {
     // aggression ramps up after landing: early on bots mostly loot
     if (this.landTime === undefined) this.landTime = g.time;
     const calm = Math.min(1, (g.time - this.landTime) / 140);
-    const sight = 18 + (SIGHT - 18) * calm;
+    const late = Math.min(1, (g.storm?.phase || 0) / 4); // late game: everyone is hunting
+    const sight = 18 + (SIGHT - 18) * calm + late * 30;
     const cands = [];
     for (const a of g.actors) {
       if (a === this || !a.alive || a.state === 'bus') continue;
@@ -302,7 +303,7 @@ export class Bot extends Actor {
       return;
     }
     if (zoneGoal) {
-      if (this.mode !== 'zone' || !this.hasGoal) this.setGoal(zoneGoal.x, zoneGoal.z);
+      this.setGoal(zoneGoal.x, zoneGoal.z);
       this.mode = 'zone';
       return;
     }
@@ -351,7 +352,7 @@ export class Bot extends Actor {
       for (const a of g.actors) {
         if (a === this || !a.alive || g.time - a.lastFireTime > 0.6) continue;
         const dd = a.pos.distanceTo(this.pos);
-        if (dd < 25 + 60 * calm && Math.random() < 0.15 + this.skill * 0.25 && (!storm || storm.isSafe(a.pos.x, a.pos.z, 10))) {
+        if (dd < 25 + 60 * calm + late * 60 && Math.random() < 0.15 + this.skill * 0.25 + late * 0.3 && (!storm || storm.isSafe(a.pos.x, a.pos.z, 10))) {
           this.huntPos.copy(a.pos);
           this.huntT = 12;
           this.mode = 'hunt';
@@ -399,12 +400,21 @@ export class Bot extends Actor {
     const dx = this.pos.x - c.x, dz = this.pos.z - c.y;
     const d = Math.hypot(dx, dz);
     const outsideNow = !storm.isInside(this.pos.x, this.pos.z, -3);
-    const margin = Math.min(12, r * 0.3);
+    const margin = Math.min(14, r * 0.3);
+    // moving zone still waiting: the next circle may lie outside the current one — stay inside the
+    // current circle on the side facing the next one until the shrink starts
+    if (storm.moving && storm.stage === 'wait' && Math.hypot(c.x - storm.center.x, c.y - storm.center.y) + r > storm.radius - 2) {
+      const ox = c.x - storm.center.x, oz = c.y - storm.center.y, ol = Math.hypot(ox, oz) || 1;
+      const edge = Math.max(0, storm.radius - Math.max(6, storm.radius * 0.25));
+      const gx = storm.center.x + (ox / ol) * edge, gz = storm.center.y + (oz / ol) * edge;
+      if (!outsideNow && Math.hypot(this.pos.x - gx, this.pos.z - gz) < 8) return null;
+      return { x: gx, z: gz, urgent: outsideNow || storm.timer < 12 };
+    }
     if (d < r - margin * 0.5 && !outsideNow) return null;
-    const travel = Math.max(0, d - (r - margin)) / 8.5; // seconds at sprint-ish speed
-    const timeLeft = storm.stage === 'wait' ? storm.timer + 12 : 0; // the shrink itself buys a little time
-    const urgent = outsideNow || storm.stage !== 'wait' || timeLeft < travel + 10;
-    if (!urgent && timeLeft > travel + 25) return null;
+    const travel = Math.max(0, d - (r - margin)) / 8; // seconds at sprint speed
+    const timeLeft = storm.stage === 'wait' ? storm.timer + 10 : 0; // the shrink itself buys a little time
+    const urgent = outsideNow || storm.stage !== 'wait' || timeLeft < travel + 25;
+    if (!urgent && timeLeft > travel + 50) return null;
     // aim for a point just inside the circle edge, on our side (less walking, avoids the center crowd)
     const k = d > 0.1 ? Math.max(0, r - margin - 4) / d : 0;
     const jitter = (this.skill - 0.5) * 4;
@@ -454,7 +464,12 @@ export class Bot extends Actor {
       return;
     }
     this.thinkT -= dt;
-    if (this.thinkT <= 0) { this.thinkT = THINK + Math.random() * 0.1; this.think(); }
+    if (this.thinkT <= 0) {
+      // far from the camera: think less often (nobody is watching closely)
+      const far = this.distToCam > 160 && !this.target;
+      this.thinkT = (far ? THINK * 2.5 : THINK) + Math.random() * 0.1;
+      this.think();
+    }
 
     const it = this.intent;
     it.mx = 0; it.mz = 0; it.jump = false; it.deploy = false;

@@ -58,10 +58,10 @@ export class Bus {
   launch() {
     const a = Math.random() * Math.PI * 2;
     const dx = Math.cos(a), dz = Math.sin(a);
-    const off = (Math.random() - 0.5) * 80;
+    const off = (Math.random() - 0.5) * 160;
     const px = -dz * off, pz = dx * off;
-    this.start.set(-dx * 250 + px, BUS_HEIGHT, -dz * 250 + pz);
-    this.end.set(dx * 250 + px, BUS_HEIGHT, dz * 250 + pz);
+    this.start.set(-dx * 420 + px, BUS_HEIGHT, -dz * 420 + pz);
+    this.end.set(dx * 420 + px, BUS_HEIGHT, dz * 420 + pz);
     this.length = this.start.distanceTo(this.end);
     this.vel.set(dx * SPEED, 0, dz * SPEED);
     this.progress = 0;
@@ -72,7 +72,7 @@ export class Bus {
   }
 
   // Doors open once the bus is over (or about to be over) the island.
-  get canDrop() { return this.active && this.pos.length() < 200; }
+  get canDrop() { return this.active && this.pos.length() < 350; }
 
   update(dt, t) {
     if (!this.active) return;

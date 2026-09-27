@@ -15,6 +15,7 @@ const GLIDE_HEIGHT = 35;
 
 // Shared body for the player and bots: state machine, physics, animation, health.
 const _tc = new THREE.Color();
+const _sph = new THREE.Sphere(new THREE.Vector3(), 2.2);
 
 // Cosmetic weapon wrap: recolour the gun body (keeps the rarity stripe).
 export function applyWrap(mesh, wrap) {
@@ -420,12 +421,17 @@ export class Actor {
     // Damage flash
     if (this.flashT > 0) { this.flashT -= dt; ch.flash(Math.max(0, this.flashT) * 2.5); if (this.flashT <= 0) ch.flash(0); }
 
-    // Animation LOD: far characters animate at a lower rate.
-    const far = this.distToCam > 70;
-    const veryFar = this.distToCam > 160;
-    if (veryFar && !this.isPlayer) { this.root.visible = this.state !== 'bus' && this.distToCam < 330; }
+    // LOD: off-screen / far characters are hidden and skip animation; the rest animate at a
+    // rate that drops with distance (keeps 100 players affordable).
+    const d = this.distToCam;
+    if (!this.isPlayer && this.state !== 'bus') {
+      _sph.center.set(this.pos.x, this.pos.y + 1, this.pos.z);
+      const visible = d < 300 && (!this.game.frustum || this.game.frustum.intersectsSphere(_sph));
+      this.root.visible = visible;
+      if (!visible) { this._animAcc = Math.min(0.2, this._animAcc + dt); return; }
+    }
     this._animAcc += dt;
-    const every = veryFar ? 0.1 : far ? 0.05 : 0;
+    const every = d > 180 ? 0.16 : d > 100 ? 0.1 : d > 45 ? 0.05 : 0;
     if (this._animAcc >= every) {
       const pitch = this.state === 'ground' ? this.aimPitch : 0;
       ch.update(this._animAcc, pitch, armed, this.crouchAmt);

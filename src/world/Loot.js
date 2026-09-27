@@ -109,8 +109,8 @@ export class Loot {
     // chest spots: next to houses, town centers, crate piles, plus random spots
     const spots = [...this.world.towns.chestSpots];
     const r = mulberry32(555);
-    for (let i = 0; i < 16; i++) {
-      const a = r() * Math.PI * 2, d = 25 + r() * 130;
+    for (let i = 0; i < 40; i++) {
+      const a = r() * Math.PI * 2, d = 25 + r() * 250;
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
       if (this.world.heightAt(x, z) > 2.5 && this.world.terrain.normalAt(x, z).y > 0.85) spots.push({ x, z, rot: r() * 6 });
     }
@@ -165,7 +165,7 @@ export class Loot {
     const trim = new THREE.MeshStandardMaterial({ color: '#e9e2c8', roughness: 0.6 });
     const spots = [];
     for (const h of this.world.towns.houses) spots.push({ x: h.x + (r() < 0.5 ? -1 : 1) * ((h.maxX - h.minX) / 2 + 1.6), z: h.z + (r() - 0.5) * 3 });
-    for (let i = 0; i < 18; i++) { const a = r() * Math.PI * 2, d = 20 + r() * 140; spots.push({ x: Math.cos(a) * d, z: Math.sin(a) * d }); }
+    for (let i = 0; i < 45; i++) { const a = r() * Math.PI * 2, d = 20 + r() * 260; spots.push({ x: Math.cos(a) * d, z: Math.sin(a) * d }); }
     for (const sp of spots) {
       const y = this.world.groundAt(sp.x, sp.z, 200, 0.5);
       if (y < 1.5) continue;
@@ -254,8 +254,8 @@ export class Loot {
   spawnFloorLoot() {
     // weapons (with ammo), heals and ammo lying around town plazas
     for (const t of TOWNS) {
-      for (let i = 0; i < 4; i++) {
-        const a = Math.random() * Math.PI * 2, d = 4 + Math.random() * t.r * 0.35;
+      for (let i = 0; i < Math.round(t.r / 6); i++) {
+        const a = Math.random() * Math.PI * 2, d = 4 + Math.random() * t.r * 0.45;
         const x = t.x + Math.cos(a) * d, z = t.z + Math.sin(a) * d;
         const y = this.world.groundAt(x, z, 200) + 0.2;
         const roll = Math.random();

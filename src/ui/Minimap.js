@@ -1,6 +1,6 @@
-import { TOWNS } from '../world/Terrain.js';
+import { TOWNS, WORLD_HALF } from '../world/Terrain.js';
 
-const VIEW = 205; // half-extent in meters shown on the map
+const VIEW = 120; // half-extent in meters shown around you
 
 // Top-down map: terrain colors, storm, next circle, bus path, player arrow.
 export class Minimap {
@@ -8,7 +8,8 @@ export class Minimap {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.game = game;
-    this.terrain = game.world.terrain.buildMinimapCanvas(320);
+    this.terrain = game.world.terrain.buildMinimapCanvas(640);
+    this.cx = 0; this.cz = 0;
     this.resize();
   }
 
@@ -19,17 +20,22 @@ export class Minimap {
     this.scale = this.canvas.width / (VIEW * 2);
   }
 
-  toMap(x, z) { return [(x + VIEW) * this.scale, (z + VIEW) * this.scale]; }
+  toMap(x, z) { return [(x - this.cx + VIEW) * this.scale, (z - this.cz + VIEW) * this.scale]; }
 
   draw() {
     const { ctx, game } = this;
     const W = this.canvas.width;
     const s = this.scale;
     ctx.clearRect(0, 0, W, W);
-    // terrain image covers [-230,230]; crop to [-VIEW,VIEW]
-    const tw = this.terrain.width;
-    const crop = ((230 - VIEW) / 460) * tw;
-    ctx.drawImage(this.terrain, crop, crop, tw - crop * 2, tw - crop * 2, 0, 0, W, W);
+    // centred on you (the bus while riding it)
+    const pl = game.player;
+    const c = pl ? (pl.state === 'bus' ? game.bus.pos : game.spectating?.pos || pl.pos) : { x: 0, z: 0 };
+    this.cx = Math.max(-WORLD_HALF + VIEW, Math.min(WORLD_HALF - VIEW, c.x));
+    this.cz = Math.max(-WORLD_HALF + VIEW, Math.min(WORLD_HALF - VIEW, c.z));
+    ctx.fillStyle = '#3cb4e6';
+    ctx.fillRect(0, 0, W, W);
+    const tw = this.terrain.width, k = tw / (WORLD_HALF * 2);
+    ctx.drawImage(this.terrain, (this.cx - VIEW + WORLD_HALF) * k, (this.cz - VIEW + WORLD_HALF) * k, VIEW * 2 * k, VIEW * 2 * k, 0, 0, W, W);
 
     // town names
     ctx.font = `700 ${Math.round(W * 0.045)}px "Barlow Condensed", sans-serif`;

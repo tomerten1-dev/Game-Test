@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mulberry32 } from '../core/noise.js';
 import { part, merge, mat } from './geomUtils.js';
-import { TOWNS } from './Terrain.js';
+import { TOWNS, MOUNTAIN, AREA_SCALE } from './Terrain.js';
 
 // KayKit Medieval buildings (CC0). Uniform world scale keeps proportions consistent.
 const KK_SCALE = 9.5;
@@ -23,6 +23,7 @@ export class Towns {
     this.lanterns = [];
     const parts = [];
     const crates = [];
+    this._townList = TOWNS;
     for (const town of TOWNS) this._town(town, parts, crates);
     this._scatterCrates(crates);
     this._landmark(parts);
@@ -71,12 +72,12 @@ export class Towns {
     const r = this.rand;
     let best = null;
     for (let i = 0; i < 400; i++) {
-      const a = r() * Math.PI * 2, d = 40 + r() * 100;
+      const a = r() * Math.PI * 2, d = 60 + r() * 190;
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
       const h = this.terrain.heightAt(x, z);
-      if (h < 6 || h > 22 || this.terrain.normalAt(x, z).y < 0.93) continue;
-      if (TOWNS.some((t) => Math.hypot(x - t.x, z - t.z) < t.r + 25)) continue;
-      if (Math.hypot(x + 62, z - 88) < 70) continue;
+      if (h < 6 || h > 26 || this.terrain.normalAt(x, z).y < 0.93) continue;
+      if (TOWNS.some((t) => Math.hypot(x - t.x, z - t.z) < t.r + 30)) continue;
+      if (Math.hypot(x - MOUNTAIN.x, z - MOUNTAIN.z) < MOUNTAIN.r + 10) continue;
       if (!best || h > best.h) best = { x, z, h };
     }
     if (!best) return;
@@ -103,16 +104,27 @@ export class Towns {
   }
 
   _town(town, parts, crates) {
-    if (town.city) return this._city(town, crates);
+    const k = town.kind;
+    if (k === 'city') return this._city(town, crates);
+    if (k === 'spires') return this._spires(town, parts, crates);
+    if (k === 'factory') return this._factory(town, parts, crates);
+    if (k === 'lake') { this._village(town, parts, crates, { ring: [0.72, 0.9], count: 7, fountain: false }); return this._lakeDocks(town, parts); }
+    if (k === 'pier') { this._village(town, parts, crates, { count: 5 }); return this._pier(town, parts); }
+    if (k === 'farm') { this._village(town, parts, crates, { count: 4, windmills: 3 }); return this._fields(town, parts); }
+    return this._village(town, parts, crates);
+  }
+
+  _village(town, parts, crates, opts = {}) {
     const r = this.rand;
-    this._fountain(town, parts);
-    this._cafe(town);
-    const count = 6 + Math.floor(r() * 3);
+    const ring = opts.ring || [0.5, 0.72];
+    if (opts.fountain !== false) this._fountain(town, parts);
+    if (opts.fountain !== false) this._cafe(town);
+    const count = opts.count || 6 + Math.floor(r() * 3);
     let placed = 0;
     const specials = [...SPECIALS].sort(() => r() - 0.5).slice(0, 2);
     for (let i = 0; i < count * 6 && placed < count; i++) {
       const a = (placed / count) * Math.PI * 2 + r() * 0.5 + i * 0.37;
-      const dist = town.r * (0.5 + r() * 0.22);
+      const dist = town.r * (ring[0] + r() * (ring[1] - ring[0]));
       const x = town.x + Math.cos(a) * dist, z = town.z + Math.sin(a) * dist;
       // face the plaza, snapped to 90 degrees
       const face = Math.atan2(town.x - x, town.z - z);
@@ -153,8 +165,8 @@ export class Towns {
       else if (pick < 0.7) this._prop('kk/wheelbarrow', px, pz, 0.9, rot + Math.PI / 2, 0.6);
       else if (pick < 0.8) this._prop('kk/weaponrack', px, pz, 1.4, rot, 0.5);
     }
-    // windmill on the outskirts
-    {
+    // windmill(s) on the outskirts
+    for (let wi = 0; wi < (opts.windmills || 1); wi++) {
       const a = r() * Math.PI * 2, wx = town.x + Math.cos(a) * town.r * 1.12, wz = town.z + Math.sin(a) * town.r * 1.12;
       const type = WINDMILLS[Math.floor(r() * WINDMILLS.length)];
       const info = this.models.get(type);
@@ -205,8 +217,8 @@ export class Towns {
 
   _scatterCrates(crates) {
     const r = this.rand;
-    for (let i = 0; i < 18; i++) {
-      const a = r() * Math.PI * 2, d = 20 + r() * 130;
+    for (let i = 0; i < Math.round(18 * AREA_SCALE); i++) {
+      const a = r() * Math.PI * 2, d = 25 + r() * 250;
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
       const h = this.terrain.heightAt(x, z);
       if (h < 2.5 || h > 25 || this.terrain.normalAt(x, z).y < 0.9) continue;
@@ -352,6 +364,195 @@ export class Towns {
       this._crateStack(crates, t.x + Math.cos(a) * d + 4, t.z + Math.sin(a) * d + 4, 1);
     }
     this.chestSpots.push({ x: t.x + 4.5, z: t.z + 4.5, rot: 0 });
+  }
+
+  // One KayKit city building on a block, facing the nearest road. `tall` scales it up.
+  _cityBlock(t, dx, dz, type, tall = 1) {
+    const S = 6, T = 12, r = this.rand;
+    const bx = t.x + dx, bz = t.z + dz;
+    const gy = Math.min(this.terrain.heightAt(bx - 5, bz - 5), this.terrain.heightAt(bx + 5, bz + 5), this.terrain.heightAt(bx - 5, bz + 5), this.terrain.heightAt(bx + 5, bz - 5));
+    if (gy < 2) return;
+    const info = this.models.get(type);
+    const rot = Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? -Math.PI / 2 : Math.PI / 2) : (dz > 0 ? Math.PI : 0);
+    this._place(type, bx, gy - 0.45, bz, rot, S * tall);
+    const hw = T * 0.4 * tall;
+    const box = { minX: bx - hw, maxX: bx + hw, minZ: bz - hw, maxZ: bz + hw };
+    this.colliders.add({ kind: 'box', ...box, y0: gy - 3, y1: gy + info.size.y * S * tall, house: true, mat: 'stone' });
+    this.houses.push({ ...box, x: bx, z: bz, y: gy, h: info.size.y * S * tall, rot });
+    const fx = Math.sin(rot), fz = Math.cos(rot);
+    this.chestSpots.push({ x: bx + fx * (hw + 1.4) + fz * 3, z: bz + fz * (hw + 1.4) - fx * 3, rot });
+    const sx = bx + fx * (hw + 0.8), sz = bz + fz * (hw + 0.8), side = r() < 0.5 ? -3.5 : 3.5;
+    if (r() < 0.5) this._prop('kk/city_bench', sx + fz * side, sz - fx * side, 0.6, rot, 0.6);
+    if (r() < 0.4) this._prop('kk/city_firehydrant', sx - fz * side, sz + fx * side, 0.8, rot, 0.3);
+  }
+
+  // Skyline Spires: the big downtown landmark — a road grid, tall blocks and a central glass tower.
+  _spires(t, parts, crates) {
+    const r = this.rand, T = 12, S = 6, y = t.y;
+    for (let i = -3; i <= 3; i++) {
+      if (i === 0) continue;
+      this._place('kk/city_road_straight', t.x + i * T, y - 0.22, t.z, 0, S);
+      this._place('kk/city_road_straight', t.x, y - 0.22, t.z + i * T, Math.PI / 2, S);
+    }
+    this._place('kk/city_road_junction', t.x, y - 0.22, t.z, 0, S);
+    const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    const blocks = [];
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      blocks.push([sx * T * 1.1, sz * T * 1.1, 1.2], [sx * 2.35 * T, sz * T * 1.1, 1], [sx * T * 1.1, sz * 2.35 * T, 1], [sx * 2.35 * T, sz * 2.35 * T, 0.9]);
+    }
+    blocks.forEach(([dx, dz, tall], i) => {
+      if (i === 0) return; // this block holds the glass tower
+      this._cityBlock(t, dx, dz, `kk/city_building_${letters[Math.floor(r() * letters.length)]}`, tall);
+    });
+    // central glass tower (the landmark you can see from the bus)
+    const tx = t.x + blocks[0][0], tz = t.z + blocks[0][1], gy = this.terrain.heightAt(tx, tz);
+    const glass = '#6fa8d6', frame = '#dfe6ee';
+    let h0 = gy - 0.5;
+    [[9, 14], [7.4, 14], [5.6, 12]].forEach(([w, h]) => {
+      parts.push(part(new THREE.BoxGeometry(w, h, w), glass, mat(tx, h0 + h / 2, tz)));
+      for (let f = 3; f < h; f += 3.5) parts.push(part(new THREE.BoxGeometry(w + 0.12, 0.35, w + 0.12), frame, mat(tx, h0 + f, tz)));
+      parts.push(part(new THREE.BoxGeometry(w + 0.6, 0.6, w + 0.6), frame, mat(tx, h0 + h, tz)));
+      h0 += h;
+    });
+    parts.push(part(new THREE.CylinderGeometry(0.15, 0.3, 9, 6), '#c9ced8', mat(tx, h0 + 4.5, tz)));
+    this.lanterns.push({ x: tx, y: h0 + 9.2, z: tz, small: true });
+    this.colliders.add({ kind: 'box', minX: tx - 4.5, maxX: tx + 4.5, minZ: tz - 4.5, maxZ: tz + 4.5, y0: gy - 3, y1: h0, house: true, mat: 'stone' });
+    this.houses.push({ minX: tx - 4.5, maxX: tx + 4.5, minZ: tz - 4.5, maxZ: tz + 4.5, x: tx, z: tz, y: gy, h: h0 - gy, rot: 0 });
+    this.chestSpots.push({ x: tx + 6, z: tz, rot: -Math.PI / 2 }, { x: tx, z: tz + 6, rot: 0 });
+    // street furniture
+    for (let i = 0; i < 8; i++) {
+      const along = (i % 2 ? 1 : -1) * T * (1 + (i >> 1) * 0.7), side = i % 4 < 2 ? 4.2 : -4.2;
+      const [lx, lz] = i < 4 ? [along, side] : [side, along];
+      this._prop('kk/city_streetlight', t.x + lx, t.z + lz, 5.5, i < 4 ? (side > 0 ? 0 : Math.PI) : (side > 0 ? -Math.PI / 2 : Math.PI / 2), 0.2);
+      this.lanterns.push({ x: t.x + lx, y: y + 5.2, z: t.z + lz, small: true });
+    }
+    const cars = ['taxi', 'sedan', 'hatchback', 'police', 'stationwagon'];
+    for (let i = 0; i < 8; i++) {
+      const along = (r() < 0.5 ? -1 : 1) * T * (0.6 + r() * 2.2), lane = r() < 0.5 ? 3.4 : -3.4;
+      const onX = i % 2 === 0;
+      const cx = t.x + (onX ? along : lane), cz = t.z + (onX ? lane : along), gy2 = this.terrain.heightAt(cx, cz);
+      const type = `kk/city_car_${cars[Math.floor(r() * cars.length)]}`;
+      const info = this.models.get(type), sc = 4.6 / info.size.z;
+      const rot = onX ? Math.PI / 2 : 0;
+      this._place(type, cx, gy2 + 0.05, cz, rot + (r() < 0.5 ? 0 : Math.PI), sc);
+      const hx = onX ? 2.4 : 1.1, hz = onX ? 1.1 : 2.4;
+      this.colliders.add({ kind: 'box', minX: cx - hx, maxX: cx + hx, minZ: cz - hz, maxZ: cz + hz, y0: gy2 - 1, y1: gy2 + info.size.y * sc * 0.9, crate: true, mat: 'metal' });
+    }
+    for (let i = 0; i < 4; i++) this._crateStack(crates, t.x + (r() - 0.5) * T * 4, t.z + (r() - 0.5) * T * 4, 1);
+    this.chestSpots.push({ x: t.x + 4.5, z: t.z + 4.5, rot: 0 });
+  }
+
+  // Rusty Works: warehouses, a smokestack, shipping containers.
+  _factory(t, parts, crates) {
+    const r = this.rand;
+    const sheds = [[-12, -10, 0], [14, -8, Math.PI / 2], [-6, 16, 0]];
+    for (const [dx, dz, rot] of sheds) {
+      const x = t.x + dx, z = t.z + dz, gy = this.terrain.heightAt(x, z) - 0.3;
+      const [w, d] = rot ? [12, 18] : [18, 12];
+      const h = 8;
+      const col = ['#b5643c', '#8f9aa6', '#c98d3a'][Math.floor(r() * 3)];
+      parts.push(part(new THREE.BoxGeometry(w, h, d), col, mat(x, gy + h / 2, z)));
+      for (let k = -w / 2 + 1; k < w / 2; k += 1.5) parts.push(part(new THREE.BoxGeometry(0.12, h - 0.4, d + 0.08), '#6d4a36', mat(x + k, gy + h / 2, z)));
+      parts.push(part(new THREE.BoxGeometry(w + 0.8, 0.5, d + 0.8), '#4a4f58', mat(x, gy + h + 0.2, z)));
+      parts.push(part(new THREE.BoxGeometry(rot ? 0.2 : 5, 5, rot ? 5 : 0.2), '#3a3f47', mat(x + (rot ? w / 2 : 0), gy + 2.5, z + (rot ? 0 : d / 2))));
+      const box = { minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 };
+      this.colliders.add({ kind: 'box', ...box, y0: gy - 2, y1: gy + h + 0.5, house: true, mat: 'metal' });
+      this.houses.push({ ...box, x, z, y: gy, h, rot });
+      this.chestSpots.push({ x: x + (rot ? w / 2 + 1.8 : 3), z: z + (rot ? 3 : d / 2 + 1.8), rot });
+    }
+    // smokestack
+    const sx = t.x + 12, sz = t.z + 14, sy = this.terrain.heightAt(sx, sz) - 0.3;
+    parts.push(part(new THREE.CylinderGeometry(1.4, 2, 26, 12), '#9a4b33', mat(sx, sy + 13, sz)));
+    for (const f of [8, 16, 23]) parts.push(part(new THREE.CylinderGeometry(1.75 - f * 0.012, 1.8 - f * 0.012, 0.8, 12), '#f2f2f2', mat(sx, sy + f, sz)));
+    this.colliders.add({ kind: 'circle', x: sx, z: sz, r: 2, y0: sy - 1, y1: sy + 26, house: true, mat: 'stone' });
+    this.smoke = this.smoke || [];
+    this.smoke.push({ x: sx, y: sy + 26, z: sz });
+    // shipping containers (stacked cover)
+    const cols = ['#d9483b', '#2f6bff', '#3aa35b', '#e8b33a'];
+    for (let i = 0; i < 7; i++) {
+      const cx = t.x + (r() - 0.5) * t.r * 1.2, cz = t.z + (r() - 0.5) * t.r * 1.2, gy = this.terrain.heightAt(cx, cz);
+      const box = { minX: cx - 3.1, maxX: cx + 3.1, minZ: cz - 1.3, maxZ: cz + 1.3 };
+      if (this._overlaps(box, 1.5) || gy < 2) continue;
+      const stack = r() < 0.35 ? 2 : 1;
+      for (let k = 0; k < stack; k++) {
+        const c = cols[Math.floor(r() * cols.length)];
+        parts.push(part(new THREE.BoxGeometry(6.1, 2.55, 2.45), c, mat(cx, gy + 1.27 + k * 2.6, cz)));
+        for (let q = -2.7; q <= 2.7; q += 0.6) parts.push(part(new THREE.BoxGeometry(0.08, 2.4, 2.5), '#2b2f38', mat(cx + q, gy + 1.27 + k * 2.6, cz)));
+      }
+      this.colliders.add({ kind: 'box', ...box, y0: gy - 1, y1: gy + stack * 2.6, crate: true, mat: 'metal' });
+      this.houses.push({ ...box, x: cx, z: cz, y: gy, h: stack * 2.6, rot: 0 });
+    }
+    this._prop('kk/city_watertower', t.x - 20, t.z + 4, 13, 0, 2.2);
+    for (let i = 0; i < 2; i++) this._prop('kk/city_dumpster', t.x + (r() - 0.5) * 20, t.z + (r() - 0.5) * 20, 1.6, r() * 6, 1.3);
+    for (let i = 0; i < 5; i++) this._crateStack(crates, t.x + (r() - 0.5) * t.r * 1.3, t.z + (r() - 0.5) * t.r * 1.3, r() < 0.4 ? 2 : 1);
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + 0.3;
+      this._lamp(parts, t.x + Math.cos(a) * t.r * 0.55, t.z + Math.sin(a) * t.r * 0.55);
+    }
+    this.chestSpots.push({ x: t.x, z: t.z, rot: 0 });
+  }
+
+  // Wooden walkway on posts (axis aligned). Walkable via a thin box collider.
+  _boardwalk(parts, x0, z0, x1, z1, top, width = 3.4) {
+    const alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0);
+    const len = alongX ? Math.abs(x1 - x0) : Math.abs(z1 - z0);
+    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    const [w, d] = alongX ? [len, width] : [width, len];
+    parts.push(part(new THREE.BoxGeometry(w, 0.3, d), '#a8784a', mat(cx, top - 0.15, cz)));
+    for (let k = -len / 2; k <= len / 2; k += 1.2) parts.push(part(new THREE.BoxGeometry(alongX ? 0.06 : width + 0.02, 0.32, alongX ? width + 0.02 : 0.06), '#7a5230', mat(cx + (alongX ? k : 0), top - 0.14, cz + (alongX ? 0 : k))));
+    for (let k = -len / 2 + 0.4; k <= len / 2; k += 4) for (const side of [-1, 1]) {
+      const px = cx + (alongX ? k : side * (width / 2 - 0.2)), pz = cz + (alongX ? side * (width / 2 - 0.2) : k);
+      const gy = Math.min(this.terrain.heightAt(px, pz), top - 0.3);
+      parts.push(part(new THREE.CylinderGeometry(0.16, 0.18, top - gy + 1.5, 6), '#6b4a2e', mat(px, (top + gy - 1.5) / 2, pz)));
+    }
+    this.colliders.add({ kind: 'box', minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2, y0: top - 0.35, y1: top, crate: true });
+  }
+
+  // Lazy Lake: two docks reaching into the water.
+  _lakeDocks(t, parts) {
+    const top = t.y - 0.3;
+    this._boardwalk(parts, t.x + t.r * 0.62, t.z, t.x + t.r * 0.18, t.z, top);
+    this._boardwalk(parts, t.x, t.z - t.r * 0.62, t.x, t.z - t.r * 0.22, top);
+    this.chestSpots.push({ x: t.x + t.r * 0.22, z: t.z, rot: 0 });
+  }
+
+  // Salty Pier: a long pier out to sea with a little hut at the end.
+  _pier(t, parts) {
+    const ax = Math.abs(t.x) > Math.abs(t.z);
+    const sx = ax ? Math.sign(t.x) : 0, sz = ax ? 0 : Math.sign(t.z);
+    // walk outward until the ground dips under water
+    let d = 0;
+    while (d < 120 && this.terrain.heightAt(t.x + sx * d, t.z + sz * d) > 0.6) d += 1;
+    const x0 = t.x + sx * (d - 6), z0 = t.z + sz * (d - 6), x1 = t.x + sx * (d + 34), z1 = t.z + sz * (d + 34);
+    const top = 1.8;
+    this._boardwalk(parts, x0, z0, x1, z1, top, 4);
+    const hx = x1 - sx * 3, hz = z1 - sz * 3;
+    parts.push(part(new THREE.BoxGeometry(4, 3, 4), '#e8dcc4', mat(hx, top + 1.5, hz)));
+    parts.push(part(new THREE.ConeGeometry(3.3, 1.6, 4), '#c0423a', mat(hx, top + 3.8, hz, 0, Math.PI / 4, 0)));
+    this.colliders.add({ kind: 'box', minX: hx - 2, maxX: hx + 2, minZ: hz - 2, maxZ: hz + 2, y0: top, y1: top + 3, house: true });
+    this.lanterns.push({ x: hx + (sz ? 2.3 : 0), y: top + 2.5, z: hz + (sx ? 2.3 : 0), small: true });
+    this.chestSpots.push({ x: hx - sx * 4 + sz * 1.2, z: hz - sz * 4 + sx * 1.2, rot: 0, y: top });
+  }
+
+  // Windy Farms: crop fields and hay bales.
+  _fields(t, parts) {
+    const r = this.rand;
+    for (let f = 0; f < 3; f++) {
+      const a = f * 2.1 + 0.4, fx = t.x + Math.cos(a) * t.r * 0.95, fz = t.z + Math.sin(a) * t.r * 0.95;
+      const crop = ['#8fcf4a', '#e8c65a', '#6fb040'][f];
+      for (let row = -3; row <= 3; row++) {
+        const rx = fx + row * 1.5, gy = this.terrain.heightAt(rx, fz);
+        if (gy < 2) continue;
+        parts.push(part(new THREE.BoxGeometry(0.7, 0.55, 10), crop, mat(rx, gy + 0.2, fz)));
+      }
+    }
+    for (let i = 0; i < 8; i++) {
+      const a = r() * Math.PI * 2, d = t.r * (0.35 + r() * 0.6);
+      const x = t.x + Math.cos(a) * d, z = t.z + Math.sin(a) * d, gy = this.terrain.heightAt(x, z);
+      if (gy < 2 || this.houses.some((h) => x > h.minX - 1 && x < h.maxX + 1 && z > h.minZ - 1 && z < h.maxZ + 1)) continue;
+      parts.push(part(new THREE.CylinderGeometry(0.9, 0.9, 1.4, 12), '#e6c35c', mat(x, gy + 0.9, z, Math.PI / 2, a, 0)));
+      this.colliders.add({ kind: 'circle', x, z, r: 0.9, y0: gy - 1, y1: gy + 1.8, crate: true });
+    }
   }
 
   // Outdoor café (KayKit Furniture Bits) near the plaza.

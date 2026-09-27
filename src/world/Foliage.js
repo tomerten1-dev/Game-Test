@@ -3,7 +3,7 @@ import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferG
 import { addWind, WIND } from '../effects/Shaders.js';
 import { mulberry32, smoothstep } from '../core/noise.js';
 import { jitter, gradientY } from './geomUtils.js';
-import { TOWNS, WORLD_HALF, ISLAND_RADIUS, PALETTE } from './Terrain.js';
+import { TOWNS, WORLD_HALF, ISLAND_RADIUS, PALETTE, AREA_SCALE } from './Terrain.js';
 import { quality } from '../core/device.js';
 import { Nature } from './Nature.js';
 
@@ -63,7 +63,7 @@ export class Foliage {
       this.nature.scatterUndergrowth(
         (a, b, c) => { const pt = this._candidate(a, b, c); return pt && { x: pt.x, y: pt.h, z: pt.z }; },
         (x, z, cell) => this._free(x, z, cell), this.rand,
-        quality.trees > 300 ? { bushes: 170, clovers: 360 } : { bushes: 60, clovers: 100 },
+        quality.trees > 300 ? { bushes: Math.round(170 * AREA_SCALE), clovers: Math.round(360 * AREA_SCALE) } : { bushes: Math.round(60 * AREA_SCALE), clovers: Math.round(100 * AREA_SCALE) },
       );
     } else this._bushes();
     this._grass();
@@ -98,7 +98,7 @@ export class Foliage {
 
   _trees() {
     const r = this.rand;
-    const count = quality.trees;
+    const count = Math.round(quality.trees * AREA_SCALE);
     const trunkGeo = new THREE.CylinderGeometry(0.16, 0.26, 1, 6);
     trunkGeo.translate(0, 0.5, 0);
     const trunkMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9 });
@@ -186,7 +186,7 @@ export class Foliage {
   _rocks() {
     if (this.models?.get('kk/rock_single_A')) return this._kkRocks();
     const r = this.rand;
-    const count = 150;
+    const count = Math.round(150 * AREA_SCALE);
     let geo = new THREE.DodecahedronGeometry(1, 1);
     geo.deleteAttribute('uv');
     geo = jitter(geo, 0.35, r);
@@ -226,7 +226,7 @@ export class Foliage {
     const types = ['kk/rock_single_A', 'kk/rock_single_B', 'kk/rock_single_C', 'kk/rock_single_D', 'kk/rock_single_E'];
     const pl = Object.fromEntries(types.map((t) => [t, []]));
     let n = 0;
-    for (let i = 0; i < 1200 && n < 160; i++) {
+    for (let i = 0; i < 1200 * AREA_SCALE && n < 160 * AREA_SCALE; i++) {
       const mountainBias = r() < 0.4;
       const c = mountainBias ? this._candidate(12, 48, 0.4) : this._candidate(0.5, 30, 0.6);
       if (!c) continue;
@@ -248,7 +248,7 @@ export class Foliage {
   _palms() {
     const r = this.rand;
     const pl = { 'palm-long': [], 'palm-short': [] };
-    for (let i = 0; i < 900 && pl['palm-long'].length + pl['palm-short'].length < 46; i++) {
+    for (let i = 0; i < 900 * AREA_SCALE && pl['palm-long'].length + pl['palm-short'].length < 46 * AREA_SCALE; i++) {
       const a = r() * Math.PI * 2, d = 130 + r() * 60;
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
       const h = this.terrain.heightAt(x, z);
@@ -270,7 +270,7 @@ export class Foliage {
     const pl = { 'formation-large-stone': [], 'formation-stone': [] };
     const grey = ['#b8bcc2', '#a7aab0', '#c9ccd1', '#9ea3aa'];
     let n = 0;
-    for (let i = 0; i < 1500 && n < 34; i++) {
+    for (let i = 0; i < 1500 * AREA_SCALE && n < 34 * AREA_SCALE; i++) {
       const onMountain = r() < 0.6;
       const c = onMountain ? this._candidate(10, 44, 0.5) : this._candidate(0.8, 14, 0.55);
       if (!c) continue;
@@ -290,7 +290,7 @@ export class Foliage {
 
   _bushes() {
     const r = this.rand;
-    const count = 260;
+    const count = Math.round(260 * AREA_SCALE);
     let geo = new THREE.IcosahedronGeometry(1, 1);
     geo.deleteAttribute('uv');
     geo = jitter(geo, 0.25, r);

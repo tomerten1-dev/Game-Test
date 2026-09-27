@@ -1,14 +1,15 @@
 import * as THREE from 'three';
 
 export const STORM_PHASES = [
-  { wait: 55, shrink: 40, radius: 115, dmg: 1 },
-  { wait: 40, shrink: 35, radius: 72, dmg: 2 },
-  { wait: 35, shrink: 30, radius: 42, dmg: 4 },
-  { wait: 30, shrink: 25, radius: 22, dmg: 6 },
-  { wait: 25, shrink: 20, radius: 9, dmg: 8 },
+  { wait: 75, shrink: 60, radius: 215, dmg: 1 },
+  { wait: 55, shrink: 45, radius: 135, dmg: 2 },
+  { wait: 45, shrink: 40, radius: 80, dmg: 4 },
+  { wait: 38, shrink: 32, radius: 44, dmg: 6 },
+  { wait: 30, shrink: 25, radius: 20, dmg: 8 },
+  { wait: 25, shrink: 22, radius: 8, dmg: 9 },
   { wait: 20, shrink: 25, radius: 0, dmg: 10 },
 ];
-const START_RADIUS = 250;
+const START_RADIUS = 440;
 
 const vert = /* glsl */ `
 varying vec2 vUv;
@@ -90,7 +91,7 @@ export class Storm {
       const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * maxOff;
       const x = this.center.x + Math.cos(a) * r, z = this.center.y + Math.sin(a) * r;
       const nearCenter = this.moving && Math.hypot(x - this.center.x, z - this.center.y) < this.radius * 0.6;
-      if (this.terrain.heightAt(x, z) > 2.2 && Math.hypot(x, z) < 140 && !nearCenter) { this.nextCenter.set(x, z); return; }
+      if (this.terrain.heightAt(x, z) > 2.2 && Math.hypot(x, z) < 250 && !nearCenter) { this.nextCenter.set(x, z); return; }
     }
     this.nextCenter.copy(this.center);
   }
@@ -124,7 +125,7 @@ export class Storm {
     const r = Math.max(0.5, this.radius);
     this.mesh.scale.set(r, 1, r);
     this.mesh.position.set(this.center.x, 0, this.center.y);
-    this.mesh.visible = r < 200;
+    this.mesh.visible = r < START_RADIUS - 20;
     this.uniforms.uRadius.value = r;
   }
 

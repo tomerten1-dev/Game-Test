@@ -1,6 +1,6 @@
-import { TOWNS } from '../world/Terrain.js';
+import { TOWNS, WORLD_HALF } from '../world/Terrain.js';
 
-const EXT = 230; // world half-extent covered by the terrain image
+const EXT = WORLD_HALF; // world half-extent covered by the terrain image
 const COLS = 'ABCDEFGHIJ';
 
 const fmt = (s) => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
@@ -30,7 +30,7 @@ export class MapScreen {
     this.ctx = this.canvas.getContext('2d');
     this.stormEl = root.querySelector('#bm-storm');
     this.aliveEl = root.querySelector('#bm-alive');
-    this.terrain = game.world.terrain.buildMinimapCanvas(720);
+    this.terrain = game.world.terrain.buildMinimapCanvas(900);
     this.open = false;
     this.zoom = 1;
     this.cx = 0;
