@@ -131,7 +131,7 @@ export class Game {
   }
 
   // Menu "Play" / end screen "Play Again": new match without reloading the page.
-  // PLAY: a short matchmaking screen, then the warm-up island, then the bus.
+  // It's you against bots, so there's no matchmaking or warm-up: straight onto the Storm Bus.
   play(mode = 'solo') {
     this.mode = mode;
     this.map.show(false);
@@ -140,20 +140,7 @@ export class Game {
     this.menus.showPause(false);
     this.paused = false;
     if (this.state !== 'menu') this.toLobby(true);
-    this.state = 'matchmaking';
-    const total = mode === 'quick' ? 30 : 100;
-    this.menus.showMatchmaking(true);
-    let found = 1;
-    this.menus.setMatchmaking(found, total);
-    clearInterval(this._mmTimer);
-    this._mmTimer = setInterval(() => {
-      found = Math.min(total, found + 3 + Math.floor(Math.random() * (total / 10)));
-      this.menus.setMatchmaking(found, total);
-      if (found >= total) {
-        clearInterval(this._mmTimer);
-        setTimeout(() => { if (this.state === 'matchmaking') this._enterMatch(); }, 350);
-      }
-    }, 260);
+    this._enterMatch();
   }
 
   cancelMatchmaking() {
@@ -360,11 +347,8 @@ export class Game {
     }
     this.hud.show(true);
     this.input.enabled = true;
-    // warm-up island: everyone spawns armed, respawns on death, nothing counts
-    this.warmup = WARMUP_TIME;
-    for (const a of this.actors) this._warmupSpawn(a);
-    this.hud.banner('Warm-up! The Storm Bus leaves in 20 seconds', 4);
-    this.rig.pitch = -0.1;
+    this.warmup = 0;
+    this.beginBus();
   }
 
   _warmupSpot() {

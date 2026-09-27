@@ -60,7 +60,7 @@ export class Menus {
                 <button class="mode" data-mode="quick"><b>Quick Match</b><span>You vs 29 bots · faster storm</span></button>
               </div>
               <button id="play-btn" class="btn big">PLAY</button>
-              <div class="sub">Warm-up island, then the Storm Bus</div>
+              <div class="sub">Straight onto the Storm Bus</div>
             </div>
           </section>
           <section class="lb-panel side" data-panel="locker"><div class="locker-slots" id="locker-slots"></div><div class="grid" id="locker-grid"></div></section>
