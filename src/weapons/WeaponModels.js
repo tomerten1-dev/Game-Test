@@ -91,6 +91,15 @@ function buildKenney(type, rarity) {
   return group;
 }
 
+// KayKit axe used as the harvesting tool; keeps its original units so it fits the hand slot.
+export function makePickaxeMesh() {
+  const info = models?.get('kk/axe_1handed');
+  if (!info) return null;
+  const m = info.scene.clone(true);
+  m.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return m;
+}
+
 export function makeWeaponMesh(type, rarity) {
   if (models && KENNEY[type]) return buildKenney(type, rarity);
   const key = `${type}:${rarity}`;

@@ -319,6 +319,18 @@ export class Effects {
     n.el.style.display = 'block';
   }
 
+  // "+8" material popup when harvesting
+  matNumber(pos, amount, mat) {
+    const n = this.numbers[this.numberCursor];
+    this.numberCursor = (this.numberCursor + 1) % this.numbers.length;
+    n.pos.copy(pos);
+    n.vx = (Math.random() - 0.5) * 0.6;
+    n.life = 0.9;
+    n.el.textContent = `+${amount}`;
+    n.el.className = `dmg-num mat mat-${mat}`;
+    n.el.style.display = 'block';
+  }
+
   update(dt) {
     this.sparks.update(dt);
     this.debris.update(dt);

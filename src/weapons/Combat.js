@@ -7,6 +7,7 @@ const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
 const _n = new THREE.Vector3();
 const _hit = {};
+const _p = new THREE.Vector3();
 
 // Random direction within a cone of half-angle `spread` around `dir`.
 export function coneDir(dir, spread, out) {
@@ -34,7 +35,8 @@ export class Combat {
     if (wh) { best = wh.t; res.collider = wh.collider; res.terrain = wh.terrain; }
     for (const a of this.game.actors) {
       if (a === ignore || !a.alive || a.state === 'bus') continue;
-      const p = a.pos;
+      const p = _p.copy(a.pos);
+      p.y -= a.crouchAmt * 0.3; // crouching lowers the hitboxes
       // broad phase
       if (raySphere(o.x, o.y, o.z, d.x, d.y, d.z, p.x, p.y + 0.95, p.z, 1.25, best) < 0) continue;
       if (a.state !== 'ground') {
@@ -63,10 +65,12 @@ export class Combat {
       if (w.ammo <= 0 && !w.reloading) this.reload(shooter);
       return false;
     }
-    w.onFire();
+    const hs = Math.hypot(shooter.vel.x, shooter.vel.z);
+    const moving = hs > 1.5;
+    const spread = w.spread(moving, !shooter.onGround, { crouched: shooter.crouched, still: hs < 0.4, now: g.time }) * (shooter.accuracyMult ?? 1);
+    w.onFire(g.time);
     shooter.lastFireTime = g.time;
-    const moving = Math.hypot(shooter.vel.x, shooter.vel.z) > 1.5;
-    const spread = w.spread(moving, !shooter.onGround) * (shooter.accuracyMult ?? 1);
+    shooter.sprinting = false;
     const def = w.def;
     const perTarget = new Map();
     for (let i = 0; i < def.pellets; i++) {
@@ -111,6 +115,44 @@ export class Combat {
 
   reload(actor) {
     const w = actor.weapon;
-    if (w && w.startReload() && actor.isPlayer) this.game.sound.play('reload');
+    if (!w) return;
+    const reserve = actor.ammoFor(w.def.ammoType);
+    if (w.startReload(reserve)) { if (actor.isPlayer) this.game.sound.play('reload'); }
+    else if (actor.isPlayer && reserve <= 0 && w.ammo < w.def.mag && !this._noAmmoT) {
+      this.game.hud.toast(`No ${w.def.ammoType} ammo`);
+      this._noAmmoT = setTimeout(() => (this._noAmmoT = null), 1500);
+    }
+  }
+
+  // Pickaxe swing: hits players (20), damages built walls (50), harvests materials from the world.
+  melee(actor, origin, dir, reach) {
+    const g = this.game;
+    const pick = actor.held;
+    if (!pick || !pick.isPickaxe || pick.cooldown > 0) return false;
+    pick.cooldown = 0.55;
+    actor.swingT = 0.5;
+    actor.lastFireTime = g.time - 1.2; // face the aim direction briefly
+    g.sound.play('swing', actor.isPlayer ? null : actor.pos);
+    const r = this.trace(origin, dir, reach, actor);
+    if (!r.hit) return true;
+    _end.copy(origin).addScaledVector(dir, r.t);
+    if (r.actor) {
+      const shieldBefore = r.actor.shield;
+      const dealt = r.actor.takeDamage(20, actor, false);
+      g.effects.hitSparks(_end, '#ffffff');
+      if (actor.isPlayer) { g.effects.damageNumber(_end, dealt, false, shieldBefore > 0); g.hud?.hitMarker(false, !r.actor.alive); g.sound.play('hit'); }
+      return true;
+    }
+    const c = r.collider;
+    if (c?.structure) { c.structure.damage(50, actor); g.effects.impact(_end, 'wood'); g.sound.play('harvest_wood', actor.isPlayer ? null : _end); return true; }
+    const mat = r.terrain ? null : c?.mat || (c?.tree || c?.crate ? 'wood' : c?.rock || c?.stone ? 'stone' : c?.house ? 'wood' : null);
+    g.effects.impact(_end, mat === 'wood' ? 'wood' : 'stone', _n.copy(dir).negate());
+    if (mat && actor.isPlayer) {
+      const amount = 7 + Math.floor(Math.random() * 4);
+      actor.addMat(mat, amount);
+      g.effects.matNumber?.(_end, amount, mat);
+      g.sound.play(`harvest_${mat}`);
+    } else if (actor.isPlayer) g.sound.play('impact');
+    return true;
   }
 }

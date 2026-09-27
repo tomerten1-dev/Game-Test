@@ -9,7 +9,7 @@ const KK = [
   'windmill_yellow', 'windmill_green', 'tower_A_green', 'tower_A_red', 'lumbermill_red', 'castle_blue',
   'tree_single_A', 'tree_single_B', 'rock_single_A', 'rock_single_B', 'rock_single_C', 'rock_single_D', 'rock_single_E',
   'cloud_big', 'cloud_small', 'barrel', 'crate_A_big', 'sack', 'wheelbarrow', 'tent',
-  'flag_blue', 'flag_red', 'flag_yellow', 'flag_green', 'resource_lumber', 'weaponrack', 'bucket_water', 'chest_gold',
+  'flag_blue', 'flag_red', 'flag_yellow', 'flag_green', 'resource_lumber', 'weaponrack', 'bucket_water', 'chest_gold', 'axe_1handed',
   // KayKit City Builder Bits + Furniture Bits (CC0)
   'city_building_A', 'city_building_B', 'city_building_C', 'city_building_D', 'city_building_E', 'city_building_F', 'city_building_G', 'city_building_H',
   'city_road_straight', 'city_road_junction', 'city_car_hatchback', 'city_car_police', 'city_car_sedan', 'city_car_stationwagon', 'city_car_taxi',

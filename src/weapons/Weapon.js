@@ -3,8 +3,10 @@ import { WEAPONS, RARITIES } from './WeaponDefs.js';
 // A weapon instance: ammo, reload, bloom and fire cooldown.
 export class Weapon {
   constructor(type, rarity = 0) {
+    this.isGun = true;
     this.type = type;
     this.def = WEAPONS[type];
+    this.lastShot = -10;
     this.rarity = rarity;
     this.ammo = this.def.mag;
     this.bloom = 0;
@@ -30,29 +32,32 @@ export class Weapon {
       this.reloadT -= dt;
       if (this.reloadT <= 0) {
         this.reloading = false;
-        this.ammo = this.def.mag;
-        return 'reloaded';
+        return 'reloaded'; // the owner moves ammo from its reserve (Actor.finishReload)
       }
     }
     return null;
   }
 
-  spread(moving, airborne) {
+  // opts: { crouched, still, now } -> first shot is perfectly accurate when standing still
+  spread(moving, airborne, opts = {}) {
     const d = this.def;
-    if (d.pellets > 1) return d.spread * (airborne ? 1.3 : 1);
-    return d.spread + this.bloom + (moving ? d.spread * 1.2 : 0) + (airborne ? d.spread * 3 : 0);
+    const crouch = opts.crouched ? 0.7 : 1;
+    if (d.pellets > 1) return d.spread * (airborne ? 1.3 : 1) * (opts.crouched ? 0.85 : 1);
+    if (opts.still && !airborne && opts.now !== undefined && opts.now - this.lastShot > 0.5 && this.bloom < 0.004) return 0;
+    return (d.spread + this.bloom + (moving ? d.spread * 1.2 : 0) + (airborne ? d.spread * 3 : 0)) * crouch;
   }
 
   canFire() { return !this.reloading && this.cooldown <= 0 && this.ammo > 0; }
 
-  onFire() {
+  onFire(now = 0) {
+    this.lastShot = now;
     this.ammo--;
     this.cooldown = 1 / this.def.rate;
     this.bloom = Math.min(this.def.maxSpread, this.bloom + this.def.bloom);
   }
 
-  startReload() {
-    if (this.reloading || this.ammo >= this.def.mag) return false;
+  startReload(reserve = Infinity) {
+    if (this.reloading || this.ammo >= this.def.mag || reserve <= 0) return false;
     this.reloading = true;
     this.reloadT = this.def.reload;
     return true;

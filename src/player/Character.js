@@ -133,9 +133,13 @@ export class Character {
   play(name, fade = 0.2, timeScale = 1) { this.setPose(name, null, fade, timeScale); }
   setTimeScale(s) { if (this.cur.lower) this.cur.lower.timeScale = s; }
 
-  setWeapon(mesh) {
-    if (this.weaponMesh) this.weaponHolder.remove(this.weaponMesh);
+  // inHand: parent to the right-hand bone (melee items animate with the hand);
+  // otherwise the gun is placed at the hand but points where the character aims.
+  setWeapon(mesh, inHand = false) {
+    if (this.weaponMesh) this.weaponMesh.parent?.remove(this.weaponMesh);
     this.weaponMesh = mesh;
+    this.inHand = inHand && !!this.handR;
+    if (mesh && this.inHand) { this.handR.add(mesh); return; }
     if (mesh) {
       this.weaponHolder.add(mesh);
       // hold point ~ between the grip and the foregrip
@@ -153,15 +157,17 @@ export class Character {
     bone.quaternion.copy(_q2.invert().multiply(_q));
   }
 
-  update(dt, pitch = 0, armed = false) {
+  update(dt, pitch = 0, armed = false, crouch = 0) {
     this.mixer.update(dt);
-    if (this.weaponMesh) this.weaponMesh.visible = armed;
-    if (armed && this.chestBone) {
+    if (this.weaponMesh) this.weaponMesh.visible = this.inHand || armed;
+    const bend = (armed ? -pitch * 0.55 : 0) + crouch * 0.35;
+    if (this.chestBone && Math.abs(bend) > 0.001) {
       this.root.updateMatrixWorld(true);
-      // bend the torso toward the aim pitch
       _axis.set(1, 0, 0).applyQuaternion(this.root.getWorldQuaternion(_q)).normalize();
-      this._rotateBoneWorld(this.chestBone, _axis, -pitch * 0.55);
+      this._rotateBoneWorld(this.chestBone, _axis, bend);
       this.chestBone.updateMatrixWorld(true);
+    }
+    if (armed && this.chestBone) {
       // gun sits in the right hand but points where the character aims
       if (this.handR) {
         this.handR.getWorldPosition(_v);

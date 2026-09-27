@@ -1,6 +1,7 @@
 import { RARITIES } from '../weapons/WeaponDefs.js';
 import { Minimap } from './Minimap.js';
 import { TOWNS } from '../world/Terrain.js';
+import { AMMO } from '../weapons/Items.js';
 
 const fmtTime = (s) => {
   s = Math.max(0, Math.ceil(s));
@@ -26,7 +27,8 @@ export class HUD {
         <div id="banner"></div>
         <div id="prompt" class="hidden"><span class="key">E</span><span id="prompt-text"></span></div>
         <div id="toast"></div>
-        <div id="reload-ring" class="hidden"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16"/></svg><span>RELOADING</span></div>
+        <div id="reload-ring" class="hidden"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16"/></svg><span id="ring-label">RELOADING</span></div>
+        <div id="pickup-notes"></div>
 
         <div id="killfeed"></div>
 
@@ -49,7 +51,11 @@ export class HUD {
           <div id="ammo"><span id="ammo-cur">0</span><span id="ammo-max">/0</span></div>
           <div id="weapon-name"></div>
           <div id="slots"></div>
-          <div id="mats"><span class="wood-icon"></span><span id="wood">0</span></div>
+          <div id="mats">
+            <div class="mat" title="Wood"><span class="mat-icon wood"></span><span id="mat-wood">0</span></div>
+            <div class="mat" title="Stone"><span class="mat-icon stone"></span><span id="mat-stone">0</span></div>
+            <div class="mat" title="Metal"><span class="mat-icon metal"></span><span id="mat-metal">0</span></div>
+          </div>
         </div>
       </div>`);
     const $ = (s) => root.querySelector(s);
@@ -57,13 +63,14 @@ export class HUD {
       hud: $('#hud'), crosshair: $('#crosshair'), hitmarker: $('#hitmarker'),
       ammoCur: $('#ammo-cur'), ammoMax: $('#ammo-max'), weaponName: $('#weapon-name'), slots: $('#slots'),
       reload: $('#reload-ring'), reloadCircle: $('#reload-ring circle'), stormTint: $('#storm-tint'), hurt: $('#hurt-flash'),
-      banner: $('#banner'), prompt: $('#prompt'), promptText: $('#prompt-text'), toast: $('#toast'), wood: $('#wood'),
+      banner: $('#banner'), prompt: $('#prompt'), promptText: $('#prompt-text'), toast: $('#toast'), ringLabel: $('#ring-label'), notes: $('#pickup-notes'),
+      mats: { wood: $('#mat-wood'), stone: $('#mat-stone'), metal: $('#mat-metal') },
       killfeed: $('#killfeed'), alive: $('#st-alive'), kills: $('#st-kills'), storm: $('#st-storm'), stormLabel: $('#storm-label'),
       shieldFill: $('#shield-fill'), shieldNum: $('#shield-num'), healthFill: $('#health-fill'), healthNum: $('#health-num'),
       dmgDir: $('#dmg-dir'),
       speed: $('#speedlines'),
     };
-    this.el.slots.innerHTML = [0, 1, 2].map((i) => `<div class="slot" data-slot="${i}"><span class="key">${i + 1}</span><span class="icon"></span></div>`).join('');
+    this.el.slots.innerHTML = [0, 1, 2, 3, 4, 5].map((i) => `<div class="slot${i === 0 ? ' pick' : ''}" data-slot="${i}"><span class="key">${i + 1}</span><span class="icon"></span><span class="count"></span></div>`).join('');
     this.slotEls = [...this.el.slots.querySelectorAll('.slot')];
     this.slotEls.forEach((s) => s.addEventListener('pointerdown', (e) => { e.stopPropagation(); this.game.player?.switchSlot(+s.dataset.slot); }));
     this.minimap = new Minimap($('#minimap'), game);
@@ -138,6 +145,18 @@ export class HUD {
     t.classList.add('show');
   }
 
+  // Small stacked notes for auto-picked ammo / materials.
+  pickupNote(text, color = '#fff') {
+    const n = document.createElement('div');
+    n.className = 'pnote';
+    n.textContent = text;
+    n.style.color = color;
+    this.el.notes.prepend(n);
+    while (this.el.notes.children.length > 4) this.el.notes.lastChild.remove();
+    setTimeout(() => n.classList.add('fade'), 1800);
+    setTimeout(() => n.remove(), 2300);
+  }
+
   stormTint(on) {
     if (this.cache.stormOn === on) return;
     this.cache.stormOn = on;
@@ -148,10 +167,11 @@ export class HUD {
     const row = document.createElement('div');
     row.className = 'kf-row' + (victim.isPlayer || killer?.isPlayer ? ' me' : '');
     const name = (a) => `<b style="color:${a.isPlayer ? '#20e6c9' : '#' + a.color.getHexString()}">${a.isPlayer ? 'You' : a.name}</b>`;
-    if (!killer || killer === victim) row.innerHTML = `${name(victim)} <span>was lost in the storm</span>`;
+    if (victim.deathCause === 'fall') row.innerHTML = `${name(victim)} <span>fell to their death</span>`;
+    else if (!killer || killer === victim) row.innerHTML = `${name(victim)} <span>was lost in the storm</span>`;
     else {
       const w = killer.weapon;
-      row.innerHTML = `${name(killer)} <span class="kf-w" style="color:${w ? RARITIES[w.rarity].color : '#fff'}">${w ? w.def.icon : '✦'}</span> ${name(victim)}`;
+      row.innerHTML = `${name(killer)} <span class="kf-w" style="color:${w ? RARITIES[w.rarity].color : '#fff'}">${w ? w.def.icon : '⛏'}</span> ${name(victim)}`;
     }
     this.el.killfeed.prepend(row);
     while (this.el.killfeed.children.length > 5) this.el.killfeed.lastChild.remove();
@@ -168,35 +188,46 @@ export class HUD {
     const w = p.weapon;
 
     // crosshair gap follows current spread
-    const spread = w ? w.spread(Math.hypot(p.vel.x, p.vel.z) > 1.5, !p.onGround) : 0.02;
+    const moving = Math.hypot(p.vel.x, p.vel.z) > 1.5;
+    const spread = w ? w.spread(moving, !p.onGround, { crouched: p.crouched, still: !moving, now: g.time }) : 0.02;
     const px = Math.min(90, Math.round(6 + (spread / Math.tan((g.camera.fov * Math.PI) / 360)) * window.innerHeight * 0.5));
     if (this.cache.gap !== px) { this.cache.gap = px; this.el.crosshair.style.setProperty('--gap', `${px}px`); }
     this.set('chVis', this.el.crosshair.style, p.state === 'ground' && p.alive && !p.victory ? 'block' : 'none', 'display');
 
+    const h = p.held;
     if (w) {
+      const res = p.ammoFor(w.def.ammoType);
       this.set('ammoCur', this.el.ammoCur, String(w.ammo));
-      this.set('ammoMax', this.el.ammoMax, `/${w.def.mag}`);
+      this.set('ammoMax', this.el.ammoMax, `/${res === Infinity ? '∞' : res}`);
       this.set('wname', this.el.weaponName, w.name);
       this.set('wcol', this.el.weaponName.style, RARITIES[w.rarity].color, 'color');
     } else {
-      this.set('ammoCur', this.el.ammoCur, '–');
+      this.set('ammoCur', this.el.ammoCur, h?.isConsumable ? String(h.count) : '–');
       this.set('ammoMax', this.el.ammoMax, '');
-      this.set('wname', this.el.weaponName, 'Unarmed');
-      this.set('wcol', this.el.weaponName.style, '#ffffff', 'color');
+      this.set('wname', this.el.weaponName, h ? h.name : 'Unarmed');
+      this.set('wcol', this.el.weaponName.style, h?.isConsumable ? h.def.color : '#ffffff', 'color');
     }
     this.slotEls.forEach((s, i) => {
-      const sw = p.weapons[i];
-      const sig = `${sw ? sw.type + sw.rarity : ''}|${i === p.slot}`;
+      const it = p.items[i];
+      const sig = `${it ? it.type + (it.rarity ?? '') + (it.count ?? '') : ''}|${i === p.slot}`;
       if (this.cache['slot' + i] === sig) return;
       this.cache['slot' + i] = sig;
       s.classList.toggle('active', i === p.slot);
-      s.style.setProperty('--rar', sw ? RARITIES[sw.rarity].color : 'rgba(255,255,255,0.15)');
-      s.querySelector('.icon').textContent = sw ? sw.def.icon : '';
+      const col = !it ? 'rgba(255,255,255,0.15)' : it.isGun ? RARITIES[it.rarity].color : it.isConsumable ? it.def.color : '#e8d7b0';
+      s.style.setProperty('--rar', col);
+      s.querySelector('.icon').textContent = !it ? '' : it.isGun ? it.def.icon : it.isConsumable ? it.def.icon : '⛏';
+      s.querySelector('.count').textContent = it?.isConsumable ? String(it.count) : '';
     });
-    this.set('wood', this.el.wood, String(p.wood));
-    const rl = w?.reloading;
-    this.el.reload.classList.toggle('hidden', !rl);
-    if (rl) this.el.reloadCircle.style.strokeDashoffset = String(100.5 * (w.reloadT / w.def.reload));
+    for (const k of ['wood', 'stone', 'metal']) this.set('mat' + k, this.el.mats[k], String(p.mats[k]));
+    const rl = w?.reloading, using = p.useT > 0 && p.useItem;
+    this.el.reload.classList.toggle('hidden', !rl && !using);
+    if (rl) {
+      this.set('ring', this.el.ringLabel, 'RELOADING');
+      this.el.reloadCircle.style.strokeDashoffset = String(100.5 * (w.reloadT / w.def.reload));
+    } else if (using) {
+      this.set('ring', this.el.ringLabel, `USING ${p.useItem.def.name.toUpperCase()}`);
+      this.el.reloadCircle.style.strokeDashoffset = String(100.5 * (p.useT / p.useItem.def.time));
+    }
 
     // speed lines while skydiving
     const sl = p.state === 'skydive' ? Math.min(1, -p.vel.y / 30) : p.state === 'glide' ? 0.25 : 0;

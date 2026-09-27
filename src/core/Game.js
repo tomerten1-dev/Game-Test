@@ -131,7 +131,7 @@ export class Game {
       this.state = 'ended';
       this.touch?.show(false);
       if (document.pointerLockElement) document.exitPointerLock();
-      this.menus.showEnd({ victory, place, killer: killer?.name, kills: p.kills, time: Math.max(0, this.time - this.matchStart) });
+      this.menus.showEnd({ victory, place, killer: killer?.name, cause: p.deathCause, kills: p.kills, time: Math.max(0, this.time - this.matchStart) });
       this.sound.play(victory ? 'victory' : 'defeat');
     }, victory ? 2600 : 2200);
   }
@@ -151,13 +151,16 @@ export class Game {
 
     this.player = new Player(this);
     this.actors.push(this.player);
-    this.player.giveWeapon(new Weapon('pistol', 0), 0);
+    this.player.giveWeapon(new Weapon('pistol', 0), 1);
+    this.player.addAmmo('light', 48);
+    this.player.switchSlot(1);
 
     const colors = botColors(19);
     this.bots = [];
     for (let i = 0; i < 19; i++) {
       const b = new Bot(this, BOT_NAMES[i], colors[i], Math.random(), CHARACTER_TYPES[i % CHARACTER_TYPES.length]);
-      b.giveWeapon(new Weapon('pistol', 0));
+      b.giveWeapon(new Weapon('pistol', 0), 1);
+      b.switchSlot(1);
       this.bots.push(b);
       this.actors.push(b);
     }
@@ -251,8 +254,13 @@ export class Game {
     this.ambient.update(dt, this.time);
     for (const a of this.actors) {
       a.updateMovement(dt);
-      for (const w of a.weapons) if (w && w.update(dt) === 'reloaded' && a.isPlayer) this.sound.play('reloaded');
+      for (const w of a.items) {
+        if (w && w.update(dt) === 'reloaded') { a.finishReload(w); if (a.isPlayer) this.sound.play('reloaded'); }
+      }
+      this.loot.autoPickup(a);
     }
+    this.sound.updateListener?.(this.camera);
+    this.sound.chestHum?.(p.alive && p.state === 'ground' ? this.loot.nearestChest(p.pos, 18) : null, p.pos);
     const mode = !p.alive || p.victory ? 'dead' : p.state === 'ground' ? (p.aiming ? 'aim' : 'ground') : p.state;
     this.rig.update(dt, p.state === 'bus' ? this.bus.mesh.position : p.pos, mode);
     for (const a of this.actors) a.updateVisual(dt, this.camera.position);
@@ -266,12 +274,12 @@ export class Game {
   updatePlayerCombat(dt) {
     const p = this.player, input = this.input;
     if (!p.alive) return;
-    for (let i = 0; i < 3; i++) if (input.pressed('slot' + (i + 1))) p.switchSlot(i);
+    for (let i = 0; i < 6; i++) if (input.pressed('slot' + (i + 1))) p.switchSlot(i);
     const wheel = input.consumeWheel();
     if (wheel) {
-      for (let k = 1; k <= 3; k++) {
-        const i = (p.slot + Math.sign(wheel) * k + 3) % 3;
-        if (p.weapons[i]) { p.switchSlot(i); break; }
+      for (let k = 1; k <= 6; k++) {
+        const i = (p.slot + Math.sign(wheel) * k + 12) % 6;
+        if (p.items[i]) { p.switchSlot(i); break; }
       }
     }
     if (input.pressed('reload')) this.combat.reload(p);
@@ -279,24 +287,58 @@ export class Game {
       if (input.pressed('wall') && !this.building.buildWall(p) && p.wood < 10) this.hud.toast?.('Need 10 wood');
       if (input.pressed('ramp') && !this.building.buildRamp(p) && p.wood < 10) this.hud.toast?.('Need 10 wood');
       const near = this.loot.nearestInteractable(p.pos);
-      this.hud.prompt?.(near ? (near.kind === 'chest' ? 'Open Chest' : `Pick up ${this.loot.label(near.pickup)}`) : null, near?.pickup?.weapon?.rarity);
+      const text = !near ? null : near.kind === 'chest' ? 'Open Chest' : near.kind === 'ammobox' ? 'Open Ammo Box' : `Pick up ${this.loot.label(near.pickup)}`;
+      this.hud.prompt?.(text, near?.pickup?.weapon?.rarity);
       if (near && input.pressed('interact')) {
         if (near.kind === 'chest') this.loot.openChest(near.chest, p);
+        else if (near.kind === 'ammobox') this.loot.openAmmoBox(near.box, p);
         else { const msg = this.loot.collect(near.pickup, p); if (msg) this.hud.toast?.(msg); }
       }
     } else this.hud.prompt?.(null);
-    if (input.down('fire') && p.weapon && p.state === 'ground') {
-      if (!p.weapon.canFire()) {
-        if (input.pressed('fire') && p.weapon.ammo <= 0) this.sound.play('empty');
-        if (p.weapon.ammo <= 0) this.combat.reload(p);
-        return;
+    this.updateConsumable(dt);
+    const held = p.held;
+    if (!held || p.state !== 'ground') return;
+    if (held.isConsumable) {
+      if (input.pressed('fire') && p.useT <= 0) {
+        if (held.usableBy(p)) { p.useT = held.def.time; p.useItem = held; this.sound.play('use'); }
+        else this.hud.toast?.(held.def.heal ? 'Health is already full' : 'Shield is already full');
       }
-      const dir = this.camera.getWorldDirection(_dir);
-      const origin = _origin.copy(this.camera.position).addScaledVector(dir, this.rig.curDist + 0.25);
-      p.character.root.updateMatrixWorld(true);
-      p.bodyYaw = p.aimYaw;
-      this.combat.fire(p, origin, dir, p.muzzleWorld(_muzzle));
+      return;
     }
+    if (!input.down('fire')) return;
+    const dir = this.camera.getWorldDirection(_dir);
+    const origin = _origin.copy(this.camera.position).addScaledVector(dir, this.rig.curDist + 0.25);
+    if (held.isPickaxe) {
+      p.bodyYaw = p.aimYaw;
+      this.combat.melee(p, origin, dir, 2.8);
+      return;
+    }
+    if (!held.canFire()) {
+      if (input.pressed('fire') && held.ammo <= 0) this.sound.play('empty');
+      if (held.ammo <= 0) this.combat.reload(p);
+      return;
+    }
+    p.character.root.updateMatrixWorld(true);
+    p.bodyYaw = p.aimYaw;
+    this.combat.fire(p, origin, dir, p.muzzleWorld(_muzzle));
+  }
+
+  // Channel the held consumable; finishing applies it and uses up one from the stack.
+  updateConsumable(dt) {
+    const p = this.player;
+    if (p.useT <= 0) return;
+    const it = p.useItem;
+    if (p.held !== it || !it) { p.useT = 0; return; }
+    p.useT -= dt;
+    if (p.useT > 0) return;
+    p.useT = 0;
+    it.apply(p);
+    this.sound.play(it.def.heal ? 'heal' : 'shield');
+    if (--it.count <= 0) {
+      p.items[p.slot] = null;
+      const next = p.items.findIndex((x, i) => i > 0 && x);
+      p.switchSlot(next > 0 ? next : 0);
+    } else if (it.usableBy(p) && this.input.down('fire')) { p.useT = it.def.time; this.sound.play('use'); }
   }
 
   updateStorm(dt) {

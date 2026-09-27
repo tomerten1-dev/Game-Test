@@ -5,6 +5,7 @@ import { Weapon } from '../weapons/Weapon.js';
 import { LOOT_WEAPONS, RARITIES, rollRarity } from '../weapons/WeaponDefs.js';
 import { makeWeaponMesh } from '../weapons/WeaponModels.js';
 import { mulberry32 } from '../core/noise.js';
+import { AMMO, MATS, CONSUMABLES, Consumable } from '../weapons/Items.js';
 
 const GOLD = '#ffc233', GOLD_DARK = '#c17d11', TRIM = '#6b3f16';
 
@@ -45,7 +46,30 @@ function itemGeometries() {
     part(new THREE.BoxGeometry(0.8, 0.14, 0.24), '#c68b52', mat(0, 0.07, 0.13, 0, -0.05, 0)),
     part(new THREE.BoxGeometry(0.8, 0.14, 0.24), '#a36c3a', mat(0, 0.21, 0, 0, 0.3, 0)),
   ]);
-  return { shield, med, wood };
+  const small = merge([
+    part(new THREE.CylinderGeometry(0.1, 0.13, 0.22, 10), '#7fd9ff', mat(0, 0.11, 0)),
+    part(new THREE.SphereGeometry(0.13, 10, 8), '#a5e6ff', mat(0, 0.22, 0)),
+    part(new THREE.CylinderGeometry(0.05, 0.05, 0.1, 8), '#e9f7ff', mat(0, 0.37, 0)),
+  ]);
+  const bandage = merge([
+    part(new THREE.CylinderGeometry(0.16, 0.16, 0.22, 14), '#f4f1ea', mat(0, 0.16, 0, 0, 0, Math.PI / 2)),
+    part(new THREE.CylinderGeometry(0.165, 0.165, 0.05, 14), '#ff5a5f', mat(0, 0.16, 0, 0, 0, Math.PI / 2)),
+  ]);
+  const ammo = merge([
+    part(new THREE.BoxGeometry(0.5, 0.28, 0.3), '#3b4a2e', mat(0, 0.14, 0)),
+    part(new THREE.BoxGeometry(0.52, 0.06, 0.32), '#ffffff', mat(0, 0.2, 0)),
+  ]);
+  const stone = merge([
+    part(new THREE.DodecahedronGeometry(0.2, 0), '#a5a9b0', mat(-0.12, 0.15, 0)),
+    part(new THREE.DodecahedronGeometry(0.16, 0), '#8f949c', mat(0.14, 0.12, 0.06)),
+    part(new THREE.DodecahedronGeometry(0.13, 0), '#b8bcc3', mat(0.02, 0.3, -0.05)),
+  ]);
+  const metal = merge([
+    part(new THREE.BoxGeometry(0.6, 0.12, 0.18), '#9fb3c8', mat(0, 0.06, -0.1)),
+    part(new THREE.BoxGeometry(0.6, 0.12, 0.18), '#8aa0b7', mat(0, 0.06, 0.1)),
+    part(new THREE.BoxGeometry(0.6, 0.12, 0.18), '#b4c6d8', mat(0, 0.18, 0)),
+  ]);
+  return { shield, med, wood, small, bandage, ammo, stone, metal };
 }
 
 let _beamTex;
@@ -64,6 +88,9 @@ function beamTexture() {
 }
 
 const _v = new THREE.Vector3();
+function g_toastPickup(game, p) {
+  game.hud?.pickupNote?.(`+${p.amount} ${p.type === 'ammo' ? AMMO[p.ammoType].name : MATS[p.matType].name}`, p.type === 'ammo' ? AMMO[p.ammoType].color : MATS[p.matType].color);
+}
 
 export class Loot {
   constructor(game) {
@@ -124,7 +151,51 @@ export class Loot {
       this.scene.add(group);
       this.chests.push({ x: s.x, z: s.z, y, group, lidPivot, glow, opened: false, openT: 0 });
     }
+    this._createAmmoBoxes(spots, r);
     this.spawnFloorLoot();
+  }
+
+  // Green ammo boxes (E to open): next to houses and around the island.
+  _createAmmoBoxes(chestSpots, r) {
+    this.ammoBoxes = [];
+    const info = this.game.models?.get('kk/crate_A_big');
+    const mat = new THREE.MeshStandardMaterial({ color: '#5f7d43', roughness: 0.7 });
+    const trim = new THREE.MeshStandardMaterial({ color: '#e9e2c8', roughness: 0.6 });
+    const spots = [];
+    for (const h of this.world.towns.houses) spots.push({ x: h.x + (r() < 0.5 ? -1 : 1) * ((h.maxX - h.minX) / 2 + 1.6), z: h.z + (r() - 0.5) * 3 });
+    for (let i = 0; i < 18; i++) { const a = r() * Math.PI * 2, d = 20 + r() * 140; spots.push({ x: Math.cos(a) * d, z: Math.sin(a) * d }); }
+    for (const sp of spots) {
+      const y = this.world.groundAt(sp.x, sp.z, 200, 0.5);
+      if (y < 1.5) continue;
+      if (chestSpots.some((c) => Math.hypot(c.x - sp.x, c.z - sp.z) < 3)) continue;
+      const g = new THREE.Group();
+      const box = info ? new THREE.Mesh(info.parts[0].geometry, mat) : new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
+      if (info) box.scale.set(0.95 / info.size.x, 0.55 / info.size.y, 0.6 / info.size.z);
+      const band = new THREE.Mesh(new THREE.BoxGeometry(0.97, 0.1, 0.62), trim);
+      band.position.y = 0.36;
+      box.castShadow = band.castShadow = true;
+      g.add(box, band);
+      g.position.set(sp.x, y, sp.z);
+      g.rotation.y = r() * Math.PI;
+      this.scene.add(g);
+      this.ammoBoxes.push({ x: sp.x, z: sp.z, y, group: g, opened: false });
+    }
+  }
+
+  openAmmoBox(b, actor) {
+    if (b.opened) return;
+    b.opened = true;
+    b.group.visible = false;
+    this.game.sound.play('ammo', actor.isPlayer ? null : _v.set(b.x, b.y, b.z));
+    const types = new Set();
+    const w = actor.weapon;
+    if (w) types.add(w.def.ammoType);
+    const all = Object.keys(AMMO).filter((t) => t !== 'heavy');
+    while (types.size < 2) types.add(all[Math.floor(Math.random() * all.length)]);
+    [...types].forEach((t, i) => {
+      const a = b.group.rotation.y + (i - 0.5) * 0.9;
+      this.spawnPickup({ type: 'ammo', ammoType: t, amount: AMMO[t].box }, _v.set(b.x, b.y + 0.6, b.z), new THREE.Vector3(Math.sin(a) * 2, 4.5, Math.cos(a) * 2));
+    });
   }
 
   kkChestMat(src) {
@@ -149,20 +220,35 @@ export class Loot {
       c.lidPivot.rotation.x = c.lidPivot.userData.baseRot || 0;
       c.glow.visible = true;
     }
+    for (const b of this.ammoBoxes) { b.opened = false; b.group.visible = true; }
     this.spawnFloorLoot();
   }
 
+  static randomConsumable() {
+    const r = Math.random();
+    const type = r < 0.35 ? 'bandage' : r < 0.55 ? 'smallshield' : r < 0.8 ? 'bigshield' : 'medkit';
+    return { type: 'consumable', ctype: type, count: CONSUMABLES[type].stack };
+  }
+
+  static ammoFor(weapon) {
+    const t = weapon.def.ammoType;
+    return { type: 'ammo', ammoType: t, amount: AMMO[t].box };
+  }
+
   spawnFloorLoot() {
-    // weapons & wood lying around town plazas
+    // weapons (with ammo), heals and ammo lying around town plazas
     for (const t of TOWNS) {
-      for (let i = 0; i < 3; i++) {
-        const a = Math.random() * Math.PI * 2, d = Math.random() * t.r * 0.35;
+      for (let i = 0; i < 4; i++) {
+        const a = Math.random() * Math.PI * 2, d = 4 + Math.random() * t.r * 0.35;
         const x = t.x + Math.cos(a) * d, z = t.z + Math.sin(a) * d;
-        const type = Math.random() < 0.75 ? 'weapon' : 'wood';
-        const item = type === 'weapon'
-          ? { type, weapon: new Weapon(LOOT_WEAPONS[Math.floor(Math.random() * LOOT_WEAPONS.length)], rollRarity(Math.random, 0)) }
-          : { type, amount: 30 };
-        this.spawnPickup(item, _v.set(x, this.world.groundAt(x, z, 200) + 0.2, z));
+        const y = this.world.groundAt(x, z, 200) + 0.2;
+        const roll = Math.random();
+        if (roll < 0.55) {
+          const w = new Weapon(LOOT_WEAPONS[Math.floor(Math.random() * LOOT_WEAPONS.length)], rollRarity(Math.random, 0));
+          this.spawnPickup({ type: 'weapon', weapon: w }, _v.set(x, y, z));
+          this.spawnPickup(Loot.ammoFor(w), _v.set(x + 0.9, y, z + 0.4));
+        } else if (roll < 0.8) this.spawnPickup(Loot.randomConsumable(), _v.set(x, y, z));
+        else this.spawnPickup({ type: 'mat', matType: ['wood', 'stone', 'metal'][Math.floor(Math.random() * 3)], amount: 30 }, _v.set(x, y, z));
       }
     }
   }
@@ -176,16 +262,25 @@ export class Loot {
       mesh.scale.setScalar(1.5);
       mesh.position.y = 0.55;
       color = RARITIES[item.weapon.rarity].color;
-    } else if (item.type === 'wood' && this.game.models?.get('kk/resource_lumber')) {
+    } else if (item.type === 'mat' && item.matType === 'wood' && this.game.models?.get('kk/resource_lumber')) {
       const info = this.game.models.get('kk/resource_lumber');
       mesh = this.game.models.instance('kk/resource_lumber');
       mesh.scale.setScalar(0.9 / info.size.x);
       mesh.position.y = 0.3;
-      color = '#c68b52';
-    } else {
-      mesh = new THREE.Mesh(item.type === 'shield' ? this.itemGeo.shield : item.type === 'medkit' ? this.itemGeo.med : this.itemGeo.wood, this.itemMat);
+      color = MATS.wood.color;
+    } else if (item.type === 'mat') {
+      mesh = new THREE.Mesh(item.matType === 'stone' ? this.itemGeo.stone : item.matType === 'metal' ? this.itemGeo.metal : this.itemGeo.wood, this.itemMat);
       mesh.position.y = 0.3;
-      color = item.type === 'shield' ? '#4fb8ff' : item.type === 'medkit' ? '#ffffff' : '#c68b52';
+      color = MATS[item.matType].color;
+    } else if (item.type === 'ammo') {
+      mesh = new THREE.Mesh(this.itemGeo.ammo, this.itemMat);
+      mesh.position.y = 0.3;
+      color = AMMO[item.ammoType].color;
+    } else {
+      const geo = { bandage: this.itemGeo.bandage, medkit: this.itemGeo.med, smallshield: this.itemGeo.small, bigshield: this.itemGeo.shield }[item.ctype];
+      mesh = new THREE.Mesh(geo, this.itemMat);
+      mesh.position.y = 0.3;
+      color = CONSUMABLES[item.ctype].color;
     }
     mesh.castShadow = true;
     g.add(mesh);
@@ -217,9 +312,9 @@ export class Loot {
 
   label(p) {
     if (p.type === 'weapon') return p.weapon.name;
-    if (p.type === 'shield') return 'Shield Potion';
-    if (p.type === 'medkit') return 'Medkit';
-    return `Wood x${p.amount}`;
+    if (p.type === 'consumable') return `${CONSUMABLES[p.ctype].name} x${p.count}`;
+    if (p.type === 'ammo') return `${AMMO[p.ammoType].name} x${p.amount}`;
+    return `${MATS[p.matType].name} x${p.amount}`;
   }
 
   openChest(c, actor) {
@@ -228,10 +323,11 @@ export class Loot {
     c.glow.visible = false;
     this.game.sound.play('chest', actor.isPlayer ? null : _v.set(c.x, c.y, c.z));
     const out = [];
-    out.push({ type: 'weapon', weapon: new Weapon(LOOT_WEAPONS[Math.floor(Math.random() * 3)], rollRarity(Math.random, 1)) });
-    out.push(Math.random() < 0.55 ? { type: 'shield' } : { type: 'medkit' });
-    out.push({ type: 'wood', amount: 30 });
-    if (Math.random() < 0.25) out.push({ type: 'shield' });
+    const w = new Weapon(LOOT_WEAPONS[Math.floor(Math.random() * 3)], rollRarity(Math.random, 1));
+    out.push({ type: 'weapon', weapon: w });
+    out.push(Loot.ammoFor(w));
+    out.push(Loot.randomConsumable());
+    out.push({ type: 'mat', matType: ['wood', 'wood', 'stone', 'metal'][Math.floor(Math.random() * 4)], amount: 30 });
     const fwd = c.group.rotation.y;
     out.forEach((it, i) => {
       const a = fwd + (i - (out.length - 1) / 2) * 0.55;
@@ -248,42 +344,84 @@ export class Loot {
     if (!p.alive) return null;
     const g = this.game;
     if (p.type === 'weapon') {
-      const free = actor.weapons.findIndex((w) => !w);
-      if (free >= 0) actor.giveWeapon(p.weapon, free);
+      const free = actor.items.findIndex((it, i) => i > 0 && !it);
+      if (free > 0) actor.giveWeapon(p.weapon, free);
       else {
-        const slot = actor.isPlayer ? actor.slot : actor.weapons.reduce((m, w, i) => (w.score < actor.weapons[m].score ? i : m), 0);
+        let slot;
+        if (actor.isPlayer) slot = actor.slot > 0 ? actor.slot : 1;
+        else {
+          // bots replace their weakest gun
+          slot = 1;
+          let worst = Infinity;
+          actor.items.forEach((it, i) => { if (i > 0 && it?.isGun && it.score < worst) { worst = it.score; slot = i; } });
+        }
         const old = actor.giveWeapon(p.weapon, slot);
-        if (old) this.spawnPickup({ type: 'weapon', weapon: old }, _v.copy(actor.pos).setY(actor.pos.y + 0.8), new THREE.Vector3((Math.random() - 0.5) * 2, 3, (Math.random() - 0.5) * 2));
+        if (old) this.dropItem(old, actor);
       }
       if (actor.isPlayer) g.sound.play('pickup');
-    } else if (p.type === 'shield') {
-      if (actor.shield >= 100) return 'Shield is full';
-      actor.shield = Math.min(100, actor.shield + 50);
-      if (actor.isPlayer) g.sound.play('shield');
-    } else if (p.type === 'medkit') {
-      if (actor.health >= 100) return 'Health is full';
-      actor.health = 100;
-      if (actor.isPlayer) g.sound.play('heal');
-    } else if (p.type === 'wood') {
-      actor.wood = Math.min(500, actor.wood + p.amount);
+    } else if (p.type === 'consumable') {
+      if (!actor.isPlayer) {
+        // bots drink/heal right away
+        const c = new Consumable(p.ctype, 1);
+        if (!c.usableBy(actor)) return 'full';
+        c.apply(actor);
+      } else {
+        const left = actor.addConsumable(p.ctype, p.count);
+        if (left === p.count) return 'Inventory full';
+        g.sound.play('pickup');
+        if (left > 0) { p.count = left; return null; }
+      }
+    } else if (p.type === 'ammo') {
+      actor.addAmmo(p.ammoType, p.amount);
+      if (actor.isPlayer) g.sound.play('ammo');
+    } else if (p.type === 'mat') {
+      actor.addMat(p.matType, p.amount);
       if (actor.isPlayer) g.sound.play('pickup');
     }
     this._removePickup(p);
     return null;
   }
 
+  // Throw an item (gun or consumable stack) out of an actor's inventory.
+  dropItem(item, actor) {
+    const vel = new THREE.Vector3((Math.random() - 0.5) * 2, 3, (Math.random() - 0.5) * 2);
+    const pos = _v.copy(actor.pos).setY(actor.pos.y + 0.8);
+    if (item.isGun) this.spawnPickup({ type: 'weapon', weapon: item }, pos, vel);
+    else if (item.isConsumable) this.spawnPickup({ type: 'consumable', ctype: item.type, count: item.count }, pos, vel);
+  }
+
+  // Auto-pickup of ammo and materials when walking over them.
+  autoPickup(actor) {
+    if (!actor.alive || actor.state !== 'ground') return;
+    for (const p of this.pickups) {
+      if (!p.alive || !p.settled || (p.type !== 'ammo' && p.type !== 'mat')) continue;
+      if (!actor.isPlayer && p.type === 'ammo') continue;
+      const dx = p.pos.x - actor.pos.x, dz = p.pos.z - actor.pos.z;
+      if (dx * dx + dz * dz < 2.6 && Math.abs(p.pos.y - actor.pos.y) < 2) {
+        this.collect(p, actor);
+        if (actor.isPlayer) g_toastPickup(this.game, p);
+      }
+    }
+  }
+
   dropInventory(actor) {
     const items = [];
-    for (const w of actor.weapons) if (w) items.push({ type: 'weapon', weapon: w });
-    if (actor.wood > 0) items.push({ type: 'wood', amount: actor.wood });
-    if (Math.random() < 0.5) items.push({ type: 'shield' });
+    actor.items.forEach((it, i) => {
+      if (i === 0 || !it) return;
+      if (it.isGun) { it.ammo = Math.max(it.ammo, Math.ceil(it.def.mag / 2)); items.push({ type: 'weapon', weapon: it }); if (actor.infiniteAmmo) items.push(Loot.ammoFor(it)); }
+      else if (it.isConsumable) items.push({ type: 'consumable', ctype: it.type, count: it.count });
+    });
+    if (!actor.infiniteAmmo) for (const [t, n] of Object.entries(actor.ammo)) if (n > 0) items.push({ type: 'ammo', ammoType: t, amount: n });
+    for (const [t, n] of Object.entries(actor.mats)) if (n > 0) items.push({ type: 'mat', matType: t, amount: n });
+    if (!actor.isPlayer && Math.random() < 0.5) items.push(Loot.randomConsumable());
     items.forEach((it, i) => {
       const a = (i / items.length) * Math.PI * 2;
-      if (it.weapon) it.weapon.ammo = it.weapon.def.mag;
-      this.spawnPickup(it, _v.copy(actor.pos).setY(actor.pos.y + 1), new THREE.Vector3(Math.cos(a) * 2.2, 4.5, Math.sin(a) * 2.2));
+      this.spawnPickup(it, _v.copy(actor.pos).setY(actor.pos.y + 1), new THREE.Vector3(Math.cos(a) * 2.4, 4.5, Math.sin(a) * 2.4));
     });
-    actor.weapons = [null, null, null];
-    actor.wood = 0;
+    actor.items = [actor.items[0], null, null, null, null, null];
+    actor.slot = 0;
+    for (const t of Object.keys(actor.ammo)) actor.ammo[t] = 0;
+    for (const t of Object.keys(actor.mats)) actor.mats[t] = 0;
     actor.character.setWeapon(null);
   }
 
@@ -299,18 +437,21 @@ export class Loot {
 
   bestPickupFor(actor, maxD) {
     let best = null, bestScore = 0;
-    const worst = actor.weapons.some((w) => !w) ? 0 : Math.min(...actor.weapons.map((w) => w.score));
+    const guns = actor.weapons;
+    const hasFree = actor.items.some((it, i) => i > 0 && !it);
+    const worst = hasFree ? 0 : Math.min(...guns.map((w) => w.score));
     for (const p of this.pickups) {
       if (!p.alive || !p.settled) continue;
       const d = p.pos.distanceTo(actor.pos);
       if (d > maxD) continue;
       let s = 0;
       if (p.type === 'weapon') {
-        if (actor.weapons.some((w) => w && w.type === p.weapon.type && w.rarity >= p.weapon.rarity)) s = 0;
+        if (guns.some((w) => w.type === p.weapon.type && w.rarity >= p.weapon.rarity)) s = 0;
         else s = p.weapon.score > worst * 1.1 ? 2 : 0;
-      } else if (p.type === 'shield') s = actor.shield <= 50 ? 1.5 : 0;
-      else if (p.type === 'medkit') s = actor.health < 70 ? 1.8 : 0;
-      else if (p.type === 'wood') s = actor.wood < 60 ? 0.6 : 0;
+      } else if (p.type === 'consumable') {
+        const d2 = CONSUMABLES[p.ctype];
+        s = d2.heal ? (actor.health < Math.min(70, d2.cap) ? 1.8 : 0) : (actor.shield < d2.cap - 10 ? 1.5 : 0);
+      } else if (p.type === 'mat') s = actor.wood < 60 && p.matType === 'wood' ? 0.6 : 0;
       s -= d / 40;
       if (s > bestScore) { bestScore = s; best = p; }
     }
@@ -325,8 +466,13 @@ export class Loot {
       const d = Math.hypot(c.x - pos.x, c.z - pos.z);
       if (d < bd && Math.abs(c.y - pos.y) < 2.5) { bd = d; best = { kind: 'chest', chest: c }; }
     }
+    for (const b of this.ammoBoxes) {
+      if (b.opened) continue;
+      const d = Math.hypot(b.x - pos.x, b.z - pos.z);
+      if (d < bd && Math.abs(b.y - pos.y) < 2.5) { bd = d; best = { kind: 'ammobox', box: b }; }
+    }
     for (const p of this.pickups) {
-      if (!p.alive) continue;
+      if (!p.alive || p.type === 'ammo' || p.type === 'mat') continue;
       const d = Math.hypot(p.pos.x - pos.x, p.pos.z - pos.z);
       if (d < bd && Math.abs(p.pos.y - pos.y) < 2.5) { bd = d; best = { kind: 'pickup', pickup: p }; }
     }
@@ -335,6 +481,7 @@ export class Loot {
 
   update(dt, t) {
     const cam = this.game.camera.position;
+    for (const b of this.ammoBoxes) if (!b.opened) b.group.visible = (b.x - cam.x) ** 2 + (b.z - cam.z) ** 2 < 120 * 120;
     for (const c of this.chests) {
       const d2 = (c.x - cam.x) ** 2 + (c.z - cam.z) ** 2;
       c.group.visible = d2 < 150 * 150;

@@ -25,18 +25,27 @@ Production build: `npm run build` (output in `dist/`), preview it with `npm run 
 | --- | --- |
 | WASD | Move / steer while skydiving |
 | Mouse | Aim (click the game to capture the mouse) |
-| Left click | Shoot |
+| Left click | Shoot · swing the axe · use a heal/shield item |
 | Right click | Zoom (over-the-shoulder aim) |
 | Space | Jump · jump out of the bus · open glider early |
-| R | Reload |
-| E (or F) | Open chest / pick up |
+| Shift | Sprint |
+| C (or Ctrl) | Crouch · press while sprinting to slide |
+| R | Reload (uses reserve ammo of the matching type) |
+| E (or F) | Open chest / ammo box · pick up |
 | Q | Build wood wall (10 wood) |
 | V | Build wood ramp (10 wood) |
-| 1 · 2 · 3 / mouse wheel | Switch weapon |
+| 1 – 6 / mouse wheel | Switch slot (1 = harvesting axe) |
 | M | Mute |
 | Esc | Pause |
 
-**Touch devices** get a floating joystick on the left, drag-to-look on the right, and buttons for Fire (hold), Jump, Wall, Ramp, Reload and Use. Tap the weapon slots to switch.
+**Touch devices** get a floating joystick on the left, drag-to-look on the right, and buttons for Fire (hold), Jump, Crouch, Wall, Ramp, Reload and Use. Push the stick all the way to sprint. Tap the inventory slots to switch.
+
+## Inventory & survival
+
+- **Slot 1** is the harvesting axe: hit trees, crates and wooden houses for wood, rocks and walls for stone, cars, lamps and city props for metal.
+- **Slots 2–6** hold guns or stacks of heals: Bandages (+15 up to 75), Medkit (full health), Small Shield (+25 up to 50), Shield Potion (+50). Hold still-ish while the ring fills.
+- Guns use **light / medium / shells** ammo; reserve shows after the slash. Green **ammo boxes** near houses and anything dropped on the ground are picked up by walking over it.
+- Sprinting is fast but inaccurate; standing still gives a perfectly accurate first shot. Falls from high up hurt.
 
 ## Graphics settings
 

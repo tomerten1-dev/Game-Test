@@ -55,7 +55,7 @@ export class Towns {
   }
 
   // Place a prop on the ground scaled to a target height (m), with an optional round collider.
-  _prop(type, x, z, height, rot = 0, colR = 0) {
+  _prop(type, x, z, height, rot = 0, colR = 0, mat = undefined) {
     const info = this.models.get(type);
     if (!info) return;
     const y = this.terrain.heightAt(x, z);
@@ -63,7 +63,7 @@ export class Towns {
     for (const h of this.houses) if (x > h.minX - 0.4 && x < h.maxX + 0.4 && z > h.minZ - 0.4 && z < h.maxZ + 0.4) return;
     const s = height / info.size.y;
     this._place(type, x, y - 0.02, z, rot, s);
-    if (colR) this.colliders.add({ kind: 'circle', x, z, r: colR, y0: y - 1, y1: y + height, crate: true });
+    if (colR) this.colliders.add({ kind: 'circle', x, z, r: colR, y0: y - 1, y1: y + height, crate: true, mat: mat || (type.includes('city_') ? 'metal' : undefined) });
   }
 
   // A castle tower on a hill as a landmark.
@@ -87,7 +87,7 @@ export class Towns {
     this._place('kk/castle_blue', best.x, y, best.z, rot, s);
     const hx = info.size.x * s * 0.4, hz = info.size.z * s * 0.4;
     const [bx, bz] = rot % Math.PI === 0 ? [hx, hz] : [hz, hx];
-    this.colliders.add({ kind: 'box', minX: best.x - bx, maxX: best.x + bx, minZ: best.z - bz, maxZ: best.z + bz, y0: y - 2, y1: y + info.size.y * s * 0.8, house: true });
+    this.colliders.add({ kind: 'box', minX: best.x - bx, maxX: best.x + bx, minZ: best.z - bz, maxZ: best.z + bz, y0: y - 2, y1: y + info.size.y * s * 0.8, house: true, mat: 'stone' });
     this.houses.push({ minX: best.x - bx, maxX: best.x + bx, minZ: best.z - bz, maxZ: best.z + bz, x: best.x, z: best.z, y, h: info.size.y * s, rot });
     const fx = Math.sin(rot), fz = Math.cos(rot);
     this.chestSpots.push({ x: best.x + fx * (bz + 3), z: best.z + fz * (bz + 3), rot });
@@ -224,8 +224,8 @@ export class Towns {
     parts.push(part(new THREE.CylinderGeometry(0.35, 0.45, 1.9, 10), '#cfc6b6', M(0, 1.3, 0)));
     parts.push(part(new THREE.CylinderGeometry(0.95, 0.5, 0.35, 14), '#d8d0c2', M(0, 2.3, 0)));
     parts.push(part(new THREE.CylinderGeometry(0.8, 0.8, 0.06, 14), '#7fdcf2', M(0, 2.46, 0)));
-    this.colliders.add({ kind: 'circle', x: t.x, z: t.z, r: 2.8, y0: y - 1, y1: y + 0.75, crate: true });
-    this.colliders.add({ kind: 'circle', x: t.x, z: t.z, r: 0.5, y0: y - 1, y1: y + 2.5, crate: true });
+    this.colliders.add({ kind: 'circle', x: t.x, z: t.z, r: 2.8, y0: y - 1, y1: y + 0.75, crate: true, mat: 'stone' });
+    this.colliders.add({ kind: 'circle', x: t.x, z: t.z, r: 0.5, y0: y - 1, y1: y + 2.5, crate: true, mat: 'stone' });
     this.fountains = this.fountains || [];
     this.fountains.push({ x: t.x, y: y + 2.5, z: t.z });
   }
@@ -236,7 +236,7 @@ export class Towns {
     parts.push(part(new THREE.CylinderGeometry(0.25, 0.3, 0.25, 8), '#3a4150', mat(x, y + 0.12, z)));
     parts.push(part(new THREE.ConeGeometry(0.38, 0.3, 4), '#3a4150', mat(x, y + 3.85, z, 0, Math.PI / 4, 0)));
     this.lanterns.push({ x, y: y + 3.5, z });
-    this.colliders.add({ kind: 'circle', x, z, r: 0.18, y0: y - 1, y1: y + 3.6, crate: true });
+    this.colliders.add({ kind: 'circle', x, z, r: 0.18, y0: y - 1, y1: y + 3.6, crate: true, mat: 'metal' });
   }
 
   // White picket fence around the front yard, with a gate gap at the door path.
@@ -311,7 +311,7 @@ export class Towns {
       this._place(type, bx, gy - 0.45, bz, rot, S);
       const hw = T * 0.4;
       const box = { minX: bx - hw, maxX: bx + hw, minZ: bz - hw, maxZ: bz + hw };
-      this.colliders.add({ kind: 'box', ...box, y0: gy - 3, y1: gy + info.size.y * S, house: true });
+      this.colliders.add({ kind: 'box', ...box, y0: gy - 3, y1: gy + info.size.y * S, house: true, mat: 'stone' });
       this.houses.push({ ...box, x: bx, z: bz, y: gy, h: info.size.y * S, rot });
       const fx = Math.sin(rot), fz = Math.cos(rot);
       this.chestSpots.push({ x: bx + fx * (hw + 1.4) + fz * 3, z: bz + fz * (hw + 1.4) - fx * 3, rot });
@@ -338,7 +338,7 @@ export class Towns {
       this._place(type, cx, gy + 0.05, cz, rot + (r() < 0.5 ? 0 : Math.PI), sc);
       const along = Math.abs(Math.sin(rot)) > 0.5;
       const hx = along ? 2.4 : 1.1, hz = along ? 1.1 : 2.4;
-      this.colliders.add({ kind: 'box', minX: cx - hx, maxX: cx + hx, minZ: cz - hz, maxZ: cz + hz, y0: gy - 1, y1: gy + info.size.y * sc * 0.9, crate: true });
+      this.colliders.add({ kind: 'box', minX: cx - hx, maxX: cx + hx, minZ: cz - hz, maxZ: cz + hz, y0: gy - 1, y1: gy + info.size.y * sc * 0.9, crate: true, mat: 'metal' });
     }
     // dumpsters and a water tower on the outskirts
     for (let i = 0; i < 2; i++) {

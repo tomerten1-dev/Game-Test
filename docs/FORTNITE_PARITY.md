@@ -145,11 +145,11 @@ Legend: ✅ have · 🟡 partial · ❌ missing · Effort: S (≤½ day) · M (1
 
 Each phase ends with a playable build, a screenshot check and a git commit (same flow as before).
 
-### Phase A — Core feel (combat & movement) · ~3 days
+### Phase A — Core feel (combat & movement) · ✅ done
 1. Sprint (Shift), crouch (C/Ctrl), slide, fall damage, first-shot accuracy when still.
 2. Pickaxe (slot 0) with melee swing; harvesting trees/rocks/buildings → wood / stone / metal.
 3. Ammo types (light / medium / heavy / shells) with reserve, ammo boxes, auto-pickup of ammo & mats.
-4. 5-slot inventory; consumables with use time (bandage 15 hp, medkit 100 hp, small shield 25, big shield 50).
+4. 5-slot inventory (+ axe slot); consumables with use time (bandage 15 hp, medkit 100 hp, small shield 25, big shield 50).
 5. 3D positional audio + footsteps + chest hum.
 
 ### Phase B — Building like Fortnite · ~3 days

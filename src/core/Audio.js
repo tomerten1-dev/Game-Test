@@ -5,6 +5,7 @@ export class Sound {
     this.ctx = null;
     this.muted = false;
     this.listener = null; // THREE.Vector3 (camera position)
+    this.right = { x: 1, y: 0, z: 0 }; // listener right vector for stereo panning
     const unlock = () => this.ensure();
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('keydown', unlock);
@@ -28,6 +29,44 @@ export class Sound {
     }
     if (this.ctx.state === 'suspended') this.ctx.resume();
     return this.ctx;
+  }
+
+  // Keep the stereo "right" vector in sync with the camera.
+  updateListener(camera) {
+    const e = camera.matrixWorld.elements;
+    this.right = { x: e[0], y: e[1], z: e[2] };
+  }
+
+  // Soft shimmering loop that swells as you get close to an unopened chest.
+  chestHum(chest, pos) {
+    if (!this.ctx || this.ctx.state !== 'running') return;
+    if (!this._hum) {
+      const ctx = this.ctx;
+      const g = ctx.createGain();
+      g.gain.value = 0;
+      const lfo = ctx.createOscillator(), lfoG = ctx.createGain();
+      lfo.frequency.value = 5; lfoG.gain.value = 12;
+      lfo.connect(lfoG);
+      const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
+      for (const f of [880, 1318.5, 1760]) {
+        const o = ctx.createOscillator();
+        o.type = 'sine'; o.frequency.value = f;
+        lfoG.connect(o.frequency);
+        const og = ctx.createGain(); og.gain.value = f === 880 ? 0.5 : 0.25;
+        o.connect(og); og.connect(g); o.start();
+      }
+      lfo.start();
+      g.connect(pan); pan.connect(this.master);
+      this._hum = { g, pan };
+    }
+    let target = 0;
+    if (chest && !this.muted) {
+      const dx = chest.x - pos.x, dz = chest.z - pos.z;
+      const d = Math.hypot(dx, dz);
+      target = Math.max(0, 1 - d / 18) ** 1.5 * 0.05;
+      if (this._hum.pan.pan) this._hum.pan.pan.value = Math.max(-1, Math.min(1, (dx * this.right.x + dz * this.right.z) / (d || 1))) * 0.8;
+    }
+    this._hum.g.gain.setTargetAtTime(target, this.ctx.currentTime, 0.2);
   }
 
   toggleMute() {
@@ -56,7 +95,7 @@ export class Sound {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(gain, t + attack);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    src.connect(f); f.connect(g); g.connect(this.master);
+    src.connect(f); f.connect(g); g.connect(this._out || this.master);
     src.start(t, Math.random() * 0.5);
     src.stop(t + dur + 0.05);
   }
@@ -71,7 +110,7 @@ export class Sound {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(gain, t + attack);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(this.master);
+    o.connect(g); g.connect(this._out || this.master);
     o.start(t);
     o.stop(t + dur + 0.05);
   }
@@ -80,8 +119,19 @@ export class Sound {
     if (this.muted || !this.ctx || this.ctx.state !== 'running') return;
     const ctx = this.ctx;
     const t = ctx.currentTime;
-    const v = pos ? this._vol(pos, opts.range || 110) : 1;
+    let v = pos ? this._vol(pos, opts.range || 110) : 1;
+    if (opts.vol != null) v *= opts.vol;
     if (v <= 0.01) return;
+    // positional sounds pan left/right relative to the camera
+    this._out = null;
+    if (pos && this.listener && ctx.createStereoPanner) {
+      const dx = pos.x - this.listener.x, dy = pos.y - this.listener.y, dz = pos.z - this.listener.z;
+      const d = Math.hypot(dx, dy, dz) || 1;
+      const pan = ctx.createStereoPanner();
+      pan.pan.value = Math.max(-1, Math.min(1, (dx * this.right.x + dz * this.right.z) / d)) * 0.85;
+      pan.connect(this.master);
+      this._out = pan;
+    }
     switch (name) {
       case 'pistol':
         this._noise(t, 0.16, { freq: 3200, freqEnd: 500, gain: 0.6 * v });
@@ -173,6 +223,38 @@ export class Sound {
         break;
       case 'defeat':
         [392, 330, 262, 196].forEach((f, i) => this._tone(t + i * 0.18, 0.5, { type: 'triangle', freq: f, gain: 0.18 }));
+        break;
+      case 'step':
+        this._noise(t, 0.07, { type: 'bandpass', freq: 380 + Math.random() * 160, q: 1.2, gain: 0.22 * v });
+        break;
+      case 'slide':
+        this._noise(t, 0.6, { type: 'bandpass', freq: 900, freqEnd: 300, q: 0.8, gain: 0.3 * v, attack: 0.03 });
+        break;
+      case 'fall':
+        this._noise(t, 0.25, { type: 'lowpass', freq: 500, freqEnd: 120, gain: 0.6 * v });
+        this._tone(t, 0.2, { type: 'sine', freq: 120, freqEnd: 50, gain: 0.4 * v });
+        break;
+      case 'swing':
+        this._noise(t, 0.18, { type: 'bandpass', freq: 600, freqEnd: 2400, q: 1.5, gain: 0.22 * v, attack: 0.04 });
+        break;
+      case 'harvest_wood':
+        this._tone(t, 0.12, { type: 'triangle', freq: 260, freqEnd: 140, gain: 0.35 * v });
+        this._noise(t, 0.1, { type: 'bandpass', freq: 900, q: 2, gain: 0.4 * v });
+        break;
+      case 'harvest_stone':
+        this._noise(t, 0.12, { type: 'highpass', freq: 2200, gain: 0.35 * v });
+        this._tone(t, 0.08, { type: 'square', freq: 520, freqEnd: 300, gain: 0.12 * v });
+        break;
+      case 'harvest_metal':
+        this._tone(t, 0.35, { type: 'triangle', freq: 1250, gain: 0.16 * v });
+        this._tone(t, 0.3, { type: 'sine', freq: 1870, gain: 0.1 * v });
+        break;
+      case 'ammo':
+        this._noise(t, 0.04, { type: 'bandpass', freq: 3500, q: 4, gain: 0.3 });
+        this._noise(t + 0.06, 0.04, { type: 'bandpass', freq: 3000, q: 4, gain: 0.25 });
+        break;
+      case 'use':
+        this._noise(t, 0.3, { type: 'bandpass', freq: 1500, q: 2, gain: 0.15, attack: 0.05 });
         break;
       case 'phase':
         this._tone(t, 0.9, { type: 'sine', freq: 220, freqEnd: 440, gain: 0.2, attack: 0.2 });

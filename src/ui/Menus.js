@@ -75,12 +75,12 @@ export class Menus {
   showMenu(v) { this.el.menu.classList.toggle('hidden', !v); }
   showPause(v) { this.el.pause.classList.toggle('hidden', !v); }
 
-  showEnd({ victory, place, killer, kills, time }) {
+  showEnd({ victory, place, killer, kills, time, cause }) {
     const $ = (id) => document.getElementById(id);
     $('end-rank').textContent = `#${place}`;
     $('end-title').textContent = victory ? 'VICTORY!' : 'ELIMINATED';
     $('end-title').className = 'logo' + (victory ? ' gold' : ' red');
-    $('end-sub').textContent = victory ? 'Last hero standing on Stormbound Island' : `Eliminated by ${killer || 'the storm'} — placed #${place}`;
+    $('end-sub').textContent = victory ? 'Last hero standing on Stormbound Island' : (killer ? `Eliminated by ${killer}` : cause === 'fall' ? 'You fell to your death' : 'Eliminated by the storm') + ` — placed #${place}`;
     $('end-kills').textContent = kills;
     $('end-time').textContent = `${Math.floor(time / 60)}:${String(Math.floor(time % 60)).padStart(2, '0')}`;
     $('end-place').textContent = `#${place}`;

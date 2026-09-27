@@ -45,6 +45,13 @@ export class Player extends Actor {
     const sy = Math.sin(rig.yaw), cy = Math.cos(rig.yaw);
     this.intent.mx = -sy * m.y + cy * m.x;
     this.intent.mz = -cy * m.y - sy * m.x;
+    // sprint: hold Shift (touch: push the stick all the way)
+    this.intent.sprint = input.down('sprint') || Math.hypot(input.touchMove.x, input.touchMove.y) > 0.95;
+    if (input.pressed('crouch') && this.state === 'ground') {
+      if (this.sprinting && this.onGround) { this.crouchHeld = false; this.startSlide(); }
+      else { this.crouchHeld = !this.crouchHeld; this.crouched = this.crouchHeld; }
+    }
+    if (input.down('sprint') && this.crouchHeld && this.slideT <= 0) this.crouchHeld = this.crouched = false;
     this.intent.jump = input.down('jump');
     this.intent.deploy = this.state === 'skydive' && input.pressed('jump');
   }

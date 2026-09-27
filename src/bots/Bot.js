@@ -176,9 +176,9 @@ export class Bot extends Actor {
 
   _chooseWeapon(d) {
     let bestI = -1, bestS = -1;
-    for (let i = 0; i < 3; i++) {
-      const w = this.weapons[i];
-      if (!w) continue;
+    for (let i = 1; i < 6; i++) {
+      const w = this.items[i];
+      if (!w || !w.isGun) continue;
       const k = w.def.key;
       let s = w.score;
       if (k === 'shotgun') s *= d < 10 ? 2.5 : d < 18 ? 0.8 : 0.1;

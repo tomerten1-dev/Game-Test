@@ -74,8 +74,18 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1830; col
 #toast { position: absolute; left: 50%; top: 68%; transform: translateX(-50%); font-weight: 700; font-size: 20px; color: #ffd6d6; text-shadow: 0 2px 4px rgba(0,0,0,0.6); opacity: 0; }
 #toast.show { animation: toast 1.6s ease-out; }
 @keyframes toast { 0% { opacity: 0; transform: translate(-50%, 8px); } 12% { opacity: 1; transform: translate(-50%, 0); } 75% { opacity: 1; } 100% { opacity: 0; } }
-#mats { display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 22px; text-shadow: 0 2px 0 rgba(0,0,0,0.4); }
-.wood-icon { width: 22px; height: 16px; border-radius: 3px; background: repeating-linear-gradient(180deg, #d19a5b 0 5px, #a36c3a 5px 6px); box-shadow: 0 2px 0 rgba(0,0,0,0.35); transform: skewX(-8deg); }
+#mats { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 18px; text-shadow: 0 2px 0 rgba(0,0,0,0.4); }
+#mats .mat { display: flex; align-items: center; gap: 5px; }
+.mat-icon { width: 18px; height: 14px; border-radius: 3px; box-shadow: 0 2px 0 rgba(0,0,0,0.35); transform: skewX(-8deg); }
+.mat-icon.wood { background: repeating-linear-gradient(180deg, #d19a5b 0 4px, #a36c3a 4px 5px); }
+.mat-icon.stone { background: linear-gradient(135deg, #d5d9e0, #8d939e); border-radius: 5px; }
+.mat-icon.metal { background: linear-gradient(180deg, #b9d3ee, #5f7fa3); box-shadow: inset 0 0 0 2px rgba(255,255,255,0.35), 0 2px 0 rgba(0,0,0,0.35); }
+.slot .count { position: absolute; right: 6px; bottom: 6px; font-size: 13px; font-weight: 800; text-shadow: 0 1px 2px rgba(0,0,0,0.7); }
+.slot.pick { width: 52px; }
+#pickup-notes { position: absolute; right: 24px; bottom: 200px; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; pointer-events: none; }
+.pnote { font-weight: 800; font-size: 15px; text-shadow: 0 1px 3px rgba(0,0,0,0.8); animation: pnote-in 0.2s ease-out; transition: opacity 0.5s; }
+.pnote.fade { opacity: 0; }
+@keyframes pnote-in { from { transform: translateX(20px); opacity: 0; } }
 
 /* top-right: minimap + stats */
 #top-right { position: absolute; right: 16px; top: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
@@ -158,12 +168,15 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1830; col
 .tbtn.reload { right: 212px; bottom: 36px; }
 .tbtn.use { right: 212px; bottom: 112px; }
 .tbtn.ramp { right: 296px; bottom: 150px; font-size: 12px; }
+.tbtn.crouch { right: 18px; bottom: 196px; font-size: 18px; }
 
 body.touch #bottom-right { bottom: 8px; right: auto; left: 50%; transform: translateX(-50%); align-items: center; gap: 2px; }
 body.touch #weapon-name { font-size: 14px; }
 body.touch #prompt { top: 56%; font-size: 17px; }
 body.touch #bottom-right #ammo-cur { font-size: 32px; }
-body.touch .slot { width: 54px; height: 48px; }
+body.touch .slot { width: 46px; height: 44px; }
+body.touch .slot.pick { width: 40px; }
+body.touch #pickup-notes { bottom: 170px; }
 body.touch #minimap-wrap { width: 130px; height: 130px; }
 body.touch .stat { font-size: 16px; }
 body.touch #bottom-left { width: min(240px, 36vw); bottom: 14px; }
@@ -186,3 +199,7 @@ body.touch #storm-label { display: none; }
   -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 38%, black 80%); mask-image: radial-gradient(circle at 50% 50%, transparent 38%, black 80%);
   animation: speedspin 0.35s steps(3) infinite; }
 @keyframes speedspin { 0% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(1.7deg) scale(1.03); } 100% { transform: rotate(-1.3deg) scale(1.01); } }
+.dmg-num.mat { font-size: 26px; }
+.dmg-num.mat-wood { color: #f0b774; }
+.dmg-num.mat-stone { color: #dfe3ea; }
+.dmg-num.mat-metal { color: #a9d2ff; }
