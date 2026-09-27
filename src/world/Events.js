@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { TOWNS } from './Terrain.js';
+import { TOWNS, WORLD_HALF } from './Terrain.js';
 import { Weapon } from '../weapons/Weapon.js';
 import { RARITIES, WEAPONS, rollWeaponType } from '../weapons/WeaponDefs.js';
 import { makeWeaponMesh, itemGeometry } from '../weapons/WeaponModels.js';
@@ -53,6 +53,7 @@ export class Events {
     this._createVending();
     this._createBenches();
     this._createHides();
+    this._createForage();
   }
 
   // ---------- helpers ----------
@@ -296,6 +297,69 @@ export class Events {
     }
   }
 
+  // ---------- foraged food: apples under trees (+5 health), mushrooms in the woods (+5 shield) ----------
+  _createForage() {
+    const rnd = mulberry32(4711);
+    const trees = this.world.colliders.query(-WORLD_HALF, WORLD_HALF, -WORLD_HALF, WORLD_HALF, []).filter((c) => c.tree && c.kind === 'circle');
+    this.forage = [];
+    const spots = [];
+    for (const c of trees) {
+      if (rnd() > 0.16) continue;
+      const kind = rnd() < 0.6 ? 'apple' : 'mushroom';
+      const n = kind === 'apple' ? 1 + Math.floor(rnd() * 3) : 1 + Math.floor(rnd() * 2);
+      for (let i = 0; i < n; i++) {
+        const a = rnd() * Math.PI * 2, d = c.r + (kind === 'apple' ? 0.5 + rnd() * 1.2 : 0.9 + rnd() * 1.8);
+        const x = c.x + Math.cos(a) * d, z = c.z + Math.sin(a) * d, y = this.world.heightAt(x, z);
+        if (y < 1.5 || spots.some((s) => Math.abs(s.x - x) < 0.5 && Math.abs(s.z - z) < 0.5)) continue;
+        spots.push({ kind, x, y, z, rot: rnd() * 6.28, s: 0.85 + rnd() * 0.3, eaten: false });
+      }
+    }
+    const apples = spots.filter((s) => s.kind === 'apple'), shrooms = spots.filter((s) => s.kind === 'mushroom');
+    const mk = (geo, color, count, extra = {}) => {
+      const m = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.45, ...extra }), Math.max(1, count));
+      m.castShadow = true; m.count = count;
+      this.scene.add(m);
+      return m;
+    };
+    const appleGeo = new THREE.SphereGeometry(0.13, 12, 10); appleGeo.scale(1, 0.9, 1);
+    const stemGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.07, 5);
+    const capGeo = new THREE.SphereGeometry(0.16, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2); capGeo.scale(1, 0.7, 1);
+    const stalkGeo = new THREE.CylinderGeometry(0.045, 0.06, 0.16, 8);
+    this.forageMeshes = {
+      apple: [[mk(appleGeo, '#d8262e', apples.length), 0.12], [mk(stemGeo, '#5b3a1e', apples.length), 0.26]],
+      mushroom: [[mk(capGeo, '#3f8dff', shrooms.length, { emissive: '#1d4dff', emissiveIntensity: 0.35 }), 0.2], [mk(stalkGeo, '#f1ead8', shrooms.length), 0.11]],
+    };
+    const place = (list, kind) => list.forEach((s, i) => { s.i = i; this.forage.push(s); this._setForage(s, kind, true); });
+    place(apples, 'apple');
+    place(shrooms, 'mushroom');
+  }
+
+  _setForage(s, kind, visible) {
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), s.rot);
+    for (const [mesh, dy] of this.forageMeshes[kind]) {
+      const sc = visible ? s.s : 0;
+      m4.compose(new THREE.Vector3(s.x, s.y + dy * s.s, s.z), q, new THREE.Vector3(sc, sc, sc));
+      mesh.setMatrixAt(s.i, m4);
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  eat(s, actor) {
+    if (s.eaten) return null;
+    if (s.kind === 'apple') {
+      if (actor.health >= 100) return 'Already at full health';
+      actor.health = Math.min(100, actor.health + 5);
+    } else {
+      if (actor.shield >= 100) return 'Shield is full';
+      actor.shield = Math.min(100, actor.shield + 5);
+    }
+    s.eaten = true;
+    this._setForage(s, s.kind, false);
+    this.game.sound.play('pickup', actor.isPlayer ? null : actor.pos);
+    if (actor.isPlayer) this.game.hud?.pickupNote?.(s.kind === 'apple' ? '+5 Health' : '+5 Shield', s.kind === 'apple' ? '#5dff8a' : '#58c8ff');
+    return null;
+  }
+
   // Jump into a hiding spot: invisible to bots, can't move or shoot; jump / interact to leave.
   hide(spot, actor) {
     if (spot.occupant || actor.state !== 'ground') return spot.occupant ? 'Someone is already in there' : null;
@@ -497,6 +561,11 @@ export class Events {
       const d = Math.hypot(h.x - pos.x, h.z - pos.z);
       if (d < bd + 0.8 && Math.abs(h.y - pos.y) < 2.5) { bd = d; best = { kind: 'hide', hide: h, text: `Hide in ${h.kind === 'hay' ? 'Haystack' : 'Dumpster'}` }; }
     }
+    for (const f of this.forage || []) {
+      if (f.eaten || Math.abs(f.x - pos.x) > bd || Math.abs(f.z - pos.z) > bd) continue;
+      const d = Math.hypot(f.x - pos.x, f.z - pos.z);
+      if (d < Math.min(bd, 1.7) && Math.abs(f.y - pos.y) < 2) { bd = d; best = { kind: 'forage', forage: f, text: f.kind === 'apple' ? 'Eat Apple · +5 health' : 'Eat Mushroom · +5 shield' }; }
+    }
     for (const b of this.benches) {
       const d = Math.hypot(b.x - pos.x, b.z - pos.z);
       if (d < bd + 0.8 && Math.abs(b.y - pos.y) < 2.5) {
@@ -546,6 +615,7 @@ export class Events {
     for (const z of this.zones) this.scene.remove(z.group);
     this.zones = [];
     for (const h of this.hides) if (h.occupant) this.unhide(h.occupant);
+    for (const f of this.forage || []) if (f.eaten) { f.eaten = false; this._setForage(f, f.kind, true); }
   }
 
   update(dt, matchTime) {

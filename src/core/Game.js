@@ -620,6 +620,7 @@ export class Game {
         if (near.kind === 'supply') this.events.openSupply(near.supply, p);
         else if (near.kind === 'vault') { const msg = this.boss.openVault(p); if (msg) this.hud.toast?.(msg); }
         else if (near.kind === 'vending') { const msg = this.events.buy(near.vending, p); if (msg) this.hud.toast?.(msg); }
+        else if (near.kind === 'forage') { const msg = this.events.eat(near.forage, p); if (msg) this.hud.toast?.(msg); }
         else if (near.kind === 'hide') { const msg = this.events.hide(near.hide, p); if (msg) this.hud.toast?.(msg); }
         else if (near.kind === 'bench') { const msg = this.events.upgrade(near.bench, p); this.hud.toast?.(msg || `Upgraded to ${p.held.name}`); }
         else if (near.kind === 'chest') this.loot.openChest(near.chest, p);

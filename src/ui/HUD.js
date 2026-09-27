@@ -546,7 +546,10 @@ export class HUD {
       this.set('storm', this.el.storm, storm.stage === 'done' ? '0:00' : fmtTime(storm.timer));
       const base = storm.stage === 'done' ? 'Final circle' : storm.stage === 'wait' ? `Storm shrinks in ${fmtTime(storm.timer)}` : 'Storm is shrinking!';
       const s = g.surge;
-      this.set('stormLabel', this.el.stormLabel, s && p.alive ? `${base} · SURGE: ${Math.round(p.dmgDealt || 0)}/${s.need} dmg` : base);
+      // distance to the safe zone when you're outside it
+      const out = p.alive && p.state !== 'bus' ? g.storm.distOutsideNext?.(p.pos) || 0 : 0;
+      const safe = out > 5 ? ` · Safe zone ${Math.round(out / 5) * 5} m` : '';
+      this.set('stormLabel', this.el.stormLabel, s && p.alive ? `${base} · SURGE: ${Math.round(p.dmgDealt || 0)}/${s.need} dmg` : base + safe);
     }
     this.set('stormCls', this.el.stormLabel, storm.stage === 'shrink' ? 'urgent' : '', 'className');
 

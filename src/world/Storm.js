@@ -137,6 +137,8 @@ export class Storm {
     return Math.hypot(x - c.x, z - c.y) < this.safeRadius() + margin;
   }
   safeCenter() { return this.stage === 'wait' ? this.nextCenter : this.nextCenter; }
+  // How far outside the next circle a point is (0 inside).
+  distOutsideNext(p) { return Math.max(0, Math.hypot(p.x - this.nextCenter.x, p.z - this.nextCenter.y) - this.nextRadius); }
   safeRadius() { return Math.max(3, this.nextRadius); }
 
   get label() {

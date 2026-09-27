@@ -71,6 +71,18 @@ export class Minimap {
       ctx.beginPath();
       ctx.arc(nx, ny, Math.max(0, storm.nextRadius * s), 0, Math.PI * 2);
       ctx.stroke();
+      // outside the next circle: dashed line to the nearest safe point
+      const me = game.player;
+      if (me?.alive && me.state !== 'bus' && storm.distOutsideNext(me.pos) > 0) {
+        const dx = me.pos.x - storm.nextCenter.x, dz = me.pos.z - storm.nextCenter.y, d = Math.hypot(dx, dz) || 1;
+        const [mx, my] = this.toMap(me.pos.x, me.pos.z);
+        const [ex, ey] = this.toMap(storm.nextCenter.x + (dx / d) * storm.nextRadius, storm.nextCenter.y + (dz / d) * storm.nextRadius);
+        ctx.setLineDash([W * 0.025, W * 0.018]);
+        ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+        ctx.lineWidth = Math.max(1.5, W * 0.009);
+        ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.setLineDash([]);
+      }
     }
 
 
