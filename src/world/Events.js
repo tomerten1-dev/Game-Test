@@ -17,6 +17,14 @@ const VEND_PRICES = [0, 0, 150, 300, 500]; // gold, by rarity (rare+)
 // upgrade bench: cost to go from rarity i to i + 1
 const UPGRADE_COST = { 0: ['gold', 100], 1: ['gold', 200], 2: ['gold', 300], 3: ['gold', 400] }; // gold bars per step
 const VEND_MATS = ['wood', 'stone', 'metal'];
+// foraged food (Fortnite): what eating each one does
+const FORAGE = {
+  apple: { health: 5, text: 'Eat Apple · +5 health', note: '+5 Health', color: '#5dff8a' },
+  mushroom: { shield: 5, text: 'Eat Mushroom · +5 shield', note: '+5 Shield', color: '#58c8ff' },
+  banana: { health: 5, text: 'Eat Banana · +5 health', note: '+5 Health', color: '#ffd84a' },
+  pepper: { health: 10, speed: 10, text: 'Eat Pepper · +10 health, speed boost', note: '+10 Health · Speed', color: '#ff5a3d' },
+  slapberry: { health: 5, slap: 12, text: 'Eat Slap Berry · endless sprint for 12 s', note: 'Slap! Endless sprint', color: '#8f7bff' },
+};
 
 function labelTexture(lines, colors) {
   const cv = document.createElement('canvas');
@@ -116,7 +124,12 @@ export class Events {
   // Bouncer (placed) and Crash Pad (thrown) pads: bounce whoever lands on them, no fall damage.
   addBouncePad(x, y, z, kind, owner = null) {
     const g = new THREE.Group();
-    if (kind === 'crash') {
+    if (kind === 'tire') {
+      const tire = new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.3, 10, 22), new THREE.MeshStandardMaterial({ color: '#1f2226', roughness: 0.9 }));
+      tire.rotation.x = Math.PI / 2; tire.position.y = 0.3; g.add(tire);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.12, 16), new THREE.MeshStandardMaterial({ color: '#9aa7b8', roughness: 0.4, metalness: 0.6 }));
+      hub.position.y = 0.3; g.add(hub);
+    } else if (kind === 'crash') {
       const ring = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.32, 8, 20), new THREE.MeshStandardMaterial({ color: '#ff7ab8', roughness: 0.5 }));
       ring.rotation.x = Math.PI / 2; ring.position.y = 0.3; g.add(ring);
       const top = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.2, 20), new THREE.MeshStandardMaterial({ color: '#ffd1e6', roughness: 0.6 }));
@@ -130,7 +143,7 @@ export class Events {
     g.traverse((o) => { o.castShadow = true; });
     g.position.set(x, y, z);
     this.scene.add(g);
-    this.pads.push({ kind: kind === 'crash' ? 'crash' : 'bounce', x, z, y, group: g, cd: 0.2, owner, life: kind === 'crash' ? 20 : Infinity });
+    this.pads.push({ kind: kind === 'crash' ? 'crash' : 'bounce', high: kind === 'tire', x, z, y, group: g, cd: 0.2, owner, life: kind === 'crash' ? 20 : Infinity });
   }
 
   // Landing here doesn't hurt (bouncers, crash pads).
@@ -215,7 +228,7 @@ export class Events {
         if (Math.hypot(a.pos.x - p.x, a.pos.z - p.z) > r) continue;
         if (a.isPlayer) g.meta?.track('pad');
         if (p.kind === 'launch') a.launch(40);
-        else if (p.kind === 'bounce' || p.kind === 'crash') { a.vel.y = p.kind === 'crash' ? 16 : 24; a.onGround = false; a.noFallT = 8; a.crouched = false; p.cd = 0.3; }
+        else if (p.kind === 'bounce' || p.kind === 'crash') { a.vel.y = p.kind === 'crash' ? 16 : p.high ? 27 : 24; a.onGround = false; a.noFallT = 8; a.crouched = false; p.cd = 0.3; }
         else { a.vel.y = 21; a.onGround = false; a.noFallT = 4; a.crouched = false; }
         g.sound.play(p.kind === 'launch' ? 'launch' : 'jumppad', a.isPlayer ? null : a.pos, { range: 60 });
         for (let i = 0; i < 16; i++) {
@@ -492,7 +505,8 @@ export class Events {
     const spots = [];
     for (const c of trees) {
       if (rnd() > 0.16) continue;
-      const kind = rnd() < 0.6 ? 'apple' : 'mushroom';
+      const k = rnd();
+      const kind = k < 0.42 ? 'apple' : k < 0.64 ? 'mushroom' : k < 0.76 ? 'banana' : k < 0.88 ? 'pepper' : 'slapberry';
       const n = kind === 'apple' ? 1 + Math.floor(rnd() * 3) : 1 + Math.floor(rnd() * 2);
       for (let i = 0; i < n; i++) {
         const a = rnd() * Math.PI * 2, d = c.r + (kind === 'apple' ? 0.5 + rnd() * 1.2 : 0.9 + rnd() * 1.8);
@@ -501,7 +515,7 @@ export class Events {
         spots.push({ kind, x, y, z, rot: rnd() * 6.28, s: 0.85 + rnd() * 0.3, eaten: false });
       }
     }
-    const apples = spots.filter((s) => s.kind === 'apple'), shrooms = spots.filter((s) => s.kind === 'mushroom');
+    const of = (k) => spots.filter((s) => s.kind === k);
     const mk = (geo, color, count, extra = {}) => {
       const m = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.45, ...extra }), Math.max(1, count));
       m.castShadow = true; m.count = count;
@@ -512,13 +526,19 @@ export class Events {
     const stemGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.07, 5);
     const capGeo = new THREE.SphereGeometry(0.16, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2); capGeo.scale(1, 0.7, 1);
     const stalkGeo = new THREE.CylinderGeometry(0.045, 0.06, 0.16, 8);
+    const bananaGeo = new THREE.TorusGeometry(0.16, 0.045, 6, 12, Math.PI * 0.8); bananaGeo.rotateX(Math.PI / 2);
+    const pepperGeo = new THREE.ConeGeometry(0.07, 0.24, 8); pepperGeo.rotateX(Math.PI);
+    const berryGeo = new THREE.DodecahedronGeometry(0.1, 1);
+    const leafGeo = new THREE.BoxGeometry(0.3, 0.02, 0.18);
     this.forageMeshes = {
-      apple: [[mk(appleGeo, '#d8262e', apples.length), 0.12], [mk(stemGeo, '#5b3a1e', apples.length), 0.26]],
-      mushroom: [[mk(capGeo, '#3f8dff', shrooms.length, { emissive: '#1d4dff', emissiveIntensity: 0.35 }), 0.2], [mk(stalkGeo, '#f1ead8', shrooms.length), 0.11]],
+      apple: [[mk(appleGeo, '#d8262e', of('apple').length), 0.12], [mk(stemGeo, '#5b3a1e', of('apple').length), 0.26]],
+      mushroom: [[mk(capGeo, '#3f8dff', of('mushroom').length, { emissive: '#1d4dff', emissiveIntensity: 0.35 }), 0.2], [mk(stalkGeo, '#f1ead8', of('mushroom').length), 0.11]],
+      banana: [[mk(bananaGeo, '#ffd84a', of('banana').length), 0.08]],
+      pepper: [[mk(pepperGeo, '#e8321f', of('pepper').length), 0.12], [mk(stemGeo, '#3e8a2e', of('pepper').length), 0.26]],
+      slapberry: [[mk(berryGeo, '#5b3dff', of('slapberry').length, { emissive: '#3a1dff', emissiveIntensity: 0.4 }), 0.12], [mk(leafGeo, '#3e8a2e', of('slapberry').length), 0.05]],
     };
     const place = (list, kind) => list.forEach((s, i) => { s.i = i; this.forage.push(s); this._setForage(s, kind, true); });
-    place(apples, 'apple');
-    place(shrooms, 'mushroom');
+    for (const k of Object.keys(this.forageMeshes)) place(of(k), k);
   }
 
   _setForage(s, kind, visible) {
@@ -533,17 +553,17 @@ export class Events {
 
   eat(s, actor) {
     if (s.eaten) return null;
-    if (s.kind === 'apple') {
-      if (actor.health >= 100) return 'Already at full health';
-      actor.health = Math.min(100, actor.health + 5);
-    } else {
-      if (actor.shield >= 100) return 'Shield is full';
-      actor.shield = Math.min(100, actor.shield + 5);
-    }
+    const f = FORAGE[s.kind];
+    if (f.health && !f.speed && !f.slap && actor.health >= 100) return 'Already at full health';
+    if (f.shield && actor.shield >= 100) return 'Shield is full';
+    if (f.health) actor.health = Math.min(100, actor.health + f.health);
+    if (f.shield) actor.shield = Math.min(100, actor.shield + f.shield);
+    if (f.speed) actor.speedT = Math.min(30, (actor.speedT || 0) + f.speed); // peppers stack
+    if (f.slap) actor.slapT = f.slap;
     s.eaten = true;
     this._setForage(s, s.kind, false);
     this.game.sound.play('pickup', actor.isPlayer ? null : actor.pos);
-    if (actor.isPlayer) this.game.hud?.pickupNote?.(s.kind === 'apple' ? '+5 Health' : '+5 Shield', s.kind === 'apple' ? '#5dff8a' : '#58c8ff');
+    if (actor.isPlayer) this.game.hud?.pickupNote?.(f.note, f.color);
     return null;
   }
 
@@ -757,7 +777,7 @@ export class Events {
     for (const f of this.forage || []) {
       if (f.eaten || Math.abs(f.x - pos.x) > bd || Math.abs(f.z - pos.z) > bd) continue;
       const d = Math.hypot(f.x - pos.x, f.z - pos.z);
-      if (d < Math.min(bd, 1.7) && Math.abs(f.y - pos.y) < 2) { bd = d; best = { kind: 'forage', forage: f, text: f.kind === 'apple' ? 'Eat Apple · +5 health' : 'Eat Mushroom · +5 shield' }; }
+      if (d < Math.min(bd, 1.7) && Math.abs(f.y - pos.y) < 2) { bd = d; best = { kind: 'forage', forage: f, text: FORAGE[f.kind].text }; }
     }
     for (const b of this.modBenches || []) {
       const d = Math.hypot(b.x - pos.x, b.z - pos.z);

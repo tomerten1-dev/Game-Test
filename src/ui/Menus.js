@@ -1,4 +1,5 @@
 import { SLOTS, COSMETIC_LIST, COSMETICS } from '../meta/Cosmetics.js';
+import { SPRITES, spriteLevel } from '../player/Sprites.js';
 import { RARITIES } from '../weapons/WeaponDefs.js';
 import { TRACK, SEASON, xpForLevel, QUEST_REWARD, WEEKLY_REWARD, milestoneReward, arenaDivision } from '../meta/Progression.js';
 import { renderSettings } from './Settings.js';
@@ -28,6 +29,7 @@ export function itemIcon(c) {
   if (c.type === 'glider') return `<i class="ic ic-glider" style="--a:${v[0]};--b:${v[1]}"></i>`;
   if (c.type === 'trail') return `<i class="ic ic-trail" style="background:${!v ? 'rgba(255,255,255,0.15)' : v === 'rainbow' ? 'linear-gradient(90deg,#ff5a5f,#ffd23f,#6ef0a8,#5fd4ff,#a15cff)' : `linear-gradient(90deg,transparent,${v[0]},${v[1]})`}"></i>`;
   if (c.type === 'emote') return '<i class="ic ic-emote">♪</i>';
+  if (c.type === 'sprite') return `<i class="ic ic-hero" style="${v ? `color:${SPRITES[v].color}` : ''}">${v ? { water: '💧', earth: '🌿', fire: '🔥' }[v] : '∅'}</i>`;
   return `<i class="ic ic-wrap" style="background:${v ? v.color : '#4a505c'}"></i>`;
 }
 
@@ -185,7 +187,8 @@ export class Menus {
     $('#locker-grid').innerHTML = items.map((c) => {
       const owned = prof.owns(c.id), eq = prof.d.equipped[c.type] === c.id;
       const lock = owned ? '' : trackLevel(c.id) ? `Level ${trackLevel(c.id)}` : 'Item Shop';
-      return `<button class="card ${owned ? '' : 'locked'} ${eq ? 'eq' : ''}" data-id="${c.id}" style="--rar:${RARITIES[c.rarity].color}">${itemIcon(c)}<b>${c.name}</b><small>${eq ? 'Equipped' : lock || RARITIES[c.rarity].name}</small></button>`;
+      const sub = c.type === 'sprite' && c.value ? `Level ${spriteLevel(prof.d.spriteXp?.[c.value])} · ${SPRITES[c.value].desc}` : null;
+      return `<button class="card ${owned ? '' : 'locked'} ${eq ? 'eq' : ''}" data-id="${c.id}" style="--rar:${RARITIES[c.rarity].color}" ${sub ? `title="${sub}"` : ''}>${itemIcon(c)}<b>${c.name}</b><small>${eq ? 'Equipped' : lock || (sub ? sub.split(' · ')[0] : RARITIES[c.rarity].name)}</small></button>`;
     }).join('');
     $('#locker-slots').querySelectorAll('[data-slot]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); this.lockerSlot = b.dataset.slot; this.refresh(); }));
     $('#locker-grid').querySelectorAll('[data-id]').forEach((b) => b.addEventListener('click', (e) => {

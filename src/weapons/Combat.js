@@ -8,6 +8,7 @@ const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
 const _n = new THREE.Vector3();
 const _hit = {};
+const BUBBLE = { kind: 'bubble', bubble: true };
 const _p = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
 
@@ -53,6 +54,11 @@ export class Combat {
       if (tb >= 0 && tb < best) { best = tb; res.actor = a; res.head = false; res.collider = null; res.terrain = false; }
       const tl = raySphere(o.x, o.y, o.z, d.x, d.y, d.z, p.x, p.y + 0.36, p.z, 0.28 + pad, best);
       if (tl >= 0 && tl < best) { best = tl; res.actor = a; res.head = false; res.collider = null; res.terrain = false; }
+    }
+    // Shield Bubbles stop everything that crosses their wall
+    if (this.game.gadgets?.bubbles.length) {
+      const bt = this.game.gadgets.rayBlock(o, d, best);
+      if (bt < best) { best = bt; res.actor = null; res.head = false; res.collider = BUBBLE; res.terrain = false; }
     }
     res.t = best;
     res.hit = best < maxT;

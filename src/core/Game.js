@@ -34,7 +34,7 @@ import { applyMood, DayCycle } from '../world/TimeOfDay.js';
 import { Meta } from '../meta/Meta.js';
 import { LobbyStage } from '../ui/LobbyStage.js';
 import { applySettings, setting } from '../ui/Settings.js';
-import { Pickaxe } from '../weapons/Items.js';
+import { Pickaxe, Consumable } from '../weapons/Items.js';
 import { Weapon } from '../weapons/Weapon.js';
 import { COSMETICS } from '../meta/Cosmetics.js';
 import { arenaDivision } from '../meta/Progression.js';
@@ -45,6 +45,8 @@ import { Snowfall } from '../effects/Weather.js';
 import { WeatherSystem } from '../effects/WeatherFX.js';
 import { BossEvent } from '../world/Boss.js';
 import { Fire } from '../world/Fire.js';
+import { Gadgets } from '../world/Gadgets.js';
+import { SPRITES, SpriteCompanion, spriteLevel } from '../player/Sprites.js';
 import { ModBench } from '../ui/ModBench.js';
 import { WEAPONS } from '../weapons/WeaponDefs.js';
 
@@ -105,6 +107,7 @@ export class Game {
     this.building = new Building(this);
     this.projectiles = new Projectiles(this);
     this.fire = new Fire(this);
+    this.gadgets = new Gadgets(this);
     this.events = new Events(this);
     this.traps = new Traps(this);
     this.homes = this.world.towns.homes;
@@ -197,6 +200,7 @@ export class Game {
     this.building.reset();
     this.projectiles.reset();
     this.fire.reset();
+    this.gadgets.reset();
     this.pings.reset();
     this.storm.reset();
     this.hud.show(false);
@@ -251,6 +255,19 @@ export class Game {
       if (v && document.pointerLockElement) { this._mapUnlock = true; document.exitPointerLock(); }
       else if (!v && this.state === 'playing') this.input.requestLock();
     }
+  }
+
+  // The equipped sprite levels up from chests and eliminations (kept in your profile).
+  addSpriteXp(n) {
+    const p = this.player, sp = p?.sprite;
+    if (!sp || this.warmup > 0) return;
+    const d = this.meta.profile.d;
+    d.spriteXp ||= {};
+    const before = spriteLevel(d.spriteXp[sp.kind]);
+    d.spriteXp[sp.kind] = (d.spriteXp[sp.kind] || 0) + n;
+    const after = spriteLevel(d.spriteXp[sp.kind]);
+    if (after > before) { p.spriteLevel = after; this.hud.banner?.(`${SPRITES[sp.kind].name} reached level ${after}!`, 3); }
+    this.meta.profile.save();
   }
 
   // Mod bench screen: frees the mouse like the inventory; closes when you walk away.
@@ -360,6 +377,7 @@ export class Game {
     this.pings.reset();
     this.projectiles.reset();
     this.fire.reset();
+    this.gadgets.reset();
     this.events.reset();
     this.homes.reset();
     this.world.destructibles.reset();
@@ -387,6 +405,7 @@ export class Game {
       const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
       if (Math.random() < 0.35) b.pickaxeSkin = pick(TOOL_IDS);
       b.applyGear({ hat: Math.random() < 0.12 ? pick(HAT_IDS) : null, backbling: Math.random() < 0.45 ? pick(BACK_IDS) : null });
+      if (Math.random() < 0.3) { b.spriteLevel = 1 + Math.floor(Math.random() * 3); b.sprite = new SpriteCompanion(b, pick(Object.keys(SPRITES))); }
       this.bots.push(b);
       this.actors.push(b);
     }
@@ -424,6 +443,7 @@ export class Game {
     this.building.reset();
     this.projectiles.reset();
     this.fire.reset();
+    this.gadgets.reset();
     this.effects.clear();
     this.hud.reset();
     this.time = 0;
@@ -447,6 +467,14 @@ export class Game {
       for (const k of Object.keys(a.mats)) a.mats[k] = 0;
       a.gold = 0; a.medallions?.clear(); a.setCrown?.(false);
       a.health = 100; a.shield = 0; a.kills = 0; a.emote = null; a.crouched = false; a.dmgDealt = 0;
+      a.scanPhase = -1; a.speedT = 0; a.slapT = 0; a.lowGravT = 0; a.markedUntil = 0;
+      // Zero Build start kit: a pistol, small shields and one extra item
+      if (this.zeroBuild && !a.npc) {
+        a.items[1] = new Weapon('pistol', 0);
+        a.ammo.light = 48;
+        a.items[5] = new Consumable('smallshield', 2);
+        a.items[4] = new Consumable(['crashpad', 'bouncer', 'chugsplash', 'grenade'][Math.floor(Math.random() * 4)], 1);
+      }
       a.vel.set(0, 0, 0);
       a.setState('bus');
       a.pos.copy(this.bus.pos);
@@ -618,6 +646,13 @@ export class Game {
     this.traps.update(dt, this.actors);
     this.projectiles.update(dt);
     this.fire.update(dt);
+    this.gadgets.update(dt);
+    for (const a of this.actors) {
+      if (!a.sprite) continue;
+      if (a.distToCam === undefined || a.distToCam < 80 || a.isPlayer) a.sprite.update(dt); else a.sprite.mesh.visible = false;
+      // bots with a Water Sprite heal with it when hurt
+      if (!a.isPlayer && a.alive && a.sprite.kind === 'water' && a.health < 50 && a.sprite.cooldownLeft <= 0 && this.warmup <= 0) a.sprite.useAbility();
+    }
     this.combat.updateBursts(dt);
     this.world.traversal.update(dt, this.time, this.actors);
     if (this.warmup <= 0) this.events.update(dt, this.time);
@@ -688,6 +723,7 @@ export class Game {
       }
     }
     if (input.pressed('reload') && !p.buildMode) this.combat.reload(p);
+    if (input.pressed('sprite')) { const msg = p.sprite ? p.sprite.useAbility() : 'Equip a Sprite in the Locker'; if (msg) this.hud.toast?.(msg); }
     if (input.pressed('drop') && !p.buildMode && p.state === 'ground') this.dropFromSlot(p.slot, Infinity);
     if (input.pressed('ping') && p.state !== 'bus') {
       const dir = this.camera.getWorldDirection(_dir);
@@ -761,6 +797,17 @@ export class Game {
       }
       return;
     }
+    if (held.isConsumable && held.def.rod) {
+      if (input.pressed('fire')) {
+        const msg = this.gadgets.useRod(p, this.camera.position, this.camera.getWorldDirection(_dir));
+        if (msg) this.hud.toast?.(msg);
+      }
+      return;
+    }
+    if (held.isConsumable && held.def.oneup) {
+      if (input.pressed('fire')) this.hud.toast?.('Keep it in your inventory: it brings you back once');
+      return;
+    }
     if (held.isConsumable && held.def.key) {
       if (input.pressed('fire')) this.hud.toast?.('Take it to the vault at Rusty Works');
       return;
@@ -782,7 +829,7 @@ export class Game {
       const plan = this.traps.preview(p, this.camera.position, dir);
       if (input.pressed('fire')) {
         if (plan && this.traps.place(p, plan)) p.consumeHeld();
-        else this.hud.toast?.('Aim at a floor, wall or ceiling nearby');
+        else this.hud.toast?.('Aim at a floor nearby');
       }
       return;
     }
@@ -1074,7 +1121,8 @@ export class Game {
       const dmg = this.storm.damage;
       for (const a of this.actors) {
         if (!a.alive || a.state === 'bus') continue;
-        if (this.storm.isInside(a.pos.x, a.pos.z)) continue;
+        const flip = this.gadgets.stormAt(a.pos);
+        if (flip === 'safe' || (this.storm.isInside(a.pos.x, a.pos.z) && flip !== 'storm')) continue;
         a.health -= dmg;
         a.lastHurtTime = this.time;
         if (a.isPlayer) { this.sound.play('storm'); this.effects.damageNumber(this.player.chest(_origin), dmg, false, false); this.hud.stormFlash?.(); }
@@ -1137,6 +1185,7 @@ export class Game {
       }
       return;
     }
+    if (killer?.isPlayer && actor !== killer) this.addSpriteXp(20);
     if (killer?.isPlayer && actor !== killer) {
       this.meta.track('kill', 1, { dist: killer.pos.distanceTo(actor.pos), first: !this._firstBlood });
       if (killer.crowned) this.meta.track('crownKill');

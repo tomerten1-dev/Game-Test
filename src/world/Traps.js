@@ -73,6 +73,8 @@ export class Traps {
     } else if (c.kind === 'ramp' || c.kind === 'cone') n = UP.clone();
     else n = null; // trees, rocks, props
     if (!n || c?.mat === 'glass' || c?.obj) return null;
+    // Fortnite spike traps only go on floors (the ground, build floors, ramps and roofs)
+    if (n.y < 0.7) return null;
     if (n.dot(dir) > 0) return null;
     // no stacking traps on top of each other
     if (this.list.some((t) => t.pos.distanceTo(pos) < 1.2)) return null;
@@ -127,6 +129,7 @@ export class Traps {
         t.popT -= dt;
         t.spikes.scale.y = t.popT > 0.8 ? 1 : Math.max(0.18, t.popT / 0.8);
       }
+      if (t.spent > 0) { if ((t.spent -= dt) <= 0) this._remove(i, true); continue; }
       if (t.cd > 0) { t.cd -= dt; continue; }
       let fired = false;
       for (const a of actors) {
@@ -143,6 +146,8 @@ export class Traps {
         }
         if (a.isPlayer) this.game.rig.shake = Math.min(1, this.game.rig.shake + 0.5);
       }
+      // single use: the trap breaks after it springs
+      if (fired) t.spent = 1.2;
     }
   }
 

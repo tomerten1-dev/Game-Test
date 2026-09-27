@@ -110,6 +110,61 @@ const BUILDERS = {
   },
 };
 
+// fish: a plump body with a tail fin
+function fish(g, color, glow = false) {
+  const m = glow ? liquid(color, 'fish' + color) : plain(color, 0.35, 0.2);
+  const body = mesh(new THREE.SphereGeometry(0.14, 14, 10), m, 0, 0.12, 0); body.scale.set(0.6, 0.8, 1.5); g.add(body);
+  g.add(mesh(new THREE.ConeGeometry(0.1, 0.16, 4), m, 0, 0.12, -0.26, -Math.PI / 2));
+  for (const x of [-0.06, 0.06]) g.add(mesh(new THREE.SphereGeometry(0.022, 6, 6), plain('#101418', 0.3), x, 0.17, 0.14));
+}
+Object.assign(BUILDERS, {
+  chugsplash(g) { bottle(g, { r: 0.11, h: 0.2, neck: 0.04, liq: '#39d0ff' }); },
+  flowberry(g) { bottle(g, { r: 0.09, h: 0.28, neck: 0.035, liq: '#ff6fd0', round: false }); },
+  spicytaco(g) {
+    const shell = mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.04, 16, 1, false, 0, Math.PI), plain('#f2c14e', 0.7), 0, 0.18, 0, 0, 0, Math.PI / 2); g.add(shell);
+    g.add(mesh(new THREE.BoxGeometry(0.03, 0.12, 0.3), plain('#e2402b', 0.6), 0, 0.2, 0));
+  },
+  smallfry(g) { fish(g, '#9fd8ff'); },
+  flopper(g) { fish(g, '#3fa4ff'); },
+  shieldfish(g) { fish(g, '#3d6dff', true); },
+  slurpfish(g) { fish(g, '#b86bff', true); },
+  spicyfish(g) { fish(g, '#ff7a3a'); },
+  goldfish(g) { fish(g, '#ffd23f', true); },
+  rod(g) {
+    g.add(mesh(new THREE.CylinderGeometry(0.012, 0.02, 1.2, 6), plain('#8a5a2b', 0.7), 0, 0.1, 0.45, Math.PI / 2));
+    g.add(mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.05, 12), plain('#c9d6e8', 0.3, 0.7), 0.05, 0.06, 0.02, 0, 0, Math.PI / 2));
+  },
+  bubble(g) {
+    g.add(mesh(new THREE.SphereGeometry(0.13, 16, 12), glass(), 0, 0.15, 0));
+    g.add(mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.06, 12), plain('#2c3140', 0.5, 0.4), 0, 0.03, 0));
+    g.add(mesh(new THREE.SphereGeometry(0.06, 10, 8), liquid('#7fd8ff', 'bub'), 0, 0.15, 0));
+  },
+  portafort(g) {
+    g.add(mesh(new THREE.BoxGeometry(0.26, 0.26, 0.26), plain('#9aa7b8', 0.5, 0.6), 0, 0.13, 0));
+    g.add(mesh(new THREE.BoxGeometry(0.28, 0.04, 0.28), liquid('#4fc3ff', 'paf'), 0, 0.27, 0));
+  },
+  stormflip(g) {
+    g.add(mesh(new THREE.SphereGeometry(0.12, 14, 10), liquid('#c05cff', 'flip'), 0, 0.14, 0));
+    g.add(mesh(new THREE.TorusGeometry(0.15, 0.02, 6, 20), plain('#e8d8ff', 0.3, 0.6), 0, 0.14, 0, Math.PI / 2));
+  },
+  sos(g) {
+    g.add(mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.32, 10), plain('#e0392b', 0.5), 0, 0.16, 0));
+    g.add(mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.05, 10), plain('#f2efe6', 0.5), 0, 0.33, 0));
+  },
+  scanner(g) {
+    g.add(mesh(new THREE.BoxGeometry(0.18, 0.26, 0.05), plain('#2c3140', 0.5, 0.4), 0, 0.13, 0));
+    g.add(mesh(new THREE.BoxGeometry(0.14, 0.14, 0.01), liquid('#c86bff', 'scan'), 0, 0.16, 0.03));
+  },
+  oneup(g) {
+    g.add(mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.04, 24), plain('#3fbf5a', 0.35, 0.5), 0, 0.2, 0, Math.PI / 2));
+    g.add(mesh(new THREE.TorusGeometry(0.16, 0.02, 6, 24), liquid('#7dff8a', 'oneup'), 0, 0.2, 0));
+  },
+  gascan(g) {
+    g.add(mesh(new THREE.BoxGeometry(0.26, 0.34, 0.14), plain('#d4291f', 0.45, 0.3), 0, 0.17, 0));
+    g.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.08, 8), plain('#f2c230', 0.5), 0.08, 0.38, 0));
+  },
+});
+
 const templates = new Map();
 const vcMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.1 });
 

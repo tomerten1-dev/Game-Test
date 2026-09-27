@@ -197,6 +197,7 @@ export class Actor {
     this.items.forEach((it, i) => {
       if (!it || !it.isConsumable || !it.usableBy(this)) return;
       const d = it.def;
+      if (d.throw || !d.time) return; // thrown heals (Chug Splash) aren't drunk
       if (kind === 'heal' && !d.heal) return;
       if (kind === 'shield' && !d.shield) return;
       const v = d.heal ? Math.min(d.heal, d.cap - this.health) : Math.min(d.shield, d.cap - this.shield);
@@ -525,7 +526,11 @@ export class Actor {
     r.acc += r.rate * dt;
     while (r.acc >= 1 && r.left > 0) {
       r.acc -= 1; r.left--;
-      if (this.health < 100) this.health++;
+      if (r.both) {
+        // Slurp: health and shield together
+        if (this.health >= 100 && this.shield >= 100) r.left = 0;
+        this.health = Math.min(100, this.health + 1); this.shield = Math.min(100, this.shield + 1);
+      } else if (this.health < 100) this.health++;
       else if (this.shield < 100) this.shield++;
       else r.left = 0;
     }
@@ -560,11 +565,13 @@ export class Actor {
       this.sprinting = !!it.sprint && !this.crouched && this.useT <= 0 && mlen > 0.3 && (fwdDot > 0.3 || !this.aiming) && !this.aiming;
       // tactical sprint burns stamina; it refills after a short breather
       this.tacSprint = this.sprinting && this.stamina > 0 && this.onGround;
-      if (this.tacSprint) { if (!this.medallions.has('surge')) this.stamina = Math.max(0, this.stamina - STAMINA_DRAIN * dt); this.staminaIdle = 0; }
+      if (this.tacSprint) { if (!this.medallions.has('surge') && !(this.slapT > 0)) this.stamina = Math.max(0, this.stamina - STAMINA_DRAIN * dt); this.staminaIdle = 0; }
       else if ((this.staminaIdle += dt) > 0.8) this.stamina = Math.min(100, this.stamina + STAMINA_REGEN * dt);
       let speed = this.sprinting ? (this.tacSprint ? TAC_SPRINT_SPEED : SPRINT_SPEED) : this.crouched ? CROUCH_SPEED : RUN_SPEED;
       if (this.useT > 0 && !this.useItem?.def.mobile) speed = Math.min(speed, 3.2);
       if (this.aiming && this.weapon && !this.swimming) speed *= this.weapon.def.scope ? 0.55 : 0.7; // ADS walks slower
+      if (this.speedT > 0) { this.speedT -= dt; speed *= 1.2; } // peppers, spicy food
+      if (this.slapT > 0) this.slapT -= dt;
       if (this.swimming) {
         // swimming: steady strokes, a bit faster when "sprinting"; no crouch / slide
         speed = it.sprint ? 5.8 : 4.4;
@@ -630,7 +637,9 @@ export class Actor {
 
       const wasGround = this.onGround;
       if (this.floatT > 0) this.floatT -= dt;
-      world.moveBody(this, dt, this.floatT > 0 && this.vel.y < 3 ? 0.55 : 1);
+      // Flowberry Fizz: low gravity, and falls don't hurt while it lasts
+      if (this.lowGravT > 0) { this.lowGravT -= dt; this.noFallT = Math.max(this.noFallT || 0, 0.6); }
+      world.moveBody(this, dt, this.floatT > 0 && this.vel.y < 3 ? 0.55 : this.lowGravT > 0 ? 0.42 : 1);
       if (this.onGround) this.scrambles = 0;
       if (this.onGround && !wasGround && this.landSpeed > 7) {
         this.onHardLanding?.(this.landSpeed);
@@ -983,6 +992,7 @@ export class Actor {
     this.lastHurtTime = this.game.time;
     this.lastAttacker = attacker;
     if (attacker && attacker !== this && !this.npc) attacker.dmgDealt = (attacker.dmgDealt || 0) + amount;
+    if (attacker?.sprite && attacker !== this) attacker.sprite.onDealt(this, amount);
     this.flashT = 0.25;
     if (attacker?.isPlayer && attacker !== this) {
       this.game.meta?.track('damage', amount);
@@ -1032,6 +1042,22 @@ export class Actor {
   die(killer) {
     if (!this.alive) return;
     if (this.hiddenIn) this.game.events?.unhide(this);
+    // 1-Up Token: the elimination counts, but you redeploy from the sky with everything you carried
+    const g = this.game;
+    const tok = g.warmup <= 0 && g.mode !== 'arena' && !this.npc ? this.items.findIndex((it) => it?.def?.oneup) : -1;
+    if (tok > 0) {
+      this.items[tok] = null;
+      if (tok === this.slot) this.switchSlot(0);
+      if (killer && killer !== this) { killer.kills++; g.hud?.killFeed?.(killer, this); }
+      this.health = 100; this.shield = 0; this.regen = null; this.useT = 0;
+      this.setBuildMode?.(null);
+      const c = g.storm.safeCenter(), r = Math.max(5, g.storm.safeRadius() * 0.6), a = Math.random() * Math.PI * 2;
+      const x = c.x + Math.cos(a) * Math.random() * r, z = c.y + Math.sin(a) * Math.random() * r;
+      this.jumpFromBus(new THREE.Vector3(x, g.world.heightAt(x, z) + 90, z), new THREE.Vector3());
+      g.effects?.eliminate?.(this.pos, this.color);
+      if (this.isPlayer) g.hud?.banner?.('1-Up! Back in the fight', 3);
+      return;
+    }
     this.alive = false;
     this.setState('dead');
     this.beamT = this.isPlayer ? 0 : 1.1; // bots dissolve upward shortly after going down
@@ -1040,6 +1066,7 @@ export class Actor {
   }
 
   destroy() {
+    this.sprite?.dispose();
     this.game.scene.remove(this.root);
     this.character.dispose();
   }

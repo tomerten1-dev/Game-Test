@@ -71,7 +71,7 @@ export class Minimap {
       ctx.beginPath();
       ctx.arc(nx, ny, Math.max(0, storm.nextRadius * s), 0, Math.PI * 2);
       ctx.stroke();
-      const fut = game.player?.alive && game.player.held?.def?.exotic === 'scout' ? storm.peekFuture() : null;
+      const fut = game.player?.alive && (game.player.held?.def?.exotic === 'scout' || game.player.scanPhase === storm.phase) ? storm.peekFuture() : null;
       if (fut) {
         const [fx, fy] = this.toMap(fut.center.x, fut.center.y);
         ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = '#4ff4ff';

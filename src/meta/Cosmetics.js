@@ -10,6 +10,7 @@ export const SLOTS = [
   { key: 'trail', name: 'Contrail' },
   { key: 'emote', name: 'Emote' },
   { key: 'wrap', name: 'Weapon Wrap' },
+  { key: 'sprite', name: 'Sprite' },
 ];
 
 export const PRICES = [200, 300, 600, 1000, 1500];
@@ -99,6 +100,11 @@ const items = [
   { id: 'emote_confetti', type: 'emote', name: 'Confetti Toss', rarity: 3, value: 'Throw', fx: 'confetti' },
   { id: 'emote_summon', type: 'emote', name: 'Grand Summon', rarity: 4, value: 'Spellcast_Long', fx: 'sparkle' },
   // weapon wraps
+  // sprites: companions with a power (they level up as you play)
+  { id: 'sp_none', type: 'sprite', name: 'No Sprite', rarity: 0, value: null, starter: true },
+  { id: 'sp_water', type: 'sprite', name: 'Water Sprite', rarity: 2, value: 'water', starter: true },
+  { id: 'sp_earth', type: 'sprite', name: 'Earth Sprite', rarity: 2, value: 'earth', starter: true },
+  { id: 'sp_fire', type: 'sprite', name: 'Fire Sprite', rarity: 2, value: 'fire', starter: true },
   { id: 'wrap_none', type: 'wrap', name: 'Factory', rarity: 0, value: null, starter: true },
   { id: 'wrap_camo', type: 'wrap', name: 'Leafy Camo', rarity: 1, value: { color: '#6b8f4a', emissive: '#000000' } },
   { id: 'wrap_ice', type: 'wrap', name: 'Glacier', rarity: 2, value: { color: '#bfeaff', emissive: '#2a7fbf' } },
@@ -109,7 +115,7 @@ const items = [
 export const COSMETICS = Object.fromEntries(items.map((i) => [i.id, { ...i, price: PRICES[i.rarity] }]));
 export const COSMETIC_LIST = items.map((i) => COSMETICS[i.id]);
 export const STARTERS = items.filter((i) => i.starter).map((i) => i.id);
-export const DEFAULT_EQUIPPED = { hero: 'hero_ranger_m', tint: 'tint_teal', backbling: 'bb_antenna', pickaxe: 'pick_default', glider: 'glider_teal', trail: 'trail_none', emote: 'emote_cheer', wrap: 'wrap_none' };
+export const DEFAULT_EQUIPPED = { hero: 'hero_ranger_m', tint: 'tint_teal', backbling: 'bb_antenna', pickaxe: 'pick_default', glider: 'glider_teal', trail: 'trail_none', emote: 'emote_cheer', wrap: 'wrap_none', sprite: 'sp_water' };
 // emote clip -> particle effect played with it
 export const EMOTE_FX = Object.fromEntries(items.filter((i) => i.type === 'emote' && i.fx).map((i) => [i.value, i.fx]));
 

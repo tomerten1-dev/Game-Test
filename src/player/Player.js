@@ -1,6 +1,7 @@
 import { setting } from '../ui/Settings.js';
 import * as THREE from 'three';
 import { Actor } from './Actor.js';
+import { SPRITES, SpriteCompanion, spriteLevel } from './Sprites.js';
 import { TOWNS } from '../world/Terrain.js';
 
 // The human-controlled actor: turns input into movement intent relative to the camera.
@@ -18,6 +19,8 @@ export class Player extends Actor {
     this.victoryEmote = this.emoteClip;
     this.pickaxeSkin = look('pickaxe') || null;
     this.applyGear({ hat: hero?.hat, backbling: prof ? look('backbling') : 'antenna' });
+    const sp = look('sprite');
+    if (sp && SPRITES[sp]) { this.spriteLevel = spriteLevel(prof.d.spriteXp?.[sp]); this.sprite = new SpriteCompanion(this, sp); }
     this._equip?.();
   }
 

@@ -298,6 +298,7 @@ export class Loot {
       ['bandage', 20], ['smallshield', 15], ['bigshield', 13], ['medkit', 9], ['medmist', 6], ['slurp', 5], ['chug', 2], ['keg', 2], ['campfire', 3],
       ['grenade', 8], ['smoke', 3], ['impulse', 3], ['fire', 3], ['launchpad', 2], ['shockwave', 3], ['grappler', 2], ['rift', 1.5], ['trap', 4],
       ['bouncer', 2], ['crashpad', 2.5], ['wingsuit', 1.5], ['sliders', 1.5], ['gascan', 2.5],
+      ['chugsplash', 4], ['flowberry', 2.5], ['spicytaco', 2.5], ['bubble', 2], ['portafort', 2], ['stormflip', 1.5], ['sos', 0.8], ['scanner', 1], ['oneup', 0.6], ['rod', 1.5], ['flopper', 1.5],
     ];
     let k = r * table.reduce((a, t) => a + t[1], 0), type = table[0][0];
     for (const [t, w] of table) { if ((k -= w) <= 0) { type = t; break; } }
@@ -334,6 +335,14 @@ export class Loot {
           this.spawnPickup(Loot.ammoFor(w), _v.set(x + 0.9, y, z + 0.4));
         } else if (roll < 0.8) this.spawnPickup(Loot.randomConsumable(), _v.set(x, y, z));
         else this.spawnPickup({ type: 'mat', matType: ['wood', 'stone', 'metal'][Math.floor(Math.random() * 3)], amount: 30 }, _v.set(x, y, z));
+      }
+    }
+    // fishing rods lie on the shore near most fishing spots
+    for (const s of this.game?.gadgets?.spots || []) {
+      if (Math.random() < 0.3) continue;
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * Math.PI * 2, x = s.x + Math.cos(a) * 11, z = s.z + Math.sin(a) * 11;
+        if (this.world.heightAt(x, z) > 1.3) { this.spawnPickup({ type: 'consumable', ctype: 'rod', count: 1 }, _v.set(x, this.world.groundAt(x, z, 200) + 0.2, z)); break; }
       }
     }
   }
@@ -446,6 +455,9 @@ export class Loot {
     }
     // like Fortnite: a weapon + ammo + materials, and sometimes a heal / utility item
     if (c.rare || Math.random() < 0.6) out.push(Loot.randomConsumable());
+    // Earth Sprite: sometimes an extra rare item
+    if (actor.sprite?.bonusChest()) { const w3 = new Weapon(rollWeaponType('rare'), 3 + (Math.random() < 0.3 ? 1 : 0)).withRandomMods(); out.push({ type: 'weapon', weapon: w3 }, Loot.ammoFor(w3)); }
+    if (actor.isPlayer) this.game.addSpriteXp?.(5);
     out.push({ type: 'mat', matType: ['wood', 'wood', 'stone', 'metal'][Math.floor(Math.random() * 4)], amount: 30 });
     out.push({ type: 'gold', amount: c.rare ? 70 + Math.floor(Math.random() * 40) : 25 + Math.floor(Math.random() * 25) });
     const fwd = c.group.rotation.y;

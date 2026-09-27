@@ -178,7 +178,7 @@ export class MapScreen {
       ctx.lineWidth = Math.max(2, W * 0.004);
       ctx.beginPath(); ctx.arc(nx, ny, Math.max(0, storm.nextRadius * s), 0, Math.PI * 2); ctx.stroke();
       // Storm Scout in hand: the circle after next, dashed cyan
-      const fut = p?.alive && p.held?.def?.exotic === 'scout' ? storm.peekFuture() : null;
+      const fut = p?.alive && (p.held?.def?.exotic === 'scout' || p.scanPhase === storm.phase) ? storm.peekFuture() : null;
       if (fut) {
         const [fx, fy] = this.toScreen(fut.center.x, fut.center.y);
         ctx.save(); ctx.setLineDash([8, 6]); ctx.strokeStyle = '#4ff4ff';

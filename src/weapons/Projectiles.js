@@ -79,6 +79,17 @@ export class Projectiles {
     if (p.nade === 'grenade' || !p.nade) { this._explode(p, pos); return; }
     this._remove(p);
     if (p.nade === 'gascan') { g.fire?.placeGasCan(pos, p.owner); return; }
+    const G = g.gadgets;
+    if (p.nade === 'bubble') { G.bubble(pos, p.owner); return; }
+    if (p.nade === 'stormflip') { G.flip(pos.setY(pos.y + 0.5), p.owner); return; }
+    if (p.nade === 'medmist') { G.splash('medmist', pos, p.owner); return; }
+    if (p.nade === 'chugsplash') { G.chugSplash(pos, p.owner); return; }
+    if (p.nade === 'portafort') { G.portaFort(pos, p.owner); return; }
+    if (p.nade === 'goldfish') {
+      // the Mythic Goldfish flops back onto the ground to be thrown again
+      g.loot.spawnPickup({ type: 'consumable', ctype: 'goldfish', count: 1 }, pos.setY(pos.y + 0.3), new THREE.Vector3(0, 3, 0));
+      return;
+    }
     if (p.nade === 'crashpad') {
       g.events.addBouncePad(pos.x, g.world.groundAt(pos.x, pos.z, pos.y + 0.5, 0.5), pos.z, 'crash', p.owner);
       g.sound.play('bounce', pos, { range: 40 });
@@ -255,7 +266,14 @@ export class Projectiles {
       // launcher grenades go off when they hit a player, otherwise bounce until the fuse runs out
       if (p.kind === 'glnade' && r.actor) { this._explode(p, _pt); return; }
       // shockwaves go off on impact; other throwables bounce
-      if (p.def?.impact) { p.pos.copy(_pt).addScaledVector(_dir, -0.2); this._detonate(p); return; }
+      if (p.def?.impact) {
+        if (p.nade === 'goldfish' && r.actor) {
+          const t = r.actor, shieldBefore = t.shield;
+          const dealt = t.takeDamage(p.def.damage * (!p.owner?.isPlayer && !t.isPlayer ? 0.45 : 1), p.owner, false);
+          if (p.owner?.isPlayer) { g.effects.damageNumber(_pt, dealt, false, shieldBefore > 0, t); g.hud?.hitMarker(false, !t.alive, shieldBefore > 0); g.sound.play('hit'); }
+        } else if (p.nade === 'goldfish' && r.collider?.structure) r.collider.structure.damage(p.def.damage, p.owner);
+        p.pos.copy(_pt).addScaledVector(_dir, -0.2); this._detonate(p); return;
+      }
       this._normal(r, _pt, _n);
       p.pos.copy(_pt).addScaledVector(_n, 0.08);
       const vn = p.vel.dot(_n);
@@ -272,6 +290,7 @@ export class Projectiles {
     const w = this.game.world;
     if (r.terrain || !r.collider) return out.copy(w.terrain.normalAt(pt.x, pt.z));
     const c = r.collider;
+    if (c.bubble) return out.copy(_dir).negate();
     if (c.kind === 'circle') return out.set(pt.x - c.x, 0, pt.z - c.z).normalize();
     if (c.kind === 'ramp' || c.kind === 'cone') return out.set(0, 1, 0);
     const d = [pt.x - c.minX, c.maxX - pt.x, pt.z - c.minZ, c.maxZ - pt.z, pt.y - c.y0, c.y1 - pt.y];
