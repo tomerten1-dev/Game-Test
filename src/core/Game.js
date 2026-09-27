@@ -48,6 +48,9 @@ import { BossEvent } from '../world/Boss.js';
 const WARMUP_TIME = 20;
 import { isTouch } from './device.js';
 
+// seconds of holding interact to search containers
+const HOLD_TIME = { chest: 0.45, ammobox: 0.3, supply: 1.0, llama: 0.8, vault: 1.0 };
+
 export class Game {
   constructor(container) {
     const renderer = new THREE.WebGLRenderer({ antialias: quality.antialias, powerPreference: 'high-performance' });
@@ -650,8 +653,26 @@ export class Game {
       const near = (door && { kind: 'door', door, text: door.open ? 'Close Door' : 'Open Door' }) || this.events.nearestInteractable(p.pos) || this.boss.nearestInteractable(p) || this.loot.nearestInteractable(p.pos);
       const text = !near ? null : near.text || (near.kind === 'chest' ? (near.chest.rare ? 'Open Rare Chest' : 'Open Chest') : near.kind === 'ammobox' ? 'Open Ammo Box' : `Pick up ${this.loot.label(near.pickup)}`);
       this.hud.prompt?.(text || (p.canRedeploy() ? `Deploy glider · ${keyLabel(this.input.keyFor('jump'))}` : null), near?.pickup?.weapon?.rarity ?? near?.rarity, near?.pickup?.weapon || null, near?.pickup || null);
-      if (near && input.pressed('interact') && this.warmup > 0) this.hud.toast?.('Loot unlocks when the match starts');
-      else if (near && input.pressed('interact')) {
+      // containers are searched by holding interact (Fortnite-style), unless "tap to search" is on;
+      // swapping into a full inventory is a short hold too
+      const full = near?.pickup && (near.pickup.type === 'weapon' || near.pickup.type === 'consumable') && !p.items.some((it, i) => i > 0 && !it);
+      const need = !near ? 0 : full ? (setting(this, 'holdToSwap') ? 0.35 : 0) : setting(this, 'tapToSearch', false) ? 0 : HOLD_TIME[near.kind] || 0;
+      const tgt = near && (near.chest || near.box || near.supply || near.llama || near.pickup || near.vending || near.door || near.bench || near.hide || near.forage || near.kind);
+      let act = false;
+      if (near && need > 0 && this.warmup <= 0) {
+        if (input.down('interact')) {
+          if (this._holdTgt !== tgt) { this._holdTgt = tgt; this._holdT = 0; }
+          this._holdT += dt;
+          if (this._holdT >= need && !this._holdDone) { act = true; this._holdDone = true; }
+        } else { this._holdTgt = null; this._holdT = 0; this._holdDone = false; }
+        this.hud.holdProgress?.(this._holdTgt === tgt && !this._holdDone ? Math.min(1, this._holdT / need) : 0);
+      } else {
+        act = !!near && input.pressed('interact');
+        if (!input.down('interact')) this._holdDone = false;
+        this.hud.holdProgress?.(0);
+      }
+      if (near && act && this.warmup > 0) this.hud.toast?.('Loot unlocks when the match starts');
+      else if (near && act) {
         if (near.kind === 'supply') this.events.openSupply(near.supply, p);
         else if (near.kind === 'vault') { const msg = this.boss.openVault(p); if (msg) this.hud.toast?.(msg); }
         else if (near.kind === 'vending') { const msg = this.events.buy(near.vending, p); if (msg) this.hud.toast?.(msg); }
@@ -961,8 +982,8 @@ export class Game {
 
   updateStorm(dt) {
     const ev = this.storm.update(dt * (this.stormScale || 1), this.time);
-    if (ev === 'shrink') { this.hud.banner?.(this.storm.moving ? 'The storm is moving!' : 'The storm is closing in!', 3); this.sound.play('phase'); }
-    else if (ev === 'phase') { this.hud.banner?.('Storm shrinks again soon', 3); if (this.player.alive) this.meta.track('circle'); }
+    if (ev === 'shrink') { this.hud.banner?.(this.storm.moving ? 'The storm eye is moving!' : 'The storm eye is shrinking!', 3); this.sound.play('phase'); }
+    else if (ev === 'phase') { this.hud.banner?.('Storm eye forming', 3); this.sound.play('stormChime'); if (this.player.alive) this.meta.track('circle'); }
     this._updateSurge(dt);
     this.stormTick += dt;
     const outside = this.player.alive && this.player.state !== 'bus' && !this.storm.isInside(this.player.pos.x, this.player.pos.z);
@@ -975,7 +996,7 @@ export class Game {
         if (this.storm.isInside(a.pos.x, a.pos.z)) continue;
         a.health -= dmg;
         a.lastHurtTime = this.time;
-        if (a.isPlayer) { this.sound.play('storm'); this.effects.damageNumber(this.player.chest(_origin), dmg, false, false); }
+        if (a.isPlayer) { this.sound.play('storm'); this.effects.damageNumber(this.player.chest(_origin), dmg, false, false); this.hud.stormFlash?.(); }
         if (a.health <= 0) { a.health = 0; a.die(null); }
       }
     }

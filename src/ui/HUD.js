@@ -5,6 +5,7 @@ import { RARITIES } from '../weapons/WeaponDefs.js';
 import { Minimap } from './Minimap.js';
 import { TOWNS } from '../world/Terrain.js';
 import { AMMO, MEDALLIONS } from '../weapons/Items.js';
+import { questDef } from '../meta/Progression.js';
 
 const angleDelta = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
 
@@ -14,6 +15,8 @@ const fmtTime = (s) => {
 };
 
 // DOM heads-up display. Built once; update() writes only changed values.
+const LAYOUT_IDS = ['top-right', 'bottom-left', 'bottom-right', 'killfeed', 'compass'];
+
 export class HUD {
   constructor(root, game) {
     this.game = game;
@@ -52,6 +55,11 @@ export class HUD {
         <div id="pickup-notes"></div>
 
         <div id="killfeed"></div>
+        <div id="elim-callout"></div>
+        <div id="accolades"></div>
+        <div id="storm-flash"></div>
+        <div id="storm-warn" class="hidden">You are in the storm · <b>RUN!</b></div>
+        <div id="fps" class="hidden"></div>
 
         <div id="top-right">
           <div id="minimap-wrap"><canvas id="minimap"></canvas></div>
@@ -61,6 +69,7 @@ export class HUD {
             <div class="stat storm" title="Storm"><span class="ico ico-storm"></span><span id="st-storm">0:00</span></div>
           </div>
           <div id="storm-label"></div>
+          <div id="quest-track"></div>
         </div>
 
         <div id="bottom-left">
@@ -83,11 +92,13 @@ export class HUD {
             </div>
             <div class="build-hint">Click: place · Right-click: material · G: edit · 1–6: exit</div>
           </div>
+          <div id="special-slots"></div>
           <div id="slots"></div>
           <div id="mats">
             <div class="mat" data-m="wood" title="Wood"><span class="mat-icon wood"></span><span id="mat-wood">0</span></div>
             <div class="mat" data-m="stone" title="Stone"><span class="mat-icon stone"></span><span id="mat-stone">0</span></div>
             <div class="mat" data-m="metal" title="Metal"><span class="mat-icon metal"></span><span id="mat-metal">0</span></div>
+            <div id="ammo-types"></div>
             <div class="gold-chip" title="Gold bars: spend them at vending machines and upgrade benches"><span class="gold-icon"></span><span id="gold-n">0</span></div>
           </div>
         </div>
@@ -402,7 +413,7 @@ export class HUD {
       it.t -= dt;
       // camera looks along (-sin yaw, -cos yaw); 0 rad = straight ahead
       const rel = angleDelta(yaw + Math.PI, it.world);
-      it.el.style.transform = `rotate(${-rel}rad) translateY(-150px)`;
+      it.el.style.transform = `rotate(${-rel}rad)`;
       it.el.style.opacity = String(Math.max(0, Math.min(1, it.t * 2)) * it.vol);
     }
   }
@@ -469,6 +480,86 @@ export class HUD {
     this.spectating = actor;
   }
 
+  // HUD layout: saved offsets (px) for the main HUD blocks.
+  applyLayout(offsets) {
+    for (const id of LAYOUT_IDS) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      const o = offsets[id];
+      el.style.translate = o ? `${o[0]}px ${o[1]}px` : '';
+    }
+  }
+
+  // Drag the HUD blocks around; Done saves, Reset puts them back.
+  editLayout(onDone) {
+    const s = this.game.meta.profile.d.settings;
+    const offs = JSON.parse(JSON.stringify(s.hudOffsets || {}));
+    document.body.classList.add('hud-editing');
+    const bar = document.createElement('div');
+    bar.id = 'hud-edit-bar';
+    bar.innerHTML = '<b>Drag the HUD pieces</b><button data-a="reset">Reset</button><button data-a="done">Done</button>';
+    document.body.appendChild(bar);
+    const offFns = [];
+    for (const id of LAYOUT_IDS) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      const down = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const o = offs[id] || [0, 0], sx = e.clientX, sy = e.clientY;
+        const move = (m) => { offs[id] = [o[0] + m.clientX - sx, o[1] + m.clientY - sy]; this.applyLayout(offs); };
+        const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+        window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+      };
+      el.addEventListener('pointerdown', down, true);
+      offFns.push(() => el.removeEventListener('pointerdown', down, true));
+    }
+    const finish = (save) => {
+      offFns.forEach((f) => f()); bar.remove(); document.body.classList.remove('hud-editing');
+      if (!save) this.applyLayout(s.hudOffsets || {});
+      onDone(save ? offs : s.hudOffsets || {});
+    };
+    bar.querySelector('[data-a="done"]').addEventListener('click', () => finish(true));
+    bar.querySelector('[data-a="reset"]').addEventListener('click', () => { for (const k of Object.keys(offs)) delete offs[k]; this.applyLayout(offs); });
+  }
+
+  // Fill bar on the prompt / loot tag while you hold interact.
+  holdProgress(k) {
+    const v = k > 0 ? `${Math.round(k * 100)}%` : '0%';
+    if (this.cache.hold === v) return;
+    this.cache.hold = v;
+    this.el.prompt.style.setProperty('--hold', v);
+    (this.el.lootTag || document.getElementById('loot-tag'))?.style.setProperty('--hold', v);
+  }
+
+  // Centre-lower "ELIMINATED name" with your elimination count.
+  elimCallout(name, kills) {
+    const el = this.el.elim || (this.el.elim = document.getElementById('elim-callout'));
+    el.innerHTML = `<span class="ec-skull"></span><div><small>ELIMINATED</small><b></b></div><span class="ec-n">${kills}</span>`;
+    el.querySelector('b').textContent = name;
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+    clearTimeout(this._elimT);
+    this._elimT = setTimeout(() => el.classList.remove('show'), 2600);
+  }
+
+  // Accolade toast under the compass: "+150 XP · Elimination".
+  accolade(text, xp) {
+    const box = this.el.acc || (this.el.acc = document.getElementById('accolades'));
+    const n = document.createElement('div');
+    n.className = 'acc';
+    n.innerHTML = `<b>+${xp} XP</b><span></span>`;
+    n.querySelector('span').textContent = text;
+    box.prepend(n);
+    while (box.children.length > 3) box.lastChild.remove();
+    setTimeout(() => n.classList.add('fade'), 2400);
+    setTimeout(() => n.remove(), 2900);
+  }
+
+  // Purple flash on each storm damage tick.
+  stormFlash() {
+    const f = this.el.sflash || (this.el.sflash = document.getElementById('storm-flash'));
+    f.classList.remove('on'); void f.offsetWidth; f.classList.add('on');
+  }
+
   // Small stacked notes for auto-picked ammo / materials.
   pickupNote(text, color = '#fff') {
     const n = document.createElement('div');
@@ -512,7 +603,10 @@ export class HUD {
     while (this.el.killfeed.children.length > 5) this.el.killfeed.lastChild.remove();
     setTimeout(() => row.classList.add('fade'), 5000);
     setTimeout(() => row.remove(), 5600);
-    if (killer?.isPlayer && victim !== killer) this.banner(`Eliminated ${victim.name}`, 2);
+    if (killer?.isPlayer && victim !== killer) {
+      this.elimCallout(victim.name, killer.kills);
+      this.accolade(killer.kills === 1 ? 'First Elimination' : 'Elimination', 150);
+    }
   }
 
   update(dt) {
@@ -577,7 +671,7 @@ export class HUD {
       const it = p.items[i];
       const code = this.game.input.keyFor('slot' + (i + 1));
       const key = code ? keyLabel(code).replace(' Mouse', '').replace('Mouse ', 'M') : '';
-      const sig = `${it ? it.type + (it.rarity ?? '') + (it.count ?? '') : ''}|${i === p.slot}|${key}`;
+      const sig = `${it ? it.type + (it.rarity ?? '') + (it.count ?? '') + (it.isGun ? '/' + it.ammo : '') : ''}|${i === p.slot}|${key}`;
       if (this.cache['slot' + i] === sig) return;
       this.cache['slot' + i] = sig;
       s.querySelector('.key').textContent = key;
@@ -589,9 +683,18 @@ export class HUD {
       if (url) ic.innerHTML = `<img src="${url}" alt="">`;
       else ic.textContent = !it ? '' : it.isGun ? it.def.icon : it.isConsumable ? it.def.icon : '⛏';
       s.classList.toggle('has-img', !!url);
-      s.querySelector('.count').textContent = it?.isConsumable ? String(it.count) : '';
+      s.querySelector('.count').textContent = it?.isConsumable ? String(it.count) : it?.isGun ? String(it.ammo) : '';
+      s.classList.toggle('low', !!it?.isGun && it.ammo <= Math.ceil(it.def.mag * 0.25));
     });
     for (const k of ['wood', 'stone', 'metal']) this.set('mat' + k, this.el.mats[k], String(p.mats[k]));
+    // ammo by type next to the materials, and special items (keycard) beside the quick bar
+    const ammoSig = Object.keys(AMMO).map((t) => p.ammoFor(t)).join(',');
+    if (this.cache.ammoTypes !== ammoSig) {
+      this.cache.ammoTypes = ammoSig;
+      const el = this.el.ammoTypes || (this.el.ammoTypes = document.getElementById('ammo-types'));
+      el.innerHTML = Object.entries(AMMO).map(([t, a]) => { const n = p.ammoFor(t); return n === Infinity ? '' : `<span class="at" title="${a.name}" style="--c:${a.color || '#fff'}"><i></i>${n}</span>`; }).join('');
+    }
+    this.set('keycard', this.el.special || (this.el.special = document.getElementById('special-slots')), p.keycard ? '<div class="sslot" title="Vault Keycard"><span>⌘</span><small>KEYCARD</small></div>' : '', 'innerHTML');
     this.set('gold', this.el.gold || (this.el.gold = document.getElementById('gold-n')), String(p.gold || 0));
     const mk = [...(p.medallions || [])].join(',');
     if (this.cache.medals !== mk) {
@@ -652,7 +755,7 @@ export class HUD {
       this.set('stormLabel', this.el.stormLabel, `Warm-up · bus leaves in ${fmtTime(g.warmup)}`);
     } else {
       this.set('storm', this.el.storm, storm.stage === 'done' ? '0:00' : fmtTime(storm.timer));
-      const base = storm.stage === 'done' ? 'Final circle' : storm.stage === 'wait' ? `Storm shrinks in ${fmtTime(storm.timer)}` : 'Storm is shrinking!';
+      const base = storm.stage === 'done' ? 'Final storm circle' : storm.stage === 'wait' ? (storm.phase === 0 ? `Storm eye forming · shrinks in ${fmtTime(storm.timer)}` : `Storm eye shrinks in ${fmtTime(storm.timer)}`) : 'Storm eye shrinking';
       const s = g.surge;
       // distance to the safe zone when you're outside it
       const out = p.alive && p.state !== 'bus' ? g.storm.distOutsideNext?.(p.pos) || 0 : 0;
@@ -660,6 +763,22 @@ export class HUD {
       this.set('stormLabel', this.el.stormLabel, s && p.alive ? `${base} · SURGE: ${Math.round(p.dmgDealt || 0)}/${s.need} dmg` : base + safe);
     }
     this.set('stormCls', this.el.stormLabel, storm.stage === 'shrink' ? 'urgent' : '', 'className');
+    const inStorm = p.alive && p.state !== 'bus' && g.warmup <= 0 && g.state === 'playing' && !storm.isInside(p.pos.x, p.pos.z);
+    this.set('stormWarn', this.el.stormWarn || (this.el.stormWarn = document.getElementById('storm-warn')), inStorm ? 'storm-warn' : 'storm-warn hidden', 'className');
+    // quest tracker (a few times a second)
+    this._qT = (this._qT || 0) - dt;
+    if (this._qT <= 0 && g.meta) {
+      this._qT = 0.5;
+      const qs = [...g.meta.ensureQuests(), ...g.meta.ensureWeekly()].filter((q) => !q.done).slice(0, 3);
+      const html = setting(g, 'questTracker') ? qs.map((q) => { const d = questDef(q); return `<div class="qt-row"><span>${d.text}</span><b>${Math.floor(q.progress).toLocaleString()}/${d.target.toLocaleString()}</b><i style="width:${Math.min(100, (q.progress / d.target) * 100)}%"></i></div>`; }).join('') : '';
+      this.set('qtrack', this.el.qtrack || (this.el.qtrack = document.getElementById('quest-track')), html, 'innerHTML');
+    }
+    // FPS counter
+    if (setting(g, 'showFps', false)) {
+      this._fpsN = (this._fpsN || 0) + 1; this._fpsT = (this._fpsT || 0) + dt;
+      if (this._fpsT >= 0.5) { this.set('fps', this.el.fps || (this.el.fps = document.getElementById('fps')), `${Math.round(this._fpsN / this._fpsT)} FPS`); this._fpsN = 0; this._fpsT = 0; }
+      this.set('fpsOn', this.el.fps || document.getElementById('fps'), 'fps', 'className');
+    } else this.set('fpsOn', this.el.fps || (this.el.fps = document.getElementById('fps')), 'fps hidden', 'className');
 
     // damage direction indicator
     if (this.dirT > 0) {

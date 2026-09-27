@@ -55,6 +55,15 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 ## Inventory & survival
 
 - **Slot 1** is the harvesting axe: hit trees, crates and wooden houses for wood, rocks and walls for stone, cars, lamps and city props for metal. Trees and rocks show a glowing blue **weak point**; hit it for double materials. Trees and rocks have HP: chop a tree down and it **topples over**, and rocks **crumble**. Bullets and explosions wear them down too. Everything grows back next match.
+- **HUD details:**
+  - Each gun slot shows its ammo (red when low), and ammo by type sits beside your materials.
+  - The Vault Keycard has its own slot beside the quick bar.
+  - Storm text reads "Storm eye forming / shrinks in / shrinking", with a chime per phase, a purple flash on every storm tick and a "You are in the storm · RUN!" warning.
+  - Eliminations show a centred "ELIMINATED name" callout, and accolade toasts ("+150 XP Elimination", "+40 XP Chest Opened") appear under the compass.
+  - Your open quests are tracked under the minimap.
+  - Chests, ammo boxes, supply drops, llamas and the vault are searched by holding interact (a fill bar shows progress), and swapping into a full inventory is a short hold. Both can be turned off.
+  - Settings add preferred slots per gun type, toggles for the minimap, compass, kill feed, quest tracker and an FPS counter, and a HUD layout editor (pause menu → Edit layout: drag the HUD blocks).
+  - Visualize sound draws coloured arcs on a ring around the crosshair: white steps, gold chests, red gunfire.
 - **Floor loot tag:** when you're next to something on the ground, a tag beside the item shows the key and 'Pick up' (or 'Swap' when your slots are full), the name, a rarity chip and the ammo in the gun or the stack count.
 - **Using items:** a countdown dial beside the crosshair shows the seconds left for heals, shields and reloads. The outfit characters drink shield potions and slurps (blue sparkles) and kneel to use bandages and medkits (green sparkles).
 - **HP bars:** hitting a build, a house wall or door, a tree, a rock or furniture shows a Fortnite-style health bar with its HP (e.g. `150 / 300`).

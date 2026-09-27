@@ -87,7 +87,7 @@ export class BossEvent {
     const v = this.vault;
     if (!v || v.opened) return null;
     if (Math.hypot(actor.pos.x - v.front.x, actor.pos.z - v.front.z) > reach) return null;
-    const has = actor.items.some((it) => it?.type === 'keycard');
+    const has = actor.keycard || actor.items.some((it) => it?.type === 'keycard');
     return { kind: 'vault', text: has ? 'Open Vault' : "Vault (needs the Foreman's keycard)", rarity: 5 };
   }
 
@@ -95,9 +95,9 @@ export class BossEvent {
     const v = this.vault, g = this.game;
     if (!v || v.opened) return null;
     const slot = actor.items.findIndex((it) => it?.type === 'keycard');
-    if (slot < 0) return 'You need the Vault Keycard (the Foreman at Rusty Works has it)';
-    actor.items[slot] = null;
-    if (actor.slot === slot) actor.switchSlot(0);
+    if (!actor.keycard && slot < 0) return 'You need the Vault Keycard (the Foreman at Rusty Works has it)';
+    if (actor.keycard) actor.keycard = false;
+    else { actor.items[slot] = null; if (actor.slot === slot) actor.switchSlot(0); }
     v.opened = true;
     v.openT = 0;
     if (actor.isPlayer) g.meta?.track('vault');

@@ -81,6 +81,7 @@ export class Actor {
     this.mats = { wood: 0, stone: 0, metal: 0 };
     this.gold = 0;               // gold bars (spent at vending machines and upgrade benches)
     this.medallions = new Set(); // boss medallions carried
+    this.keycard = false; // vault keycard (its own slot)
     this.crowned = false;        // wearing the Victory Crown
     this.infiniteAmmo = !isPlayer; // bots don't track reserve ammo
     this.crouched = false;

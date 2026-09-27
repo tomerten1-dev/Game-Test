@@ -251,13 +251,14 @@ body.touch #compass { top: 6px; height: 32px; width: min(300px, 44vw); }
 
 /* sound visualizer */
 #soundviz { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
-.sv { position: absolute; left: -18px; top: -18px; width: 36px; height: 36px; opacity: 0; transition: opacity 0.15s; }
-.sv i { display: block; width: 36px; height: 36px; border-radius: 50%; border: 3px solid #fff; background: rgba(10,18,40,0.55); }
-.sv i::after { content: ''; position: absolute; left: 9px; top: 9px; width: 18px; height: 18px; background: #fff; }
-.sv.shot i { border-color: #ff6b6b; } .sv.shot i::after { background: #ff6b6b; clip-path: polygon(0 35%, 70% 35%, 70% 15%, 100% 50%, 70% 85%, 70% 65%, 0 65%); }
-.sv.step i::after { clip-path: polygon(30% 0, 70% 0, 75% 55%, 25% 55%, 30% 0, 35% 65%, 65% 65%, 60% 100%, 40% 100%); }
-.sv.chest i { border-color: #ffd23f; } .sv.chest i::after { background: #ffd23f; clip-path: polygon(0 30%, 100% 30%, 100% 100%, 0 100%); }
-.sv.build i { border-color: #d19a5b; } .sv.build i::after { background: #d19a5b; clip-path: polygon(0 20%, 100% 20%, 100% 80%, 0 80%); }
+/* sound visualizer: coloured arcs on a ring around the crosshair (white steps, gold chests, red gunfire) */
+.sv { position: absolute; left: -150px; top: -150px; width: 300px; height: 300px; opacity: 0; transition: opacity 0.15s; --c: #fff; }
+.sv i { position: absolute; inset: 0; border-radius: 50%; border: 6px solid transparent; border-top-color: var(--c); -webkit-mask: conic-gradient(from -17deg, #000 34deg, transparent 0); mask: conic-gradient(from -17deg, #000 34deg, transparent 0); filter: drop-shadow(0 0 3px rgba(0,0,0,0.6)); }
+.sv::after { content: ''; position: absolute; left: 141px; top: 16px; width: 18px; height: 18px; background: var(--c); filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7)); }
+.sv.shot { --c: #ff5a4f; } .sv.shot::after { clip-path: polygon(50% 0, 62% 38%, 100% 38%, 69% 60%, 81% 100%, 50% 75%, 19% 100%, 31% 60%, 0 38%, 38% 38%); }
+.sv.step::after { clip-path: polygon(30% 0, 70% 0, 75% 55%, 25% 55%, 30% 0, 35% 65%, 65% 65%, 60% 100%, 40% 100%); }
+.sv.chest { --c: #ffd23f; } .sv.chest::after { clip-path: polygon(0 30%, 100% 30%, 100% 100%, 0 100%); }
+.sv.build { --c: #e8c38f; } .sv.build::after { clip-path: polygon(0 20%, 100% 20%, 100% 80%, 0 80%); }
 
 /* spectate */
 #spectate { position: absolute; left: 50%; top: 62px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 18px 10px; border-radius: 14px; background: rgba(10,18,40,0.6); pointer-events: auto; }
@@ -725,3 +726,46 @@ body.touch #loot-tag .lt-name { font-size: 16px; }
 /* health bars shake on damage */
 .shake { animation: barshake 0.32s ease-out; }
 @keyframes barshake { 0%,100% { transform: translate(0,0); } 20% { transform: translate(-4px,1px); } 40% { transform: translate(4px,-1px); } 60% { transform: translate(-3px,0); } 80% { transform: translate(2px,1px); } }
+
+/* quick bar: ammo in each gun slot (red when low), keycard side slot, ammo by type */
+.slot.low .count { color: #ff6b5d; }
+#special-slots { display: flex; gap: 6px; }
+#special-slots .sslot { display: flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 6px; background: rgba(40,34,10,0.7); border: 1px solid #ffe94d; color: #ffe94d; font-weight: 800; }
+#special-slots .sslot span { font-size: 18px; } #special-slots .sslot small { font-size: 11px; letter-spacing: 1px; }
+#ammo-types { display: flex; gap: 9px; font-size: 14px; font-weight: 800; }
+#ammo-types .at { display: flex; align-items: center; gap: 3px; }
+#ammo-types .at i { width: 7px; height: 13px; border-radius: 2px 2px 1px 1px; background: var(--c); box-shadow: 0 0 0 1px rgba(0,0,0,0.4); }
+/* elimination callout */
+#elim-callout { position: absolute; left: 50%; top: 70%; transform: translate(-50%, 10px); display: flex; align-items: center; gap: 12px; padding: 6px 18px 6px 12px; background: linear-gradient(90deg, rgba(120,10,20,0.0), rgba(120,10,20,0.75) 18%, rgba(120,10,20,0.75) 82%, rgba(120,10,20,0)); opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; }
+#elim-callout.show { opacity: 1; transform: translate(-50%, 0); }
+#elim-callout small { display: block; font-size: 12px; font-weight: 900; letter-spacing: 2px; color: #ffb3ab; }
+#elim-callout b { font-size: 24px; font-weight: 900; font-style: italic; text-transform: uppercase; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.6); }
+#elim-callout .ec-skull { width: 26px; height: 26px; background: #fff; clip-path: polygon(20% 0, 80% 0, 100% 25%, 100% 60%, 80% 70%, 80% 100%, 20% 100%, 20% 70%, 0 60%, 0 25%); }
+#elim-callout .ec-n { font-size: 26px; font-weight: 900; color: #ffd23f; }
+/* accolades under the compass */
+#accolades { position: absolute; left: 50%; top: 58px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; }
+#accolades .acc { display: flex; gap: 8px; align-items: baseline; padding: 3px 12px; border-radius: 4px; background: rgba(10,18,40,0.6); animation: accin 0.25s ease-out; transition: opacity 0.4s; }
+#accolades .acc b { color: #7df1ff; font-weight: 900; font-size: 15px; } #accolades .acc span { font-weight: 800; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
+#accolades .acc.fade { opacity: 0; }
+@keyframes accin { from { transform: translateY(-8px); opacity: 0; } to { transform: none; opacity: 1; } }
+/* storm: purple flash per tick, warning */
+#storm-flash { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, rgba(150,60,255,0) 40%, rgba(150,60,255,0.55)); opacity: 0; }
+#storm-flash.on { animation: sflash 0.45s ease-out; }
+@keyframes sflash { 0% { opacity: 1; } 100% { opacity: 0; } }
+#storm-warn { position: absolute; left: 50%; top: 31%; transform: translateX(-50%); padding: 5px 16px; border-radius: 6px; background: rgba(90,20,160,0.7); font-weight: 800; font-size: 18px; letter-spacing: 0.5px; pointer-events: none; animation: swarn 1.2s ease-in-out infinite; }
+#storm-warn b { color: #ffd23f; }
+@keyframes swarn { 50% { opacity: 0.65; } }
+/* quest tracker */
+#quest-track { display: flex; flex-direction: column; gap: 4px; width: 240px; }
+#quest-track .qt-row { position: relative; display: flex; justify-content: space-between; gap: 8px; padding: 4px 8px 6px; border-radius: 5px; background: rgba(10,18,40,0.5); font-size: 12px; font-weight: 700; overflow: hidden; }
+#quest-track .qt-row span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } #quest-track .qt-row b { color: #ffd23f; }
+#quest-track .qt-row i { position: absolute; left: 0; bottom: 0; height: 2px; background: #ffd23f; }
+/* hold-to-interact fill */
+#prompt, #loot-tag .lt-box { position: relative; --hold: 0%; }
+#prompt::after, #loot-tag .lt-box::after { content: ''; position: absolute; left: 0; bottom: 0; height: 3px; width: var(--hold); background: #ffd23f; border-radius: 0 0 0 10px; }
+#fps { position: absolute; left: 12px; bottom: 6px; font: 700 12px monospace; color: #b8ffb0; text-shadow: 0 1px 2px #000; pointer-events: none; }
+/* HUD element toggles and the layout editor */
+body.no-minimap #minimap-wrap, body.no-compass #compass, body.no-killfeed #killfeed { display: none !important; }
+body.hud-editing #top-right, body.hud-editing #bottom-left, body.hud-editing #bottom-right, body.hud-editing #killfeed, body.hud-editing #compass { outline: 2px dashed #ffd23f; outline-offset: 4px; cursor: move; pointer-events: auto !important; }
+#hud-edit-bar { position: fixed; left: 50%; top: 40%; transform: translateX(-50%); z-index: 50; display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(10,18,40,0.9); color: #fff; font-weight: 800; }
+#hud-edit-bar button { cursor: pointer; border: 0; border-radius: 6px; padding: 6px 14px; font-weight: 800; background: #ffd23f; color: #14204a; }

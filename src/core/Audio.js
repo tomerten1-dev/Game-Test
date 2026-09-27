@@ -578,6 +578,9 @@ export class Sound {
       case 'supply':
         [392, 523, 659, 784].forEach((f, i) => this._tone(t + i * 0.12, 0.5, { type: 'triangle', freq: f, gain: 0.16 }));
         break;
+      case 'stormChime':
+        [392, 523, 659].forEach((f, i) => this._tone(t + i * 0.16, 0.5, { type: 'sine', freq: f, gain: 0.12 }));
+        break;
       case 'headshotLegacy':
         // the older, sharper "ding" some players prefer
         this._tone(t, 0.12, { type: 'square', freq: 2400, gain: 0.08 });

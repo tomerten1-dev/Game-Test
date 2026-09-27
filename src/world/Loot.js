@@ -128,6 +128,9 @@ function g_toastPickup(game, p, count = p.count) {
   game.hud?.pickupNote?.(`+${p.amount} ${p.type === 'ammo' ? AMMO[p.ammoType].name : MATS[p.matType].name}`, p.type === 'ammo' ? AMMO[p.ammoType].color : MATS[p.matType].color);
 }
 
+// weapon type -> preferred-slot class (Settings)
+export const PREF_CLASS = { shotgun: 'shotgun', pump: 'shotgun', ar: 'rifle', burst: 'rifle', smg: 'smg', pistol: 'smg', sniper: 'sniper', rocket: 'explosive' };
+
 export class Loot {
   constructor(game) {
     this.game = game;
@@ -460,7 +463,10 @@ export class Loot {
     if (!p.alive || this.game.warmup > 0) return null;
     const g = this.game;
     if (p.type === 'weapon') {
-      const free = actor.items.findIndex((it, i) => i > 0 && !it);
+      let free = actor.items.findIndex((it, i) => i > 0 && !it);
+      // your preferred slot for this kind of gun, if it's empty
+      const pref = actor.isPlayer ? g.meta?.profile?.d?.settings?.prefSlots?.[PREF_CLASS[p.weapon.type]] : 0;
+      if (pref && !actor.items[pref]) free = pref;
       if (free > 0) actor.giveWeapon(p.weapon, free);
       else {
         let slot;
@@ -482,6 +488,11 @@ export class Loot {
         if (old) this.dropItem(old, actor);
       }
       if (actor.isPlayer) g.sound.play('pickup');
+    } else if (p.type === 'consumable' && p.ctype === 'keycard') {
+      // keycards live in their own slot beside the quick bar, not in the inventory
+      if (actor.keycard) return 'You already have a keycard';
+      actor.keycard = true;
+      if (actor.isPlayer) { g.sound.play('supply'); g.hud?.toast?.('Vault Keycard: open the vault at Rusty Works'); }
     } else if (p.type === 'consumable') {
       let left = actor.addConsumable(p.ctype, p.count);
       if (left === p.count && actor.isPlayer) {
@@ -571,6 +582,7 @@ export class Loot {
     if (!actor.infiniteAmmo) for (const [t, n] of Object.entries(actor.ammo)) if (n > 0) items.push({ type: 'ammo', ammoType: t, amount: n });
     for (const [t, n] of Object.entries(actor.mats)) if (n > 0) items.push({ type: 'mat', matType: t, amount: n });
     if (actor.gold > 0) items.push({ type: 'gold', amount: actor.gold });
+    if (actor.keycard) { items.push({ type: 'consumable', ctype: 'keycard', count: 1 }); actor.keycard = false; }
     for (const k of actor.medallions || []) items.push({ type: 'medallion', key: k });
     if (actor.crowned) { items.push({ type: 'crown' }); actor.setCrown(false); }
     actor.gold = 0; actor.medallions?.clear();

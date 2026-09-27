@@ -21,7 +21,11 @@ const SLIDERS = [
 const keyName = keyLabel;
 // on/off gameplay options (missing from older saves = on)
 const TOGGLES = [['autoPickup', 'Auto pick up weapons'], ['stackDamage', 'Stack damage numbers'], ['autoSort', 'Auto sort consumables right'],
-  ['weaponReticles', 'Crosshair changes per weapon'], ['throwArc', 'Show throw arc'], ['legacyHitSound', 'Legacy headshot sound', false]];
+  ['weaponReticles', 'Crosshair changes per weapon'], ['throwArc', 'Show throw arc'], ['legacyHitSound', 'Legacy headshot sound', false],
+  ['tapToSearch', 'Tap to search (no holding)', false], ['holdToSwap', 'Hold to swap when inventory is full'],
+  ['questTracker', 'Quest tracker in matches'], ['showMinimap', 'Show minimap'], ['showCompass', 'Show compass'], ['showKillfeed', 'Show kill feed'], ['showFps', 'FPS counter', false]];
+// preferred inventory slot per kind of gun (0 = any)
+const PREF_ROWS = [['shotgun', 'Shotgun slot'], ['rifle', 'Assault rifle slot'], ['smg', 'SMG / pistol slot'], ['sniper', 'Sniper slot'], ['explosive', 'Explosive slot']];
 const TOGGLE_DEFAULT = Object.fromEntries(TOGGLES.map(([k, , d = true]) => [k, d]));
 // A saved on/off setting (missing = its default).
 export const setting = (game, k, def = TOGGLE_DEFAULT[k] ?? true) => { const v = game.meta?.profile?.d?.settings?.[k]; return v === undefined ? def : v !== false; };
@@ -35,6 +39,8 @@ export function applySettings(game) {
   document.documentElement.style.setProperty('--hud-scale', String(s.hudScale));
   game.hud?.setSoundViz(!!s.soundViz);
   if (game.effects) game.effects.stackDamage = s.stackDamage !== false;
+  for (const [k, cls] of [['showMinimap', 'no-minimap'], ['showCompass', 'no-compass'], ['showKillfeed', 'no-killfeed']]) document.body.classList.toggle(cls, !setting(game, k));
+  game.hud?.applyLayout?.(s.hudOffsets || {});
   game.input.applyBindings(s.keys || {});
 }
 
@@ -50,6 +56,8 @@ export function renderSettings(el, game, { compact = false } = {}) {
       <div class="set-row"><span>Graphics</span><div class="seg">${['auto', 'low', 'medium', 'high'].map((q) => `<button data-q="${q}">${q[0].toUpperCase() + q.slice(1)}</button>`).join('')}</div></div>
       <div class="set-row"><span>Visualize sound</span><div class="seg"><button data-sv="0">Off</button><button data-sv="1">On</button></div></div>
       ${TOGGLES.map(([k, label]) => `<div class="set-row"><span>${label}</span><div class="seg"><button data-tog="${k}" data-val="0">Off</button><button data-tog="${k}" data-val="1">On</button></div></div>`).join('')}
+      ${PREF_ROWS.map(([k, label]) => `<div class="set-row"><span>${label}</span><div class="seg">${[0, 2, 3, 4, 5, 6].map((n) => `<button data-pref="${k}" data-n="${n}">${n || 'Any'}</button>`).join('')}</div></div>`).join('')}
+      <div class="set-row"><span>HUD layout</span><div class="seg"><button data-act="hudedit">Edit layout</button><button data-act="hudreset">Reset</button></div></div>
       ${compact ? '' : `<div class="set-row"><span>Island season</span><div class="seg">${[['auto', 'Auto'], ['summer', 'Summer'], ['winter', 'Winter'], ['desert', 'Desert']].map(([k, n]) => `<button data-island="${k}">${n}</button>`).join('')}</div></div>
       <div class="set-row island-note hidden"><span></span><div class="seg"><button data-act="reload">Reload to build the new island</button></div></div>`}
     </div>
@@ -62,6 +70,7 @@ export function renderSettings(el, game, { compact = false } = {}) {
     el.querySelectorAll('[data-q]').forEach((b) => b.classList.toggle('on', b.dataset.q === q));
     el.querySelectorAll('[data-sv]').forEach((b) => b.classList.toggle('on', (b.dataset.sv === '1') === !!s.soundViz));
     el.querySelectorAll('[data-island]').forEach((b) => b.classList.toggle('on', b.dataset.island === (s.island || 'auto')));
+    el.querySelectorAll('[data-pref]').forEach((b) => b.classList.toggle('on', +b.dataset.n === (s.prefSlots?.[b.dataset.pref] || 0)));
     el.querySelectorAll('[data-tog]').forEach((b) => b.classList.toggle('on', (b.dataset.val === '1') === (s[b.dataset.tog] === undefined ? TOGGLE_DEFAULT[b.dataset.tog] : s[b.dataset.tog] !== false)));
     const want = s.island && s.island !== 'auto' ? s.island : null;
     el.querySelector('.island-note')?.classList.toggle('hidden', !want || want === VARIANT_KEY);
@@ -70,6 +79,15 @@ export function renderSettings(el, game, { compact = false } = {}) {
   el.querySelectorAll('input[type=range]').forEach((inp) => inp.addEventListener('input', () => { s[inp.dataset.k] = Number(inp.value); save(); sync(); }));
   el.querySelectorAll('[data-q]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); game.quality.set(b.dataset.q); s.quality = b.dataset.q; save(); sync(); }));
   el.querySelectorAll('[data-sv]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); s.soundViz = b.dataset.sv === '1'; save(); sync(); }));
+  el.querySelectorAll('[data-pref]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); s.prefSlots = { ...(s.prefSlots || {}), [b.dataset.pref]: +b.dataset.n }; save(); sync(); }));
+  el.querySelector('[data-act="hudreset"]')?.addEventListener('click', (e) => { e.stopPropagation(); s.hudOffsets = {}; save(); game.hud?.toast?.('HUD layout reset'); });
+  el.querySelector('[data-act="hudedit"]')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (game.state !== 'playing') { game.hud?.toast?.('Start a match, then use Edit layout from the pause menu'); return; }
+    const pause = game.menus?.el?.pause;
+    pause?.classList.add('hidden');
+    game.hud.editLayout((offsets) => { s.hudOffsets = offsets; save(); pause?.classList.remove('hidden'); });
+  });
   el.querySelectorAll('[data-tog]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); s[b.dataset.tog] = b.dataset.val === '1'; save(); sync(); }));
   el.querySelectorAll('[data-bind]').forEach((b) => b.addEventListener('click', (e) => {
     e.stopPropagation();
