@@ -178,6 +178,15 @@ export class HUD {
     t.classList.add('show');
   }
 
+  editHint(on) {
+    let el = this.root.querySelector('#edit-hint');
+    if (!el) {
+      this.el.hud.insertAdjacentHTML('beforeend', '<div id="edit-hint" class="hidden">EDITING · click or drag tiles · <b>G</b> confirm · right-click reset</div>');
+      el = this.root.querySelector('#edit-hint');
+    }
+    el.classList.toggle('hidden', !on);
+  }
+
   scope(on) {
     if (this.cache.scope === on) return;
     this.cache.scope = on;

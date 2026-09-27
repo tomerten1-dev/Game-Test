@@ -555,7 +555,8 @@ export class Game {
   updateBuild(dt) {
     const p = this.player, input = this.input, b = this.building;
     this._buildCd = Math.max(0, (this._buildCd || 0) - dt);
-    if (input.pressed('edit') && p.state === 'ground') this.editLookedAtWall();
+    if (input.pressed('edit') && p.state === 'ground') { this.toggleEdit(); return !!this.editing; }
+    if (this.editing) { this.updateEdit(); return true; }
     for (const piece of PIECES) {
       if (!input.pressed(piece)) continue;
       if (this.touch) { this.placePiece(piece); return false; }
@@ -595,16 +596,47 @@ export class Game {
     this.sound.play('click');
   }
 
-  // Cut a door / window into the wall under the crosshair (only your own pieces, like the real thing).
-  editLookedAtWall() {
+  // Edit mode (G): pick tiles on your own wall / floor, G again to confirm. Ramps just flip.
+  toggleEdit() {
+    const b = this.building, p = this.player;
+    if (this.editing) {
+      const { s, mask } = this.editing;
+      if (s.hp > 0) b.edit(s, mask);
+      this.stopEdit();
+      return;
+    }
     const dir = this.camera.getWorldDirection(_dir);
     const origin = _origin.copy(this.camera.position).addScaledVector(dir, this.rig.curDist * 0.8);
     const hit = this.world.raycast(origin, dir, 7);
     const s = hit?.collider?.structure;
-    if (!s || s.type !== 'wall') { this.hud.toast?.('Look at one of your walls to edit it'); return; }
-    if (s.owner !== this.player) { this.hud.toast?.('You can only edit your own walls'); return; }
-    const e = this.building.edit(s);
-    this.hud.toast?.(e === 'door' ? 'Edit: door' : e === 'window' ? 'Edit: window' : 'Edit: reset');
+    if (!s || s.type === 'cone') { this.hud.toast?.('Look at one of your builds to edit it'); return; }
+    if (s.owner !== p) { this.hud.toast?.('You can only edit your own builds'); return; }
+    if (s.type === 'ramp') { b.flipRamp(s); return; }
+    p.setBuildMode(null);
+    this.editing = { s, mask: s.editMask || 0, paint: null };
+    b.showEditGrid(s, this.editing.mask);
+    this.hud.editHint?.(true);
+  }
+
+  stopEdit() {
+    this.editing = null;
+    this.building.showEditGrid(null);
+    this.hud.editHint?.(false);
+  }
+
+  updateEdit() {
+    const e = this.editing, p = this.player, input = this.input;
+    if (!e.s || e.s.hp <= 0 || e.s.falling || !p.alive || p.pos.distanceTo(e.s.mesh.position) > 9) { this.stopEdit(); return; }
+    if (input.pressed('aim')) { this.building.edit(e.s, null); this.stopEdit(); this.hud.toast?.('Edit reset'); return; }
+    if (!input.down('fire')) { e.paint = null; return; }
+    const dir = this.camera.getWorldDirection(_dir);
+    const tile = this.building.pickTile(this.camera.position, dir);
+    if (tile < 0) return;
+    const bit = 1 << tile;
+    // the first tile you press decides whether the drag selects or deselects
+    if (e.paint === null) e.paint = !(e.mask & bit);
+    const next = e.paint ? e.mask | bit : e.mask & ~bit;
+    if (next !== e.mask && next !== 511) { e.mask = next; this.building.showEditGrid(e.s, e.mask); this.sound.play('click'); }
   }
 
   // Channel the held consumable; finishing applies it and uses up one from the stack.

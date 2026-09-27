@@ -37,7 +37,7 @@ Production build: `npm run build` (output in `dist/`), preview it with `npm run 
 | Right click (build mode) | Switch material: wood → stone → metal |
 | Mouse wheel (build mode) | Cycle pieces |
 | B | Toggle build mode |
-| G | Edit the wall you look at: door → window → plain |
+| G | Edit your wall/floor: click or drag tiles on the 3×3 grid, G again to confirm, right-click to reset (ramps flip) |
 | 1 – 6 / mouse wheel | Switch slot (1 = harvesting axe) · leaves build mode |
 | M | Full-screen map (click: marker, right-click: clear, wheel: zoom, drag: pan) |
 | Middle click | Ping what you're looking at |

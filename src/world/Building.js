@@ -12,7 +12,6 @@ export const MAT_STATS = {
   stone: { hp: 300, start: 0.25, time: 5, color: '#a9adb5' },
   metal: { hp: 450, start: 0.2, time: 8, color: '#7f93a8' },
 };
-const EDITS = [null, 'door', 'window'];
 const CONE_H = 1.8;
 const FLOOR_T = 0.22;
 
@@ -81,15 +80,63 @@ const TEXTURES = {
   },
 };
 
-// Solid parts of a wall (local x -2..2, y 0..4) for each edit.
-function wallRects(edit) {
-  if (edit === 'door') return [[-2, -0.7, 0, 4], [0.7, 2, 0, 4], [-0.7, 0.7, 2.9, 4]];
-  if (edit === 'window') return [[-2, -0.8, 0, 4], [0.8, 2, 0, 4], [-0.8, 0.8, 0, 1.4], [-0.8, 0.8, 2.6, 4]];
-  return [[-2, 2, 0, 4]];
+// Edits are a 3x3 tile mask (bit set = tile removed). Tile index = row * 3 + col, row 0 at the top
+// of a wall / the -Z side of a floor. Named presets for bots and quick edits:
+export const EDIT_PRESETS = { door: (1 << 4) | (1 << 7), window: 1 << 4, arch: (1 << 6) | (1 << 7) | (1 << 8) | (1 << 3) | (1 << 4) | (1 << 5), half: (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) };
+const TILE = GRID / 3;
+export const FULL_MASK = 511;
+
+// Solid rectangles of an edited wall (local x -2..2, y 0..4): merge kept tiles down each column.
+function wallRects(mask = 0) {
+  const out = [];
+  for (let c = 0; c < 3; c++) {
+    let run = null;
+    for (let r = 0; r <= 3; r++) {
+      const kept = r < 3 && !(mask & (1 << (r * 3 + c)));
+      if (kept && !run) run = { start: r };
+      if (!kept && run) {
+        out.push([-2 + c * TILE, -2 + (c + 1) * TILE, HEIGHT - r * TILE, HEIGHT - run.start * TILE]);
+        run = null;
+      }
+    }
+  }
+  // merge identical vertical spans across neighbouring columns (fewer boxes)
+  const merged = [];
+  for (const rc of out) {
+    const m = merged.find((q) => q[2] === rc[2] && q[3] === rc[3] && Math.abs(q[1] - rc[0]) < 1e-6);
+    if (m) m[1] = rc[1]; else merged.push([...rc]);
+  }
+  return merged;
 }
 
-function wallGeometry(edit) {
-  const parts = wallRects(edit).map(([x0, x1, y0, y1]) => {
+// Solid rectangles of an edited floor (local x -2..2, z -2..2).
+function floorRects(mask = 0) {
+  const out = [];
+  for (let r = 0; r < 3; r++) {
+    let run = null;
+    for (let c = 0; c <= 3; c++) {
+      const kept = c < 3 && !(mask & (1 << (r * 3 + c)));
+      if (kept && run === null) run = c;
+      if (!kept && run !== null) { out.push([-2 + run * TILE, -2 + c * TILE, -2 + r * TILE, -2 + (r + 1) * TILE]); run = null; }
+    }
+  }
+  return out;
+}
+
+function floorGeometry(mask) {
+  const parts = floorRects(mask).map(([x0, x1, z0, z1]) => {
+    const w = x1 - x0, d = z1 - z0;
+    const g = new THREE.BoxGeometry(w, FLOOR_T, d);
+    const uv = g.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, (x0 + 2) / GRID + uv.getX(i) * (w / GRID), (z0 + 2) / GRID + uv.getY(i) * (d / GRID));
+    g.translate((x0 + x1) / 2, -FLOOR_T / 2 + 0.04, (z0 + z1) / 2);
+    return g;
+  });
+  return parts.length === 1 ? parts[0] : mergeGeometries(parts);
+}
+
+function wallGeometry(mask) {
+  const parts = wallRects(mask).map(([x0, x1, y0, y1]) => {
     const w = x1 - x0, h = y1 - y0;
     const g = new THREE.BoxGeometry(w, h, 0.24);
     // keep the texture at world scale so edited pieces line up
@@ -117,14 +164,24 @@ export class Building {
       ramp: new THREE.BoxGeometry(GRID, 0.2, Math.hypot(GRID, HEIGHT)),
       cone: new THREE.ConeGeometry(GRID / Math.SQRT2, CONE_H, 4, 1).rotateY(Math.PI / 4).translate(0, CONE_H / 2, 0),
     };
-    for (const e of EDITS) this.geo.wall[e] = wallGeometry(e);
+    this.geo.wall[0] = wallGeometry(0);
+    this.geo.floorMask = { 0: this.geo.floor };
+    // edit-mode tile overlay
+    this.tileMat = new THREE.MeshBasicMaterial({ color: '#5fd4ff', transparent: true, opacity: 0.3, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
+    this.tileSelMat = new THREE.MeshBasicMaterial({ color: '#ff5a5f', transparent: true, opacity: 0.6, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
+    this.editGrid = new THREE.Group();
+    const tg = new THREE.PlaneGeometry(TILE * 0.92, TILE * 0.92);
+    for (let i = 0; i < 9; i++) { const m = new THREE.Mesh(tg, this.tileMat); m.userData.tile = i; m.renderOrder = 6; this.editGrid.add(m); }
+    this.editGrid.visible = false;
+    this.scene.add(this.editGrid);
+    this._ray = new THREE.Raycaster();
     // ghost preview
     this.ghostMat = new THREE.MeshBasicMaterial({ color: '#5fd4ff', transparent: true, opacity: 0.35, depthWrite: false });
     this.ghostEdge = new THREE.LineBasicMaterial({ color: '#bff0ff', transparent: true, opacity: 0.9 });
     this.ghost = new THREE.Group();
     this.ghostMeshes = {};
     for (const t of PIECES) {
-      const geo = t === 'wall' ? this.geo.wall[null] : this.geo[t];
+      const geo = t === 'wall' ? this.geo.wall[0] : this.geo[t];
       const m = new THREE.Mesh(geo, this.ghostMat);
       m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), this.ghostEdge));
       m.visible = false;
@@ -261,11 +318,11 @@ export class Building {
     const { type, cx, cz, y0 } = s;
     if (type === 'wall') {
       const h = 0.12;
-      return wallRects(s.edit).map(([a0, a1, b0, b1]) => (s.alongX
+      return wallRects(s.editMask).map(([a0, a1, b0, b1]) => (s.alongX
         ? { kind: 'box', minX: cx + a0, maxX: cx + a1, minZ: cz - h, maxZ: cz + h, y0: y0 + b0, y1: y0 + b1 }
         : { kind: 'box', minX: cx - h, maxX: cx + h, minZ: cz - a1, maxZ: cz - a0, y0: y0 + b0, y1: y0 + b1 }));
     }
-    if (type === 'floor') return [{ kind: 'box', minX: cx - 2, maxX: cx + 2, minZ: cz - 2, maxZ: cz + 2, y0: y0 - FLOOR_T, y1: y0 + 0.04 }];
+    if (type === 'floor') return floorRects(s.editMask).map(([a0, a1, b0, b1]) => ({ kind: 'box', minX: cx + a0, maxX: cx + a1, minZ: cz + b0, maxZ: cz + b1, y0: y0 - FLOOR_T, y1: y0 + 0.04 }));
     if (type === 'ramp') return [{ kind: 'ramp', minX: cx - 2, maxX: cx + 2, minZ: cz - 2, maxZ: cz + 2, y0, y1: y0 + HEIGHT, dirX: s.dirX, dirZ: s.dirZ }];
     return [{ kind: 'cone', minX: cx - 2, maxX: cx + 2, minZ: cz - 2, maxZ: cz + 2, y0, y1: y0 + CONE_H }];
   }
@@ -276,13 +333,13 @@ export class Building {
     if (!plan || actor.state !== 'ground' || !this.isValid(plan, actor, mat)) return null;
     const st = MAT_STATS[mat];
     const material = new THREE.MeshStandardMaterial({ map: this.tex[mat], roughness: mat === 'metal' ? 0.55 : 0.85, metalness: mat === 'metal' ? 0.25 : 0, transparent: true, opacity: 0.6 });
-    const geo = plan.type === 'wall' ? this.geo.wall[null] : this.geo[plan.type];
+    const geo = plan.type === 'wall' ? this.geo.wall[0] : this.geo[plan.type];
     const mesh = new THREE.Mesh(geo, material);
     this._place(mesh, plan);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     const s = {
-      ...plan, mat, mesh, edit: null, owner: actor,
+      ...plan, mat, mesh, edit: null, editMask: 0, owner: actor,
       maxHp: st.hp, hp: st.hp * st.start, buildT: 0, buildTime: st.time, grow: 0,
       base: mesh.position.clone(), baseRot: mesh.rotation.clone(),
     };
@@ -320,18 +377,62 @@ export class Building {
     return this.keys.get(p.key) || null;
   }
 
-  // Cycle a wall's edit (plain → door → window → plain), or set a specific one.
+  // Apply an edit: a preset name ('door', 'window', …), null to reset, or a raw 3x3 tile mask.
   edit(s, edit) {
-    if (!s || s.type !== 'wall' || s.falling) return null;
-    const next = edit !== undefined ? edit : EDITS[(EDITS.indexOf(s.edit) + 1) % EDITS.length];
-    if (next === s.edit) return next;
-    s.edit = next;
+    if (!s || s.falling || (s.type !== 'wall' && s.type !== 'floor')) return null;
+    const mask = edit == null ? 0 : typeof edit === 'number' ? edit : EDIT_PRESETS[edit] ?? 0;
+    if (mask === FULL_MASK) return s.edit;
+    if (mask === s.editMask) return s.edit;
+    s.editMask = mask;
+    s.edit = !mask ? null : Object.keys(EDIT_PRESETS).find((k) => EDIT_PRESETS[k] === mask) || 'custom';
     for (const c of s.cols) this.world.colliders.remove(c);
     s.cols = this._colliders(s);
     for (const c of s.cols) { c.dynamic = true; c.structure = s; this.world.colliders.add(c); }
-    s.mesh.geometry = this.geo.wall[next];
+    if (s.type === 'wall') s.mesh.geometry = this.geo.wall[mask] ||= wallGeometry(mask);
+    else s.mesh.geometry = this.geo.floorMask[mask] ||= floorGeometry(mask);
     this.game.sound.play('click', s.mesh.position);
-    return next;
+    return s.edit;
+  }
+
+  // Ramps don't have tiles: editing flips which way they climb.
+  flipRamp(s) {
+    if (!s || s.type !== 'ramp' || s.falling) return;
+    s.dirX = -s.dirX; s.dirZ = -s.dirZ;
+    for (const c of s.cols) this.world.colliders.remove(c);
+    s.cols = this._colliders(s);
+    for (const c of s.cols) { c.dynamic = true; c.structure = s; this.world.colliders.add(c); }
+    this._place(s.mesh, s);
+    s.base.copy(s.mesh.position);
+    this.game.sound.play('click', s.mesh.position);
+  }
+
+  // Edit-mode overlay: 9 tiles over the structure, selected ones in red.
+  showEditGrid(s, mask) {
+    const g = this.editGrid;
+    g.visible = !!s;
+    if (!s) return;
+    g.children.forEach((m, i) => {
+      const r = Math.floor(i / 3), c = i % 3;
+      const u = -2 + (c + 0.5) * TILE;
+      if (s.type === 'wall') {
+        const v = HEIGHT - (r + 0.5) * TILE;
+        m.rotation.set(0, s.alongX ? 0 : Math.PI / 2, 0);
+        if (s.alongX) m.position.set(s.cx + u, s.y0 + v, s.cz);
+        else m.position.set(s.cx, s.y0 + v, s.cz - u);
+      } else {
+        m.rotation.set(-Math.PI / 2, 0, 0);
+        m.position.set(s.cx + u, s.y0 + 0.12, s.cz - 2 + (r + 0.5) * TILE);
+      }
+      m.material = mask & (1 << i) ? this.tileSelMat : this.tileMat;
+    });    g.updateMatrixWorld(true);
+  }
+
+  // Which tile of the edit grid is under a ray (or -1).
+  pickTile(origin, dir) {
+    this._ray.set(origin, dir);
+    this._ray.far = 9;
+    const hit = this._ray.intersectObjects(this.editGrid.children, false)[0];
+    return hit ? hit.object.userData.tile : -1;
   }
 
   damage(s, amount) {

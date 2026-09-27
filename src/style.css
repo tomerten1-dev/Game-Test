@@ -172,6 +172,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1830; col
 .tbtn.floor { right: 296px; bottom: 72px; font-size: 11px; width: 54px; height: 54px; }
 .tbtn.cone { right: 360px; bottom: 112px; font-size: 11px; width: 54px; height: 54px; }
 .tbtn.mat { right: 104px; bottom: 176px; font-size: 11px; width: 50px; height: 50px; }
+.tbtn.edit { right: 160px; bottom: 196px; font-size: 11px; width: 50px; height: 50px; }
 
 body.touch #bottom-right { bottom: 8px; right: auto; left: 50%; transform: translateX(-50%); align-items: center; gap: 2px; }
 body.touch #weapon-name { font-size: 14px; }
@@ -427,3 +428,6 @@ body.touch .kbd { display: none; }
 .bar-row.stamina .bar { height: 7px; }
 .bar-row.stamina .bar-ico { font-size: 12px; color: #ffd23f; }
 #stamina-fill { background: linear-gradient(90deg, #ffe066, #ffb319); }
+
+#edit-hint { position: absolute; left: 50%; top: calc(50% + 70px); transform: translateX(-50%); padding: 6px 14px; border-radius: 10px; background: rgba(10,18,40,0.7); font-weight: 800; font-size: 15px; letter-spacing: 0.5px; color: #bff0ff; white-space: nowrap; }
+#edit-hint b { color: #ffd23f; }
