@@ -433,6 +433,7 @@ export class Game {
     this.loot.update(dt, this.time);
     this.building.update(dt);
     this.projectiles.update(dt);
+    this.combat.updateBursts(dt);
     if (this.warmup <= 0) this.events.update(dt, this.time);
     this.ambient.update(dt, this.time);
     for (const a of this.actors) {

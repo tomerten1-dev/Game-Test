@@ -19,11 +19,11 @@ export const WEAPONS = {
     key: 'ar', name: 'Assault Rifle', icon: 'AR', ammoType: 'medium',
     damage: 30, pellets: 1, rate: 5.5, mag: 30, reload: 2.2,
     spread: 0.007, bloom: 0.011, maxSpread: 0.055, recover: 0.18,
-    range: 230, falloffStart: 60, recoil: 0.014, idealRange: 34, shake: 0.14,
+    range: 230, falloffStart: 60, recoil: 0.014, idealRange: 34, shake: 0.14, drop: 380,
   },
   shotgun: {
-    key: 'shotgun', name: 'Shotgun', icon: 'SG', ammoType: 'shells',
-    damage: 11, pellets: 10, rate: 1.05, mag: 5, reload: 3.4,
+    key: 'shotgun', name: 'Tactical Shotgun', icon: 'TAC', ammoType: 'shells',
+    damage: 8.5, pellets: 10, rate: 1.45, mag: 8, reload: 4.2,
     spread: 0.075, bloom: 0, maxSpread: 0.075, recover: 1,
     range: 50, falloffStart: 9, recoil: 0.07, idealRange: 7, shake: 0.4,
   },
@@ -32,6 +32,18 @@ export const WEAPONS = {
     damage: 16, pellets: 1, rate: 12, mag: 30, reload: 2.0,
     spread: 0.02, bloom: 0.007, maxSpread: 0.08, recover: 0.25,
     range: 110, falloffStart: 22, recoil: 0.008, idealRange: 13, shake: 0.08,
+  },
+  pump: {
+    key: 'pump', name: 'Pump Shotgun', icon: 'PMP', ammoType: 'shells',
+    damage: 11.5, pellets: 10, rate: 0.8, mag: 5, reload: 4.6, headMult: 2,
+    spread: 0.058, bloom: 0, maxSpread: 0.058, recover: 1,
+    range: 45, falloffStart: 8, recoil: 0.09, idealRange: 6, shake: 0.5,
+  },
+  burst: {
+    key: 'burst', name: 'Burst Rifle', icon: 'BRS', ammoType: 'medium',
+    damage: 27, pellets: 1, rate: 2.4, mag: 30, reload: 2.4, burst: 3, burstGap: 0.075,
+    spread: 0.005, bloom: 0.006, maxSpread: 0.04, recover: 0.2,
+    range: 230, falloffStart: 70, recoil: 0.011, idealRange: 38, shake: 0.12, drop: 420,
   },
   sniper: {
     key: 'sniper', name: 'Sniper Rifle', icon: 'SNP', ammoType: 'heavy',
@@ -51,9 +63,9 @@ export const WEAPONS = {
 
 // Weighted loot tables: sniper and rocket are rare on the floor, likelier in rare chests / supply drops.
 const WEAPON_WEIGHTS = {
-  floor: { ar: 30, shotgun: 25, smg: 22, pistol: 20, sniper: 3, rocket: 0 },
-  chest: { ar: 30, shotgun: 26, smg: 20, pistol: 10, sniper: 9, rocket: 5 },
-  rare: { ar: 24, shotgun: 22, smg: 12, pistol: 0, sniper: 22, rocket: 20 },
+  floor: { ar: 24, burst: 8, shotgun: 13, pump: 12, smg: 22, pistol: 18, sniper: 3, rocket: 0 },
+  chest: { ar: 22, burst: 10, shotgun: 13, pump: 14, smg: 18, pistol: 8, sniper: 9, rocket: 5 },
+  rare: { ar: 16, burst: 10, shotgun: 8, pump: 16, smg: 10, pistol: 0, sniper: 20, rocket: 20 },
 };
 export function rollWeaponType(table = 'floor', rand = Math.random) {
   const w = WEAPON_WEIGHTS[table];

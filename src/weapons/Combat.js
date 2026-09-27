@@ -70,6 +70,9 @@ export class Combat {
     const spread = w.spread(moving, !shooter.onGround, { crouched: shooter.crouched, still: hs < 0.4, now: g.time, scoped: shooter.aiming && w.def.scope }) * (shooter.accuracyMult ?? 1);
     w.onFire(g.time);
     shooter.lastFireTime = g.time;
+    if (shooter.character) shooter.character.kick = Math.min(1, 0.35 + w.def.shake * 1.5);
+    // burst weapons queue the rest of the burst (fired by updateBursts)
+    if (w.def.burst && !this._inBurst) { w.burstLeft = w.def.burst - 1; w.burstT = w.def.burstGap; }
     shooter.sprinting = false;
     const def = w.def;
     if (def.projectile) {
@@ -92,14 +95,21 @@ export class Combat {
     const perTarget = new Map();
     for (let i = 0; i < def.pellets; i++) {
       coneDir(aimDir, spread, _dir);
-      const r = this.trace(origin, _dir, def.range, shooter);
+      let r = this.trace(origin, _dir, def.range, shooter);
+      // long-range rifles: bullets drop a little (re-trace along the sagging line)
+      if (def.drop && r.t > 50) {
+        const t = r.t / def.drop, sag = 0.5 * 9.8 * t * t;
+        _dir.y -= sag / r.t;
+        _dir.normalize();
+        r = this.trace(origin, _dir, def.range, shooter);
+      }
       _end.copy(origin).addScaledVector(_dir, r.t);
       if (i % 2 === 0 || def.pellets === 1) g.effects.tracer(muzzle, _end, shooter.isPlayer ? '#fff2b0' : '#ffd08a', def.pellets > 1 ? 0.03 : 0.045);
       if (r.actor) {
         const fall = 1 - 0.4 * Math.min(1, Math.max(0, (r.t - def.falloffStart) / (def.range - def.falloffStart)));
         // bots trade damage a bit slower with each other so matches last longer
         const botVsBot = !shooter.isPlayer && !r.actor.isPlayer ? 0.45 : 1;
-        const dmg = w.damage * fall * (r.head ? 1.5 : 1) * botVsBot;
+        const dmg = w.damage * fall * (r.head ? def.headMult || 1.5 : 1) * botVsBot;
         let e = perTarget.get(r.actor);
         if (!e) { e = { dmg: 0, head: false, point: _end.clone() }; perTarget.set(r.actor, e); }
         e.dmg += dmg;
@@ -128,6 +138,36 @@ export class Combat {
     }
     if (w.ammo <= 0) this.reload(shooter);
     return true;
+  }
+
+  // Fire the queued shots of burst weapons, re-aiming each one.
+  updateBursts(dt) {
+    const g = this.game;
+    for (const a of g.actors) {
+      const w = a.weapon;
+      if (!w || !w.burstLeft || !a.alive) continue;
+      w.burstT -= dt;
+      if (w.burstT > 0) continue;
+      if (w.ammo <= 0 || w.reloading || a.state !== 'ground') { w.burstLeft = 0; continue; }
+      w.burstLeft--;
+      w.burstT = w.def.burstGap;
+      let origin, dir;
+      if (a.isPlayer) {
+        dir = g.camera.getWorldDirection(_b);
+        origin = _a.copy(g.camera.position).addScaledVector(dir, g.rig.curDist + 0.25);
+      } else {
+        const cp = Math.cos(a.aimPitch);
+        dir = _b.set(Math.sin(a.aimYaw) * cp, Math.sin(a.aimPitch), Math.cos(a.aimYaw) * cp);
+        origin = a.eye(_a);
+      }
+      a.character.root.updateMatrixWorld(true);
+      const cd = w.cooldown;
+      w.cooldown = 0;
+      this._inBurst = true;
+      this.fire(a, origin.clone(), dir.clone(), a.muzzleWorld(_p).clone());
+      this._inBurst = false;
+      w.cooldown = Math.max(cd, w.cooldown);
+    }
   }
 
   reload(actor) {

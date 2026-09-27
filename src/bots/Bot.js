@@ -441,7 +441,8 @@ export class Bot extends Actor {
       if (!w || !w.isGun) continue;
       const k = w.def.key;
       let s = w.score;
-      if (k === 'shotgun') s *= d < 10 ? 2.5 : d < 18 ? 0.8 : 0.1;
+      if (k === 'shotgun' || k === 'pump') s *= d < 10 ? 2.5 : d < 18 ? 0.8 : 0.1;
+      else if (k === 'burst') s *= d > 15 ? 1.5 : 0.9;
       else if (k === 'smg') s *= d < 22 ? 1.4 : 0.6;
       else if (k === 'ar') s *= d > 15 ? 1.5 : 0.9;
       else if (k === 'sniper') s *= d > 45 ? 2.2 : d > 25 ? 1 : 0.15;
@@ -614,7 +615,7 @@ export class Bot extends Actor {
       this.reactionT -= dt;
       const d = _dir.length();
       const w = this.weapon;
-      if (this.reactionT <= 0 && w && Math.abs(dy) < 0.12 && d < w.def.range * 0.8 && !(w.def.key === 'shotgun' && d > 20)) {
+      if (this.reactionT <= 0 && w && Math.abs(dy) < 0.12 && d < w.def.range * 0.8 && !(w.def.pellets > 1 && d > 20)) {
         // burst pacing so bots aren't lasers
         if (this.pauseT > 0) this.pauseT -= dt;
         else {

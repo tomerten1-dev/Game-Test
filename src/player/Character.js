@@ -177,7 +177,11 @@ export class Character {
         this.root.worldToLocal(_v);
         this.weaponHolder.position.copy(_v);
       }
-      this.weaponHolder.rotation.set(-pitch, 0, 0);
+      // recoil kick: the gun jumps back and up, then settles
+      this.kick = Math.max(0, (this.kick || 0) - dt * 7);
+      const k = this.kick * this.kick;
+      this.weaponHolder.rotation.set(-pitch - k * 0.35, 0, 0);
+      this.weaponHolder.translateZ(-k * 0.14);
     }
   }
 

@@ -30,6 +30,23 @@ function build(type, rarity) {
     p.push(part(BOX(0.05, 0.14, 0.06), MID, mat(0, -0.1, 0.02, -0.25, 0, 0)));
     p.push(part(BOX(0.05, 0.05, 0.14), '#1d2027', mat(0, 0.14, 0.14)));
     muzzle = 0.78; foregrip = 0.38;
+  } else if (type === 'pump') {
+    p.push(part(BOX(0.09, 0.1, 0.46), '#3b2a1c', mat(0, 0.0, 0.1)));
+    p.push(part(CYL(0.034, 0.66), DARK, mat(0, 0.05, 0.46, Math.PI / 2, 0, 0)));
+    p.push(part(CYL(0.045, 0.2, 10), '#8a5a2b', mat(0, -0.01, 0.52, Math.PI / 2, 0, 0)));
+    p.push(part(BOX(0.095, 0.06, 0.12), acc, mat(0, 0.07, -0.02)));
+    p.push(part(BOX(0.07, 0.16, 0.28), '#3b2a1c', mat(0, -0.05, -0.24, 0.22, 0, 0)));
+    muzzle = 0.8; foregrip = 0.5;
+  } else if (type === 'burst') {
+    p.push(part(BOX(0.085, 0.13, 0.6), '#39414f', mat(0, 0.02, 0.2)));
+    p.push(part(BOX(0.09, 0.045, 0.5), acc, mat(0, 0.1, 0.2)));
+    p.push(part(CYL(0.024, 0.26, 8), DARK, mat(0, 0.03, 0.64, Math.PI / 2, 0, 0)));
+    p.push(part(BOX(0.06, 0.08, 0.16), '#1d2027', mat(0, 0.17, 0.12)));
+    p.push(part(CYL(0.03, 0.12, 8), '#6fd0ff', mat(0, 0.17, 0.21, Math.PI / 2, 0, 0)));
+    p.push(part(BOX(0.06, 0.2, 0.08), DARK, mat(0, -0.12, 0.24, 0.2, 0, 0)));
+    p.push(part(BOX(0.05, 0.14, 0.06), MID, mat(0, -0.1, 0.03, -0.25, 0, 0)));
+    p.push(part(BOX(0.07, 0.11, 0.22), '#39414f', mat(0, 0.0, -0.2)));
+    muzzle = 0.78; foregrip = 0.4;
   } else if (type === 'shotgun') {
     p.push(part(BOX(0.09, 0.11, 0.5), '#6b4a2e', mat(0, 0.0, 0.12)));
     p.push(part(CYL(0.035, 0.6), DARK, mat(0, 0.05, 0.45, Math.PI / 2, 0, 0)));
