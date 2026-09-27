@@ -138,6 +138,7 @@ const _up = new THREE.Vector3(0, 1, 0);
 export class Effects {
   constructor(scene, camera, uiRoot) {
     this.scene = scene;
+    this.scene = scene;
     this.camera = camera;
     this.sparks = new Particles(scene, 1400, true);
     this.debris = new Particles(scene, 1000, false);
@@ -283,6 +284,26 @@ export class Effects {
       _c.copy(c).multiplyScalar(0.7);
       this.debris.emit(pos.x, pos.y + 1, pos.z, (Math.random() - 0.5) * 8, 3 + Math.random() * 6, (Math.random() - 0.5) * 8, _c, 1.0 + Math.random() * 0.5, 0.14, 16);
     }
+    // "beam up": a light pillar and sparks streaming skyward
+    for (let i = 0; i < 60; i++) {
+      const a = Math.random() * Math.PI * 2, rr = Math.random() * 0.6;
+      _c.copy(c).lerp(new THREE.Color('#ffffff'), 0.3 + Math.random() * 0.4);
+      this.sparks.emit(pos.x + Math.cos(a) * rr, pos.y + Math.random() * 1.8, pos.z + Math.sin(a) * rr, 0, 4 + Math.random() * 9, 0, _c, 0.9 + Math.random() * 0.8, 0.12 + Math.random() * 0.1, -2);
+    }
+    if (!this.pillars) this.pillars = [];
+    let pl = this.pillars.find((x) => x.life <= 0);
+    if (!pl) {
+      if (this.pillars.length < 8) {
+        const m = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 40, 16, 1, true).translate(0, 20, 0), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+        this.scene.add(m);
+        pl = { mesh: m, life: 0 };
+        this.pillars.push(pl);
+      } else pl = this.pillars[0];
+    }
+    pl.mesh.position.set(pos.x, pos.y, pos.z);
+    pl.mesh.material.color.copy(c).lerp(new THREE.Color('#ffffff'), 0.4).multiplyScalar(1.6);
+    pl.mesh.visible = true;
+    pl.life = 1.4;
     const r = this.rings.find((x) => x.life <= 0) || this.rings[0];
     r.mesh.position.set(pos.x, pos.y + 0.3, pos.z);
     r.mesh.material.color.copy(c).lerp(new THREE.Color('#ffffff'), 0.3).multiplyScalar(2);
@@ -332,6 +353,14 @@ export class Effects {
   }
 
   update(dt) {
+    for (const pl of this.pillars || []) {
+      if (pl.life <= 0) continue;
+      pl.life -= dt;
+      const k = Math.max(0, pl.life / 1.4);
+      pl.mesh.material.opacity = 0.6 * k;
+      pl.mesh.scale.set(0.4 + k * 0.8, 1, 0.4 + k * 0.8);
+      if (pl.life <= 0) pl.mesh.visible = false;
+    }
     this.sparks.update(dt);
     this.debris.update(dt);
     const h = window.innerHeight * this.camera.projectionMatrix.elements[5] * 0.5;

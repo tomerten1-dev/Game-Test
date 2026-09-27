@@ -471,6 +471,14 @@ export class Actor {
       this.glider.rotation.z = Math.sin(this.game.time * 1.3) * 0.05;
     }
     if ((this.state === 'skydive' || this.state === 'glide') && this.trail && this.distToCam < 90) this._emitTrail();
+    if (this.state === 'dead' && this.beamT > 0) {
+      this.beamT -= dt;
+      const k = Math.max(0, this.beamT / 1.1);
+      const s = this.npc === 'boss' ? 1.3 : 1;
+      this.root.scale.set(s * (0.3 + 0.7 * k), s * (1 + (1 - k) * 0.6), s * (0.3 + 0.7 * k));
+      ch.flash((1 - k) * 1.5);
+      if (this.beamT <= 0) { this.root.visible = false; this.root.scale.setScalar(s); ch.flash(0); this.hiddenCorpse = true; }
+    }
     if (this.state === 'ground' || this.state === 'dead') ch.model.position.y = damp(ch.model.position.y, ch.footOffset - this.crouchAmt * 0.3 - (this.slideT > 0 ? 0.25 : 0), 10, dt);
     this.root.rotation.y = this.bodyYaw;
 
@@ -482,7 +490,7 @@ export class Actor {
     const d = this.distToCam;
     if (!this.isPlayer && this.state !== 'bus') {
       _sph.center.set(this.pos.x, this.pos.y + 1, this.pos.z);
-      const visible = d < 300 && (!this.game.frustum || this.game.frustum.intersectsSphere(_sph));
+      const visible = !this.hiddenCorpse && d < 300 && (!this.game.frustum || this.game.frustum.intersectsSphere(_sph));
       this.root.visible = visible;
       if (!visible) { this._animAcc = Math.min(0.2, this._animAcc + dt); return; }
     }
@@ -577,6 +585,8 @@ export class Actor {
   // Warm-up respawn: back on your feet somewhere else with a fresh loadout slot.
   revive(x, z) {
     this.alive = true;
+    this.beamT = 0;
+    if (this.hiddenCorpse) { this.hiddenCorpse = false; this.root.visible = true; }
     this.health = 100;
     this.shield = 0;
     this.killer = null;
@@ -591,6 +601,7 @@ export class Actor {
     if (!this.alive) return;
     this.alive = false;
     this.setState('dead');
+    this.beamT = this.isPlayer ? 0 : 1.1; // bots dissolve upward shortly after going down
     this.killer = killer;
     this.game.onActorDied?.(this, killer);
   }

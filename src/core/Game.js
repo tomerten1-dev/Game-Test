@@ -258,6 +258,7 @@ export class Game {
   }
 
   startMatch() {
+    this.cinematic = null;
     for (const a of this.actors) a.destroy();
     this.actors = [];
     this.effects.clear();
@@ -412,6 +413,7 @@ export class Game {
   }
 
   update(dt) {
+    if (this.cinematic) dt *= this.cinematic.t < 2.2 ? 0.35 : 0.8;
     this.time += dt;
     if (this.input.pressed('mute')) this.hud.toast(this.sound.toggleMute() ? 'Sound off' : 'Sound on');
     const p = this.player;
@@ -483,6 +485,7 @@ export class Game {
     this.hud.scope?.(inScope);
     if (p.state === 'ground') p.root.visible = !inScope; // your own hero would block the scope view
     this.rig.update(dt, view.state === 'bus' ? this.bus.mesh.position : view.pos, mode);
+    if (this.cinematic) this._victoryCam(dt);
     // one frustum per frame for character culling
     this.camera.updateMatrixWorld();
     _projView.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
@@ -707,6 +710,18 @@ export class Game {
     if (this.warmup <= 0) this.beginBus();
   }
 
+  _victoryCam(dt) {
+    const c = this.cinematic, p = this.player;
+    c.t += dt / (c.t < 2.2 ? 0.35 : 0.8);
+    c.yaw += dt * 1.2;
+    const r = 5.5 - Math.min(1.5, c.t * 0.4);
+    this.camera.position.set(p.pos.x + Math.sin(c.yaw) * r, p.pos.y + 2 + Math.sin(c.t * 0.8) * 0.4, p.pos.z + Math.cos(c.yaw) * r);
+    this.camera.lookAt(p.pos.x, p.pos.y + 1.2, p.pos.z);
+    if (this.camera.fov !== 55) { this.camera.fov = 55; this.camera.updateProjectionMatrix(); }
+    p.bodyYaw = Math.atan2(this.camera.position.x - p.pos.x, this.camera.position.z - p.pos.z);
+    if (c.t > c.dur) this.cinematic = null;
+  }
+
   startSpectate(actor) {
     this.spectating = actor;
     this.hud.showSpectate(actor);
@@ -793,10 +808,13 @@ export class Game {
       setTimeout(() => this.finishSpectate(), 2500);
     } else if (p.alive && this.aliveCount === 1) {
       p.victory = true;
-      this.hud.banner('#1 VICTORY!', 3);
+      this.hud.banner('#1 VICTORY!', 4);
       this.effects.confetti(p.pos);
       setTimeout(() => this.effects.confetti(p.pos), 700);
-      this.endMatch(true, 1, null);
+      setTimeout(() => this.effects.confetti(p.pos), 1600);
+      // slow-motion orbit around the winner before the results
+      this.cinematic = { t: 0, dur: 5, yaw: this.rig.yaw };
+      this.endMatch(true, 1, null, 5200);
     }
   }
 
