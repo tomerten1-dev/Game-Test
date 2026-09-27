@@ -7,7 +7,7 @@ import { itemGeometry } from '../weapons/WeaponModels.js';
 import { makeWeaponMesh, makeAmmoBoxMesh, makeAmmoPickupMesh, makeThrowableMesh } from '../weapons/WeaponModels.js';
 import { mulberry32 } from '../core/noise.js';
 import { makeConsumableMesh } from './ItemMeshes.js';
-import { AMMO, MATS, CONSUMABLES } from '../weapons/Items.js';
+import { AMMO, MATS, CONSUMABLES, Consumable } from '../weapons/Items.js';
 
 // Loadout roles smart bots try to fill: one close-range gun, one rifle, one long-range, one explosive.
 const ROLE = { shotgun: 'close', pump: 'close', smg: 'close', ar: 'mid', burst: 'mid', sniper: 'long', rocket: 'boom', pistol: 'side' };
@@ -426,8 +426,11 @@ export class Loot {
       if (free > 0) actor.giveWeapon(p.weapon, free);
       else {
         let slot;
-        if (actor.isPlayer) slot = actor.slot > 0 ? actor.slot : 1;
-        else {
+        if (actor.isPlayer) {
+          // full: swap with whatever you're holding (the axe can't be swapped out)
+          if (actor.slot <= 0) return 'Inventory full · select the slot to swap';
+          slot = actor.slot;
+        } else {
           // bots replace their weakest gun (smart bots: the weakest in the same role, else a doubled-up role)
           slot = 1;
           let worst = Infinity;
@@ -442,8 +445,18 @@ export class Loot {
       }
       if (actor.isPlayer) g.sound.play('pickup');
     } else if (p.type === 'consumable') {
-      const left = actor.addConsumable(p.ctype, p.count);
-      if (left === p.count) return 'Inventory full';
+      let left = actor.addConsumable(p.ctype, p.count);
+      if (left === p.count && actor.isPlayer) {
+        // no room: swap it with the held item, like a gun
+        if (actor.slot <= 0) return 'Inventory full · select the slot to swap';
+        const old = actor.items[actor.slot];
+        if (old?.isGun || old?.isConsumable) this.dropItem(old, actor);
+        const n = Math.min(p.count, CONSUMABLES[p.ctype].max);
+        actor.items[actor.slot] = new Consumable(p.ctype, n);
+        actor.useT = 0;
+        actor._equip();
+        left = p.count - n;
+      } else if (left === p.count) return 'Inventory full';
       if (actor.isPlayer) g.sound.play('pickup');
       if (left > 0) { p.count = left; return null; }
     } else if (p.type === 'ammo') {

@@ -20,7 +20,7 @@ export class Inventory {
             <div><div class="inv-sub">Materials</div><div id="inv-mats" class="inv-list"></div></div>
             <div><div class="inv-sub">Ammo</div><div id="inv-ammo" class="inv-list"></div></div>
           </div>
-          <div class="inv-help">Drag a slot onto another to swap · <span id="inv-key"></span> or Esc: close</div>
+          <div class="inv-help">Drag a slot onto another to swap, or out of the row to drop it · <span id="inv-key"></span> or Esc: close</div>
           <button id="inv-close" class="btn">CLOSE</button>
         </div>
       </div>`);
@@ -51,14 +51,16 @@ export class Inventory {
     window.addEventListener('pointerup', () => { this.pointerDown = false; });
     this.slotsEl.addEventListener('dragstart', (e) => { const s = e.target.closest('[data-slot]'); if (s) { this.dragging = true; e.dataTransfer.setData('text/plain', s.dataset.slot); } });
     this.slotsEl.addEventListener('dragend', () => { this.dragging = false; this.pointerDown = false; });
-    this.slotsEl.addEventListener('dragover', (e) => e.preventDefault());
-    this.slotsEl.addEventListener('drop', (e) => {
+    // drop on another slot: swap; drop anywhere else on the screen: throw the item out
+    this.el.addEventListener('dragover', (e) => e.preventDefault());
+    this.el.addEventListener('drop', (e) => {
       e.preventDefault();
       this.dragging = false;
-      const to = e.target.closest('[data-slot]');
       const from = +e.dataTransfer.getData('text/plain');
-      if (!to || Number.isNaN(from)) return;
-      if (this.game.swapSlots(from, +to.dataset.slot)) this.sel = +to.dataset.slot;
+      if (Number.isNaN(from) || from <= 0) return;
+      const to = e.target.closest('[data-slot]');
+      if (to) { if (this.game.swapSlots(from, +to.dataset.slot)) this.sel = +to.dataset.slot; }
+      else if (!e.target.closest('.inv-slots')) { this.game.dropFromSlot(from, Infinity); this.sel = -1; }
       this.render();
     });
   }
