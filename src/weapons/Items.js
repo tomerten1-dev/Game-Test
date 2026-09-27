@@ -30,6 +30,9 @@ export const CONSUMABLES = {
   smoke: { name: 'Smoke Grenade', throw: 'smoke', max: 4, stack: 2, icon: '☁', color: '#c9d3dc', radius: 6.5, fuse: 1.4, duration: 12 },
   impulse: { name: 'Impulse Grenade', throw: 'impulse', max: 4, stack: 2, icon: '✺', color: '#6fd0ff', radius: 6, fuse: 1.1, push: 17 },
   fire: { name: 'Fire Flask', throw: 'fire', max: 4, stack: 2, icon: '♨', color: '#ff8a2a', radius: 3.6, fuse: 1.2, duration: 6, dps: 14 },
+  shockwave: { name: 'Shockwave Grenade', throw: 'shockwave', max: 6, stack: 2, icon: 'SHK', color: '#8f7bff', radius: 5.5, fuse: 3, push: 30, impact: true, desc: 'Launches everyone nearby (you too) · no fall damage' },
+  grappler: { name: 'Grappler', grapple: true, max: 10, stack: 10, icon: 'GRP', color: '#ffd23f', desc: 'Pull yourself to where you aim · 10 charges' },
+  rift: { name: 'Rift-to-Go', rift: true, time: 0.6, max: 1, stack: 1, icon: 'RFT', color: '#c86bff', desc: 'Warp high into the sky and glide' },
   launchpad: { name: 'Launch Pad', place: 'launchpad', max: 1, stack: 1, icon: '⇑', color: '#ffcf3f', desc: 'Place it: launch into the air and glide' },
   keycard: { name: 'Vault Keycard', key: true, max: 1, stack: 1, icon: '⌘', color: '#ffe94d' },
 };
@@ -61,7 +64,7 @@ export class Consumable {
   // Can this actor benefit right now?
   usableBy(a) {
     const d = this.def;
-    if (d.throw || d.place || d.key) return true;
+    if (d.throw || d.place || d.key || d.grapple || d.rift) return true;
     if (d.heal && d.shield) return a.health < d.cap || a.shield < d.cap;
     if (d.heal) return a.health < d.cap;
     return a.shield < d.cap;
@@ -71,6 +74,7 @@ export class Consumable {
     const d = this.def;
     // Slurp: a pool that tops up health first, then shield
     if (d.overTime) { a.regen = { left: d.heal, rate: d.overTime, acc: 0 }; return; }
+    if (d.rift) { a.riftUp(); return; }
     if (d.heal) a.health = Math.max(a.health, Math.min(d.cap, a.health + d.heal));
     if (d.shield) a.shield = Math.max(a.shield, Math.min(d.cap, a.shield + d.shield));
   }

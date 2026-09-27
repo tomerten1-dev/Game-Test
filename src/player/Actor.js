@@ -231,6 +231,47 @@ export class Actor {
     if (this.mantleT <= 0) { this.pos.copy(this.mantleTo); this.onGround = true; this.vel.set(0, 0, 0); }
   }
 
+  // Rift-to-Go: warp up into the sky and skydive / glide from there.
+  riftUp() {
+    if (this.state !== 'ground') return;
+    this.setBuildMode?.(null);
+    this.useT = 0;
+    this.game.effects.shieldBreak?.(this.chest(new THREE.Vector3()));
+    this.pos.y = Math.max(this.pos.y + 55, this.game.world.heightAt(this.pos.x, this.pos.z) + 60);
+    this.vel.set(0, 0, 0);
+    this.onGround = false;
+    this.noFallT = 10;
+    this.setState('skydive');
+  }
+
+  // Grappler: fly in a straight line to a point.
+  startGrapple(to) {
+    if (this.state !== 'ground') return false;
+    this.grapple = { to: to.clone(), t: 1.8 };
+    this.onGround = false;
+    this.crouched = false;
+    this.slideT = 0;
+    return true;
+  }
+
+  _updateGrapple(dt) {
+    const g = this.grapple;
+    g.t -= dt;
+    const dx = g.to.x - this.pos.x, dy = g.to.y - this.pos.y - 0.4, dz = g.to.z - this.pos.z;
+    const len = Math.hypot(dx, dy, dz);
+    if (len < 1.4 || g.t <= 0) {
+      this.grapple = null;
+      this.vel.multiplyScalar(0.35);
+      this.vel.y = Math.max(this.vel.y, 6);
+      this.noFallT = 3;
+      return;
+    }
+    this.vel.set((dx / len) * 32, (dy / len) * 32, (dz / len) * 32);
+    this.game.world.moveBody(this, dt, 0);
+    // blocked by something on the way: let go
+    if (Math.hypot(this.vel.x, this.vel.y, this.vel.z) < 4 && g.t < 1.6) g.t = 0;
+  }
+
   // Launch pad: fly up and redeploy the glider.
   launch(vy = 40) {
     if (this.state !== 'ground') return;
@@ -311,6 +352,7 @@ export class Actor {
       return;
     }
     if (this.state === 'ground' && this.mantleT > 0) { this._updateMantle(dt); return; }
+    if (this.state === 'ground' && this.grapple) { this._updateGrapple(dt); return; }
     if (this.state === 'ground') {
       const mlen = Math.hypot(it.mx, it.mz);
       if (this.emote && (mlen > 0.2 || it.jump || this.slideT > 0)) this.emote = null;
@@ -324,7 +366,9 @@ export class Actor {
       let speed = this.sprinting ? (this.tacSprint ? TAC_SPRINT_SPEED : SPRINT_SPEED) : this.crouched ? CROUCH_SPEED : RUN_SPEED;
       if (this.useT > 0 && !this.useItem?.def.mobile) speed = Math.min(speed, 3.2);
       if (this.inWater) speed *= this.groundY < -1.2 ? 0.5 : 0.65;
-      const k = this.onGround ? 14 : 3;
+      // flung by a shockwave: keep the momentum instead of braking in the air
+      if (this.flungT > 0) this.flungT -= dt;
+      const k = this.onGround ? 14 : this.flungT > 0 ? 0.35 : 3;
       if (this.slideT > 0) {
         this.slideT -= dt;
         const sp = 3 + 9 * Math.max(0, this.slideT / SLIDE_TIME);

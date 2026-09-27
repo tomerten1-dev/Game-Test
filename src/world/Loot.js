@@ -285,7 +285,7 @@ export class Loot {
     const r = Math.random();
     const table = [
       ['bandage', 20], ['smallshield', 15], ['bigshield', 13], ['medkit', 9], ['medmist', 6], ['slurp', 5], ['chug', 2], ['keg', 2], ['campfire', 3],
-      ['grenade', 8], ['smoke', 3], ['impulse', 3], ['fire', 3], ['launchpad', 2],
+      ['grenade', 8], ['smoke', 3], ['impulse', 3], ['fire', 3], ['launchpad', 2], ['shockwave', 3], ['grappler', 2], ['rift', 1.5],
     ];
     let k = r * table.reduce((a, t) => a + t[1], 0), type = table[0][0];
     for (const [t, w] of table) { if ((k -= w) <= 0) { type = t; break; } }
@@ -343,7 +343,7 @@ export class Loot {
       mesh.position.y = 0.4;
       color = CONSUMABLES[item.ctype].color;
     } else {
-      const geo = { bandage: this.itemGeo.bandage, medkit: this.itemGeo.med, smallshield: this.itemGeo.small, bigshield: this.itemGeo.shield, grenade: itemGeometry('grenade'), launchpad: itemGeometry('launchpad') }[item.ctype] || this.itemGeo[item.ctype] || this.itemGeo.small;
+      const geo = { bandage: this.itemGeo.bandage, medkit: this.itemGeo.med, smallshield: this.itemGeo.small, bigshield: this.itemGeo.shield, grenade: itemGeometry('grenade'), launchpad: itemGeometry('launchpad'), shockwave: itemGeometry('shockwave'), grappler: itemGeometry('grappler'), rift: itemGeometry('rift') }[item.ctype] || this.itemGeo[item.ctype] || this.itemGeo.small;
       mesh = new THREE.Mesh(geo, this.itemMat);
       mesh.position.y = 0.3;
       color = CONSUMABLES[item.ctype].color;
@@ -535,7 +535,7 @@ export class Loot {
         const d2 = CONSUMABLES[p.ctype];
         const room = hasFree || actor.items.some((it) => it?.isConsumable && it.type === p.ctype && it.count < d2.max);
         const carried = actor.items.reduce((n, it) => n + (it?.isConsumable ? 1 : 0), 0);
-        s = !room ? 0 : (d2.heal ? (actor.health < 70 ? 1.8 : 0.9) : d2.shield ? 1.2 : d2.throw ? 0.8 : 0) - carried * 0.25;
+        s = !room ? 0 : (d2.heal ? (actor.health < 70 ? 1.8 : 0.9) : d2.shield ? 1.2 : d2.throw || d2.rift ? 0.8 : 0) - carried * 0.25;
         if (guns.length === 0) s *= 0.5; // a gun first
       } else if (p.type === 'mat') s = actor.wood < 60 && p.matType === 'wood' ? 0.6 : 0;
       if (p.type === 'weapon' && guns.length === 0) s = 3;

@@ -449,6 +449,7 @@ export class Bot extends Actor {
     if (zoneGoal) {
       this.setGoal(zoneGoal.x, zoneGoal.z);
       this.mode = 'zone';
+      this._rotateWithItems(zoneGoal);
       return;
     }
     // loot (search further when unarmed)
@@ -550,6 +551,24 @@ export class Bot extends Actor {
     this.throwHeld(_dir);
     this._chooseWeapon(this.target ? this.pos.distanceTo(this.target.pos) : 30);
     return true;
+  }
+
+  // Far from a closing zone: rift out, or shockwave ourselves toward it.
+  _rotateWithItems(zg) {
+    const g = this.game;
+    if (!zg.urgent || this.useT > 0 || !this.onGround || (this.mobCd || 0) > g.time) return;
+    const dx = zg.x - this.pos.x, dz = zg.z - this.pos.z, d = Math.hypot(dx, dz);
+    const rift = this.items.findIndex((it) => it?.def?.rift);
+    if (rift > 0 && d > 90) {
+      this.switchSlot(rift);
+      if (this.startUse()) { this.dropTarget.set(zg.x, 0, zg.z); this.mobCd = g.time + 3; }
+      return;
+    }
+    if (d > 40) {
+      // a shockwave just behind us throws us forward
+      _v.set(this.pos.x - (dx / d) * 2, this.pos.y, this.pos.z - (dz / d) * 2);
+      if (this._throwAt(['shockwave'], _v)) this.mobCd = g.time + 3;
+    }
   }
 
   _enemyNear(r) {

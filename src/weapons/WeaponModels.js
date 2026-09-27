@@ -147,7 +147,26 @@ const itemGeoCache = {};
 export function itemGeometry(kind) {
   if (itemGeoCache[kind]) return itemGeoCache[kind];
   let g;
-  if (kind === 'grenade') {
+  if (kind === 'shockwave') {
+    g = merge([
+      part(new THREE.SphereGeometry(0.12, 14, 10), '#8f7bff', mat(0, 0.12, 0)),
+      part(new THREE.TorusGeometry(0.125, 0.02, 6, 16), '#e6e0ff', mat(0, 0.12, 0, Math.PI / 2, 0, 0)),
+      part(new THREE.TorusGeometry(0.125, 0.02, 6, 16), '#e6e0ff', mat(0, 0.12, 0)),
+    ]);
+  } else if (kind === 'grappler') {
+    g = merge([
+      part(new THREE.BoxGeometry(0.1, 0.12, 0.36), '#3a3f4a', mat(0, 0.1, 0)),
+      part(new THREE.BoxGeometry(0.06, 0.14, 0.07), '#2b2f38', mat(0, 0.0, -0.1, -0.25, 0, 0)),
+      part(new THREE.CylinderGeometry(0.05, 0.05, 0.12, 10), '#ffd23f', mat(0, 0.12, 0.22, Math.PI / 2, 0, 0)),
+      part(new THREE.ConeGeometry(0.06, 0.1, 4), '#c9d6e8', mat(0, 0.12, 0.32, Math.PI / 2, 0, 0)),
+    ]);
+  } else if (kind === 'rift') {
+    g = merge([
+      part(new THREE.SphereGeometry(0.14, 14, 10), '#c86bff', mat(0, 0.16, 0)),
+      part(new THREE.TorusGeometry(0.2, 0.025, 6, 20), '#f0d4ff', mat(0, 0.16, 0, Math.PI / 2 - 0.4, 0, 0)),
+      part(new THREE.CylinderGeometry(0.09, 0.11, 0.05, 10), '#3a2a55', mat(0, 0.02, 0)),
+    ]);
+  } else if (kind === 'grenade') {
     g = merge([
       part(new THREE.SphereGeometry(0.11, 12, 10), '#5f8f3e', mat(0, 0.11, 0)),
       part(new THREE.CylinderGeometry(0.045, 0.05, 0.06, 8), '#3a3f47', mat(0, 0.23, 0)),

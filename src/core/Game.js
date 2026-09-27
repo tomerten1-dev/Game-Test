@@ -634,6 +634,10 @@ export class Game {
       if (input.pressed('fire')) this.hud.toast?.('Take it to the vault at Rusty Works');
       return;
     }
+    if (held.isConsumable && held.def.grapple) {
+      if (input.pressed('fire')) this.fireGrapple(p);
+      return;
+    }
     if (held.isConsumable && held.def.place) {
       if (input.pressed('fire')) {
         if (this.events.placeItem(p, held.def.place)) p.consumeHeld();
@@ -762,12 +766,40 @@ export class Game {
   }
 
   // Channel the held consumable; finishing applies it and uses up one from the stack.
+  // Grappler: pull toward the surface under the crosshair (up to 60 m).
+  fireGrapple(p) {
+    if (p.grapple) return;
+    const dir = this.camera.getWorldDirection(_dir);
+    const o = _origin.copy(this.camera.position).addScaledVector(dir, this.rig.curDist);
+    const hit = this.world.raycast(o, dir, 60, {});
+    if (!hit) { this.hud.toast?.('Too far to grapple'); return; }
+    const to = o.clone().addScaledVector(dir, Math.max(0, hit.t - 0.6));
+    if (p.startGrapple(to)) { p.consumeHeld(); this.sound.play('launch'); }
+  }
+
+  _updateGrappleLine() {
+    const p = this.player, g = p?.grapple;
+    if (!this._cable) {
+      this._cable = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: '#ffd23f' }));
+      this._cable.frustumCulled = false;
+      this.scene.add(this._cable);
+    }
+    this._cable.visible = !!g;
+    if (!g) return;
+    const a = this._cable.geometry.attributes.position;
+    const c = p.chest(_v1);
+    a.setXYZ(0, c.x, c.y + 0.3, c.z);
+    a.setXYZ(1, g.to.x, g.to.y, g.to.z);
+    a.needsUpdate = true;
+  }
+
   updateConsumable(dt) {
     const p = this.player;
+    this._updateGrappleLine();
     const it = p.tickUse(dt);
     if (!it) return;
-    this.meta.track('heal');
-    this.sound.play(it.def.heal ? 'heal' : 'shield');
+    if (!it.def.rift) this.meta.track('heal');
+    this.sound.play(it.def.rift ? 'launch' : it.def.heal ? 'heal' : 'shield');
     if (it.count > 0 && p.held === it && this.input.down('fire')) p.startUse();
   }
 
@@ -935,7 +967,7 @@ export class Game {
   }
 }
 
-const _dir = new THREE.Vector3(), _origin = new THREE.Vector3(), _muzzle = new THREE.Vector3();
+const _dir = new THREE.Vector3(), _origin = new THREE.Vector3(), _muzzle = new THREE.Vector3(), _v1 = new THREE.Vector3();
 const _projView = new THREE.Matrix4();
 
 export const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));

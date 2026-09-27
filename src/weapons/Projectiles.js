@@ -50,7 +50,7 @@ export class Projectiles {
     vel.y += 5;
     vel.x += owner.vel.x * 0.4; vel.z += owner.vel.z * 0.4;
     let mesh = makeThrowableMesh(kind);
-    if (!mesh) { mesh = new THREE.Mesh(itemGeometry('grenade'), this.grenadeMat); mesh.scale.setScalar(1.3); }
+    if (!mesh) { mesh = new THREE.Mesh(itemGeometry(kind === 'shockwave' ? 'shockwave' : 'grenade'), this.grenadeMat); mesh.scale.setScalar(1.3); }
     mesh.traverse((o) => { o.castShadow = true; });
     this.game.sound.play('throw', owner.isPlayer ? null : owner.pos, { range: 40 });
     return this._add({
@@ -74,6 +74,8 @@ export class Projectiles {
       g.sound.play('explosion', pos, { range: 60, vol: 0.5 });
     } else if (p.nade === 'impulse') {
       impulse(g, pos, def.radius, def.push);
+    } else if (p.nade === 'shockwave') {
+      impulse(g, pos, def.radius, def.push, true);
     }
   }
 
@@ -176,7 +178,8 @@ export class Projectiles {
       _pt.copy(_prev).addScaledVector(_dir, r.t);
       if (p.kind === 'bullet') { g.effects.tracer(_prev, _pt, '#fff2b0', 0.05); this._bulletHit(p, r, _pt); return; }
       if (p.kind === 'rocket') { this._explode(p, _pt.addScaledVector(_dir, -0.3)); return; }
-      // grenade: bounce
+      // shockwaves go off on impact; other throwables bounce
+      if (p.def?.impact) { p.pos.copy(_pt).addScaledVector(_dir, -0.2); this._detonate(p); return; }
       this._normal(r, _pt, _n);
       p.pos.copy(_pt).addScaledVector(_n, 0.08);
       const vn = p.vel.dot(_n);
@@ -279,7 +282,7 @@ export function explode(game, pos, owner, damage, radius, structureDamage) {
 }
 
 // Impulse grenade: no damage, flings everyone nearby (including the thrower) away from the blast.
-export function impulse(game, pos, radius, push) {
+export function impulse(game, pos, radius, push, shockwave = false) {
   const fx = game.effects;
   for (let i = 0; i < 50; i++) {
     const a = Math.random() * Math.PI * 2, u = Math.random() * 2 - 1, s = 6 + Math.random() * 8;
@@ -299,8 +302,9 @@ export function impulse(game, pos, radius, push) {
     const f = push * (1 - 0.5 * (d / radius));
     a.vel.x = (dx / h) * f;
     a.vel.z = (dz / h) * f;
-    a.vel.y = Math.max(a.vel.y, 9 + f * 0.35);
+    a.vel.y = Math.max(a.vel.y, shockwave ? 14 + f * 0.4 : 9 + f * 0.35);
     a.onGround = false;
     a.pos.y += 0.15;
+    if (shockwave) { a.noFallT = 6; a.flungT = 2.5; } // shockwaves carry you far and never cause fall damage
   }
 }
