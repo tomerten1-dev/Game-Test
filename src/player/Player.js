@@ -66,6 +66,11 @@ export class Player extends Actor {
     }
     if (input.down('sprint') && this.crouchHeld && this.slideT <= 0) this.crouchHeld = this.crouched = false;
     this.intent.jump = input.down('jump');
+    // quick 90s: run up the ramp we just built
+    if (this.autoRun && (this.autoRun.t -= dt) > 0 && this.pos.y < this.autoRun.top - 0.3) {
+      this.intent.mx = this.autoRun.x; this.intent.mz = this.autoRun.z; this.intent.sprint = false;
+      this.aimYaw = rig.yaw + Math.PI;
+    } else this.autoRun = null;
     this.intent.deploy = this.state === 'skydive' && input.pressed('jump');
   }
 }

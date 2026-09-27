@@ -234,7 +234,7 @@ export class Building {
   }
 
   // Work out where a piece would go for an actor looking along yaw/pitch.
-  plan(actor, type, yaw, pitch = 0) {
+  plan(actor, type, yaw, pitch = 0, opts = {}) {
     const [dx, dz] = Building.dirFromYaw(yaw);
     const px = actor.pos.x, pz = actor.pos.z;
     const ix = Math.floor(px / GRID), iz = Math.floor(pz / GRID);
@@ -252,7 +252,7 @@ export class Building {
       box = alongX ? [cx - 2, cx + 2, y0, y0 + HEIGHT, cz - h, cz + h] : [cx - h, cx + h, y0, y0 + HEIGHT, cz - 2, cz + 2];
     } else {
       let cell;
-      if (type === 'floor' && pitch < -0.6) cell = [ix, iz];
+      if (opts.own || (type === 'floor' && pitch < -0.6)) cell = [ix, iz];
       else if (type === 'cone' && up) cell = [ix, iz];
       else cell = [Math.floor((px + dx * 2.6) / GRID), Math.floor((pz + dz * 2.6) / GRID)];
       cx = cell[0] * GRID + GRID / 2; cz = cell[1] * GRID + GRID / 2;
@@ -357,6 +357,28 @@ export class Building {
   }
 
   buildPiece(actor, type, yaw, pitch = 0, mat) { return this.build(actor, this.plan(actor, type, yaw, pitch), mat); }
+
+  // A plan for a floor directly under a planned ramp (same cell, same base).
+  floorUnder(plan) {
+    const { cx, cz, y0 } = plan;
+    return { type: 'floor', cx, cz, y0, dirX: 0, dirZ: 1, box: [cx - 2, cx + 2, y0 - 0.22, y0 + 0.04, cz - 2, cz + 2], key: `f:${cx}:${cz}:${Math.round(y0 * 4)}` };
+  }
+
+  // Quick "90s": wall in your own cell and drop a ramp inside it whose low end is where you stand.
+  // Returns the climb direction, or null when nothing could be built.
+  do90(actor, mat) {
+    const ix = Math.floor(actor.pos.x / GRID), iz = Math.floor(actor.pos.z / GRID);
+    const fx = actor.pos.x - (ix * GRID + GRID / 2), fz = actor.pos.z - (iz * GRID + GRID / 2);
+    // climb away from the edge we're closest to
+    const [dx, dz] = Math.abs(fx) > Math.abs(fz) ? [-Math.sign(fx) || 1, 0] : [0, -Math.sign(fz) || 1];
+    let n = 0;
+    for (let k = 0; k < 4; k++) if (this.buildPiece(actor, 'wall', (k * Math.PI) / 2, 0, mat)) n++;
+    const ramp = this.build(actor, this.plan(actor, 'ramp', Math.atan2(dx, dz), 0, { own: true }), mat);
+    if (!ramp && !n) return null;
+    // distance to run: from where we stand to just short of the far wall
+    const along = dx ? fx * dx : fz * dz;
+    return { x: dx, z: dz, dist: Math.max(0.5, GRID / 2 - along - 0.4), top: ramp ? ramp.y0 + HEIGHT : actor.pos.y + 3.5 };
+  }
 
   // --- helpers used by bots (and touch quick-build) ---
   buildWallFacing(actor, yaw) { return !!this.buildPiece(actor, 'wall', yaw); }

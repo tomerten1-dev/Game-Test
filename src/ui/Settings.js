@@ -3,7 +3,7 @@ import { DEFAULT_SETTINGS } from '../meta/Profile.js';
 const BINDABLE = [
   ['forward', 'Move forward'], ['back', 'Move back'], ['left', 'Move left'], ['right', 'Move right'],
   ['jump', 'Jump'], ['sprint', 'Sprint'], ['crouch', 'Crouch / slide'], ['reload', 'Reload'], ['interact', 'Interact'],
-  ['wall', 'Wall'], ['floor', 'Floor'], ['ramp', 'Ramp'], ['cone', 'Cone'], ['build', 'Build mode'], ['edit', 'Edit'],
+  ['wall', 'Wall'], ['floor', 'Floor'], ['ramp', 'Ramp'], ['cone', 'Cone'], ['build', 'Build mode'], ['edit', 'Edit'], ['ninety', 'Quick 90s'],
   ['map', 'Map'], ['emote', 'Emote'], ['mute', 'Mute'],
 ];
 const SLIDERS = [

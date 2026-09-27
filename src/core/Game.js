@@ -563,6 +563,11 @@ export class Game {
       p.setBuildMode(piece);
     }
     if (input.pressed('build')) p.setBuildMode(p.buildMode ? null : this._lastPiece || 'wall');
+    if (input.pressed('ninety') && p.state === 'ground') {
+      const dir = b.do90(p, b.pickMat(p, p.buildMat));
+      if (dir) { p.autoRun = { x: dir.x, z: dir.z, t: dir.dist / 6.4 + 0.15, top: dir.top }; p.vel.y = Math.max(p.vel.y, 5); }
+      else this.hud.toast?.(`Need ${COST * 5} materials for a 90`);
+    }
     if (input.pressed('buildmat')) this.cycleBuildMat();
     if (!p.buildMode || p.state !== 'ground' || !p.alive) {
       if (p.buildMode && !p.alive) p.setBuildMode(null);
@@ -586,7 +591,9 @@ export class Game {
     const mat = b.pickMat(p, p.buildMat);
     if (!mat) { if (!this._buildCd) this.hud.toast?.(`Need ${COST} materials — harvest with the axe`); this._buildCd = 0.4; return; }
     if (mat !== p.buildMat) { p.buildMat = mat; }
-    if (b.build(p, plan, mat)) this._buildCd = 0.16;
+    // floating ramps get a floor under them (ramp-rush helper)
+    if (piece === 'ramp' && !b._grounded(plan.box) && b.canAfford(p)) b.build(p, b.floorUnder(plan), b.pickMat(p, p.buildMat));
+    if (b.build(p, plan, mat)) this._buildCd = 0.09; // turbo build while the button is held
   }
 
   cycleBuildMat() {
