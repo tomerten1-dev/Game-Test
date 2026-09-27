@@ -7,6 +7,8 @@ const _right = new THREE.Vector3();
 const _want = new THREE.Vector3();
 const _dir = new THREE.Vector3();
 const _hit = {};
+const _sh = new THREE.Vector3();
+const _shDir = new THREE.Vector3();
 
 // Over-the-shoulder third-person camera that never clips into the ground or walls.
 export class CameraRig {
@@ -60,8 +62,16 @@ export class CameraRig {
     _pivot.set(target.x, target.y + pivotH, target.z);
     const fwd = this.forward(_fwd);
     _right.set(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
-    // shoulder origin
-    const sx = _pivot.x + _right.x * this.side, sz = _pivot.z + _right.z * this.side, sy = _pivot.y + this.up;
+    // shoulder origin (pulled in when a wall is right beside you, e.g. indoors)
+    let sideOff = this.side;
+    if (mode !== 'bus' && Math.abs(sideOff) > 0.05) {
+      const sgn = Math.sign(sideOff);
+      _sh.set(_pivot.x, _pivot.y + this.up, _pivot.z);
+      _shDir.set(_right.x * sgn, 0, _right.z * sgn);
+      const hs = this.world.raycast(_sh, _shDir, Math.abs(sideOff) + 0.3, _hit);
+      if (hs) sideOff = sgn * Math.max(0, hs.t - 0.3);
+    }
+    const sx = _pivot.x + _right.x * sideOff, sz = _pivot.z + _right.z * sideOff, sy = _pivot.y + this.up;
     // boom collision
     _dir.copy(fwd).multiplyScalar(-1);
     let maxD = dist;

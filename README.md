@@ -60,6 +60,7 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 - **Slots 2–6** hold guns or stacks of heals: Bandages (+15 up to 75), Medkit (full health), Small Shield (+25 up to 50), Shield Potion (+50), **Med-Mist** (+30, use it on the move), **Slurp Juice** (+75 over time: health, then shield), **Chug Jug** (full health and shield, 15 s). Placeables: **Shield Keg** (shields everyone nearby up to 100) and **Campfire** (heals everyone nearby over time). Hold still-ish while the ring fills.
 - **Mobility:** **Shockwave Grenade** (goes off on impact and launches everyone nearby, you too, ~40 m with no fall damage), **Grappler** (10 charges: pulls you to where you aim, up to 60 m), **Rift-to-Go** (warps you into the sky to glide).
 - **Upgrade benches** in six towns (orange on the map): hold a gun and interact to raise its rarity for 100 wood / 150 stone / 200 metal / 300 metal.
+- **Houses you can go into:** the village homes are one- or two-story houses with furnished rooms: living room, kitchen or bedroom downstairs, and stairs up to a bedroom floor in the two-story ones. Chests and floor loot are inside. Doors open and close with interact (bots open them as they walk up) and break if you shoot or hit them. Windows shatter. Walls are panels that break under bullets, the axe and explosions and give wood when harvested. Everything is repaired at the start of the next match. You can also land and walk on the roofs.
 - **Hiding spots:** jump into haystacks and dumpsters (interact); bots can't see you inside. Jump or interact to pop out.
 - Crates, barrels, furniture and street clutter **break** from the axe, bullets and explosions and sometimes drop loot.
 - **Swimming:** deep water is swimmable (slower, and no shooting or building while swimming).
@@ -148,7 +149,7 @@ The start menu and pause screen have a **Graphics** selector:
 src/
   core/      Game loop + match flow, input, device/quality presets, noise, Web Audio synth
   world/     Terrain (fbm island + heightAt), sky & clouds, water, lighting, foliage,
-             towns, colliders, storm, battle bus, loot, building
+             towns, enterable houses (Houses.js), colliders, storm, battle bus, loot, building
   player/    Hero character (clone/tint/layered animations), shared Actor body, Player, camera rig, glider
   bots/      Bot AI + names
   weapons/   Weapon stats & rarities, weapon instances, procedural gun models, hitscan combat
@@ -164,6 +165,7 @@ public/models/        models: chars/ (KayKit heroes), kk/ (KayKit world), env/ (
 - **Terrain:** a 460 m height grid from fbm noise. `heightAt(x, z)` is bilinear, and everything (movement, grass, bullets, camera) uses it. Towns are flattened plateaus.
 - **Foliage:** instanced trees (round, pine, some autumn), rocks and bushes. Grass is one instanced draw call with a wind-sway vertex shader that samples a height texture and wraps around the player.
 - **Characters:** KayKit Adventurers (Knight, Barbarian, Mage, Rogue, Hooded Rogue). Each player/bot is a `SkeletonUtils.clone` with a subtle color tint; you are the teal hooded rogue with a glowing backpack antenna. Animation runs on two layers: the legs play run / strafe / backpedal / jump while the upper body plays aim / shoot / reload. Crossfades take 0.2 s and running speed follows movement speed.
+- **Houses:** built procedurally from vertex-colored boxes (one draw call per house, plus glass and doors) in local space, then placed with a 90° rotation so every collider stays an axis-aligned box. Stairs and roofs use ramp colliders. Bots route through the house with a small portal graph (outside ↔ front door ↔ room A ↔ interior door ↔ room B, and room A ↔ stairs ↔ upstairs), walk around corners when the door is on the far side, and walk off roofs they land on.
 - **Performance:** instancing, object pools for effects, bot "think" every ~0.3 s, animation LOD for far characters, and lower pixel ratio / shadows / grass on mobile.
 - **Post-processing:** [`postprocessing`](https://github.com/pmndrs/postprocessing) + [`n8ao`](https://github.com/N8python/n8ao): ambient occlusion, bloom on glowing things (loot beams, chests, muzzle flashes, sun), a warm/cool color grade and SMAA.
 - **Baked lighting:** at load the game traces sun rays from every terrain point against houses, tree canopies, rocks and the mountain. That gives soft shadows and ambient occlusion across the whole island. Near the player they fade into the real shadow map.

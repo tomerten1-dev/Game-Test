@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Houses } from './Houses.js';
 import { makeWeaponMesh } from '../weapons/WeaponModels.js';
 import { mulberry32 } from '../core/noise.js';
 import { part, merge, mat } from './geomUtils.js';
@@ -28,7 +29,10 @@ export class Towns {
     const parts = [];
     const crates = [];
     this._townList = TOWNS;
+    // enterable homes (interiors, doors, stairs); their furniture goes through the prop instancer
+    this.homes = new Houses(scene, colliders, mulberry32(77), (type, x, y, z, height, rot, colR) => this._propAt(type, x, y, z, height, rot, colR));
     for (const town of TOWNS) this._town(town, parts, crates);
+    this.chestSpots.push(...this.homes.chestSpots);
     this._scatterCrates(crates);
     this._landmark(parts);
 
@@ -92,6 +96,19 @@ export class Towns {
     const idx = this._place(type, x, y - 0.02, z, rot, s);
     if (colR) {
       const c = { kind: 'circle', x, z, r: colR, y0: y - 1, y1: y + height, crate: true, mat: mat || (type.includes('city_') ? 'metal' : undefined) };
+      if (BREAKABLE.test(type)) c.breakable = { type, idx: [idx], hp: 90, loot: 0.35 };
+      this.colliders.add(c);
+    }
+  }
+
+  // A prop at an exact height (inside houses, upstairs), scaled to `height`, with an optional collider.
+  _propAt(type, x, y, z, height, rot = 0, colR = 0) {
+    const info = this.models.get(type);
+    if (!info) return;
+    const s = height / info.size.y;
+    const idx = this._place(type, x, y, z, rot, s);
+    if (colR) {
+      const c = { kind: 'circle', x, z, r: colR, y0: y - 0.2, y1: y + height, crate: true };
       if (BREAKABLE.test(type)) c.breakable = { type, idx: [idx], hp: 90, loot: 0.35 };
       this.colliders.add(c);
     }
@@ -161,20 +178,26 @@ export class Towns {
       const rotIdx = ((Math.round(face / (Math.PI / 2)) % 4) + 4) % 4;
       const rot = rotIdx * (Math.PI / 2);
       const type = placed < specials.length ? specials[placed] : HOMES[Math.floor(r() * HOMES.length)];
+      const home = type.includes('home');
+      const kind = home ? (r() < 0.5 ? 'two' : 'one') : null;
       const info = this.models.get(type);
       const scale = KK_SCALE;
-      const w = info.size.x * scale * 0.86, d = info.size.z * scale * 0.86, h = info.size.y * scale;
+      const size = home ? Houses.size(kind) : null;
+      const w = home ? size.W : info.size.x * scale * 0.86, d = home ? size.D : info.size.z * scale * 0.86, h = home ? (kind === 'two' ? 11 : 7) : info.size.y * scale;
       const sw = rotIdx % 2 ? d : w, sd = rotIdx % 2 ? w : d;
       const box = { minX: x - sw / 2, maxX: x + sw / 2, minZ: z - sd / 2, maxZ: z + sd / 2 };
       if (this._overlaps(box, 3)) continue;
-      const y = this.terrain.heightAt(x, z);
-      this._house(parts, type, scale, x, y, z, rot, w, d);
+      let y = this.terrain.heightAt(x, z);
+      if (home) {
+        // floor sits just above the highest ground under the house
+        for (const [ax, az] of [[box.minX, box.minZ], [box.maxX, box.minZ], [box.minX, box.maxZ], [box.maxX, box.maxZ]]) y = Math.max(y, this.terrain.heightAt(ax, az));
+        this.homes.add({ x, z, y: y + 0.25, rot, color: type.split('_').pop(), kind });
+      } else this._house(parts, type, scale, x, y, z, rot, w, d);
       if (r() < 0.4 && type.includes('home')) this._fence(parts, x, y, z, rot, w, d);
       if (type.includes('home')) this._flowers(parts, x, y, z, rot, w, d);
       if (type.includes('home') && r() < 0.45) this._porch(x, z, rot, w, d);
-      const col = { kind: 'box', ...box, y0: y - 3, y1: y + h, house: true };
-      this.colliders.add(col);
-      this.houses.push({ ...box, x, z, y, h, rot });
+      if (!home) this.colliders.add({ kind: 'box', ...box, y0: y - 3, y1: y + h, house: true });
+      this.houses.push({ ...box, x, z, y, h, rot, home });
       placed++;
       // chest spot next to the door side, crates at the corner
       const fx = Math.sin(rot), fz = Math.cos(rot);

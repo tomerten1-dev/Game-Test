@@ -94,6 +94,8 @@ export class Game {
     this.building = new Building(this);
     this.projectiles = new Projectiles(this);
     this.events = new Events(this);
+    this.homes = this.world.towns.homes;
+    this.homes.game = this;
     this.boss = new BossEvent(this);
     this.dayCycle = new DayCycle(this);
     this.ambient = new Ambient(this);
@@ -327,6 +329,7 @@ export class Game {
     this.pings.reset();
     this.projectiles.reset();
     this.events.reset();
+    this.homes.reset();
     this.mood = applyMood(this, 'day');
     this.dayCycle.stop();
     this.spectating = null;
@@ -385,6 +388,7 @@ export class Game {
     this.stormTick = 0;
     this.storm.reset();
     this.events.reset();
+    this.homes.reset();
     this.bus.launch();
     for (const a of this.actors) {
       if (!a.alive) a.revive(0, 0);
@@ -527,6 +531,7 @@ export class Game {
     if (this.warmup <= 0) this.updateStorm(dt);
     this.loot.update(dt, this.time);
     this.building.update(dt);
+    this.homes.update(dt, this.actors, this.camera.position);
     this.projectiles.update(dt);
     this.combat.updateBursts(dt);
     if (this.warmup <= 0) this.events.update(dt, this.time);
@@ -613,7 +618,8 @@ export class Game {
     }
     if (this.updateBuild(dt)) return;
     if (p.state === 'ground') {
-      const near = this.events.nearestInteractable(p.pos) || this.boss.nearestInteractable(p) || this.loot.nearestInteractable(p.pos);
+      const door = this.homes.nearestDoor(p.pos, 1.7);
+      const near = (door && { kind: 'door', door, text: door.open ? 'Close Door' : 'Open Door' }) || this.events.nearestInteractable(p.pos) || this.boss.nearestInteractable(p) || this.loot.nearestInteractable(p.pos);
       const text = !near ? null : near.text || (near.kind === 'chest' ? (near.chest.rare ? 'Open Rare Chest' : 'Open Chest') : near.kind === 'ammobox' ? 'Open Ammo Box' : `Pick up ${this.loot.label(near.pickup)}`);
       this.hud.prompt?.(text || (p.canRedeploy() ? `Deploy glider · ${keyLabel(this.input.keyFor('jump'))}` : null), near?.pickup?.weapon?.rarity ?? near?.rarity, near?.pickup?.weapon || null);
       if (near && input.pressed('interact') && this.warmup > 0) this.hud.toast?.('Loot unlocks when the match starts');
@@ -621,6 +627,7 @@ export class Game {
         if (near.kind === 'supply') this.events.openSupply(near.supply, p);
         else if (near.kind === 'vault') { const msg = this.boss.openVault(p); if (msg) this.hud.toast?.(msg); }
         else if (near.kind === 'vending') { const msg = this.events.buy(near.vending, p); if (msg) this.hud.toast?.(msg); }
+        else if (near.kind === 'door') this.homes.setDoor(near.door, !near.door.open);
         else if (near.kind === 'llama') this.events.openLlama(near.llama, p);
         else if (near.kind === 'forage') { const msg = this.events.eat(near.forage, p); if (msg) this.hud.toast?.(msg); }
         else if (near.kind === 'hide') { const msg = this.events.hide(near.hide, p); if (msg) this.hud.toast?.(msg); }

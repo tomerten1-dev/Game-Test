@@ -148,8 +148,8 @@ export class Loot {
       if (this.world.heightAt(x, z) > 2.5 && this.world.terrain.normalAt(x, z).y > 0.85) spots.push({ x, z, rot: r() * 6 });
     }
     for (const s of spots) {
-      if (r() > 0.68) continue; // not every spot gets a chest (less loot overall)
-      const y = this.world.groundAt(s.x, s.z, 200, 0.6);
+      if (r() > (s.y !== undefined ? 0.8 : 0.68)) continue; // not every spot gets a chest (less loot overall)
+      const y = s.y ?? this.world.groundAt(s.x, s.z, 200, 0.6); // spots inside houses know their floor
       if (y < 1) continue;
       const group = new THREE.Group();
       const rare = r() < 0.12; // rare chests: purple, better loot
@@ -303,6 +303,17 @@ export class Loot {
   }
 
   spawnFloorLoot() {
+    // inside houses: one item on some of the floor spots
+    for (const s of this.world.towns.homes?.lootSpots || []) {
+      if (Math.random() > 0.55) continue;
+      const roll = Math.random();
+      if (roll < 0.4) {
+        const w = new Weapon(rollWeaponType('floor'), rollRarity(Math.random, 0));
+        this.spawnPickup({ type: 'weapon', weapon: w }, _v.set(s.x, s.y + 0.2, s.z));
+        this.spawnPickup(Loot.ammoFor(w), _v.set(s.x + 0.5, s.y + 0.2, s.z + 0.4));
+      } else if (roll < 0.8) this.spawnPickup(Loot.randomConsumable(), _v.set(s.x, s.y + 0.2, s.z));
+      else this.spawnPickup({ type: 'ammo', ammoType: ['light', 'medium', 'shells'][Math.floor(Math.random() * 3)], amount: 20 }, _v.set(s.x, s.y + 0.2, s.z));
+    }
     // weapons (with ammo), heals and ammo lying around town plazas
     for (const t of TOWNS) {
       for (let i = 0; i < Math.round(t.r / 10); i++) {

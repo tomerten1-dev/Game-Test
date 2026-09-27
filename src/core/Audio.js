@@ -448,6 +448,15 @@ export class Sound {
       case 'click':
         this._tone(t, 0.05, { type: 'triangle', freq: 1200, gain: 0.1 });
         break;
+      case 'door': // wooden creak + latch knock
+        this._tone(t, 0.32, { type: 'sawtooth', freq: 190, freqEnd: 260, gain: 0.05 * v, attack: 0.04 });
+        this._noise(t, 0.3, { type: 'bandpass', freq: 700, freqEnd: 1100, q: 4, gain: 0.12 * v, attack: 0.05 });
+        this._noise(t + 0.3, 0.08, { type: 'lowpass', freq: 500, gain: 0.35 * v });
+        break;
+      case 'glass': // shatter: bright noise burst + tinkles
+        this._noise(t, 0.28, { type: 'highpass', freq: 2500, freqEnd: 5000, gain: 0.4 * v });
+        for (let i = 0; i < 5; i++) this._tone(t + 0.03 + i * 0.045, 0.12, { type: 'sine', freq: 2600 + Math.random() * 2400, gain: 0.05 * v });
+        break;
       case 'victory':
         [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => this._tone(t + i * 0.13, 0.4, { type: 'triangle', freq: f, gain: 0.2 }));
         break;

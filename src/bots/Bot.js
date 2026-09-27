@@ -225,7 +225,7 @@ export class Bot extends Actor {
     this.boxed = false;
   }
 
-  setGoal(x, z) { this.goal.set(x, 0, z); this.hasGoal = true; }
+  setGoal(x, z, y = null) { this.goal.set(x, 0, z); this.goalY = y; this.hasGoal = true; }
 
   think() {
     const g = this.game;
@@ -481,8 +481,8 @@ export class Bot extends Actor {
       }
       if (this.lootChest) {
         this.mode = 'loot';
-        this.setGoal(this.lootChest.x, this.lootChest.z);
-        if (Math.hypot(this.lootChest.x - this.pos.x, this.lootChest.z - this.pos.z) < 2.2) loot.openChest(this.lootChest, this);
+        this.setGoal(this.lootChest.x, this.lootChest.z, this.lootChest.y);
+        if (Math.hypot(this.lootChest.x - this.pos.x, this.lootChest.z - this.pos.z) < 2.2 && Math.abs(this.lootChest.y - this.pos.y) < 2) loot.openChest(this.lootChest, this);
         return;
       }
       if (this.pickup && !this.pickup.alive) this.pickup = null;
@@ -492,8 +492,8 @@ export class Bot extends Actor {
       }
       if (this.pickup) {
         this.mode = 'pickup';
-        this.setGoal(this.pickup.pos.x, this.pickup.pos.z);
-        if (Math.hypot(this.pickup.pos.x - this.pos.x, this.pickup.pos.z - this.pos.z) < 2) { loot.collect(this.pickup, this); this.pickup = null; }
+        this.setGoal(this.pickup.pos.x, this.pickup.pos.z, this.pickup.pos.y);
+        if (Math.hypot(this.pickup.pos.x - this.pos.x, this.pickup.pos.z - this.pos.z) < 2 && Math.abs(this.pickup.pos.y - this.pos.y) < 2) { loot.collect(this.pickup, this); this.pickup = null; }
         return;
       }
       // ammo boxes on the way
@@ -818,8 +818,9 @@ export class Bot extends Actor {
       const melee = !this.weapon;
       const ideal = melee ? 1.6 : this.weapon.def.idealRange;
       let fwd = 0;
-      if (!this.targetVisible) { // chase last seen spot
-        const lx = this.lastSeenPos.x - this.pos.x, lz = this.lastSeenPos.z - this.pos.z;
+      if (!this.targetVisible) { // chase last seen spot (through doors when it's inside a house)
+        const wp = g.homes?.route(this.pos, this.lastSeenPos.x, this.lastSeenPos.z, this.lastSeenPos.y);
+        const lx = (wp ? wp.x : this.lastSeenPos.x) - this.pos.x, lz = (wp ? wp.z : this.lastSeenPos.z) - this.pos.z;
         const ld = Math.hypot(lx, lz);
         if (ld > 2) { mx = lx / ld; mz = lz / ld; }
         wantSprint = ld > 12;
@@ -885,14 +886,17 @@ export class Bot extends Actor {
         }
       }
     } else if (this.hasGoal) {
-      const dx = this.goal.x - this.pos.x, dz = this.goal.z - this.pos.z;
+      // inside / into houses: head for the next door or stair on the way
+      const wp = g.homes?.route(this.pos, this.goal.x, this.goal.z, this.goalY);
+      const gx = wp ? wp.x : this.goal.x, gz = wp ? wp.z : this.goal.z;
+      const dx = gx - this.pos.x, dz = gz - this.pos.z;
       const d = Math.hypot(dx, dz);
-      if (d > 1.2) { mx = dx / d; mz = dz / d; }
+      if (d > (wp ? 0.2 : 1.2)) { mx = dx / d; mz = dz / d; }
       wantSprint = d > 10 && (this.mode !== 'wander' || this.zoneUrgent);
       // progress check: running back and forth in a pocket doesn't trip the speed-based stuck test,
       // so also watch whether we get any closer; if not, sidestep + jump, then ramp over it
-      if (Math.hypot(this.goal.x - (this.progGX ?? 1e9), this.goal.z - (this.progGZ ?? 1e9)) > 6) {
-        this.progGX = this.goal.x; this.progGZ = this.goal.z; this.progBest = d; this.progT = 0; this.progFails = 0;
+      if (Math.hypot(gx - (this.progGX ?? 1e9), gz - (this.progGZ ?? 1e9)) > (wp ? 1.5 : 6)) {
+        this.progGX = gx; this.progGZ = gz; this.progBest = d; this.progT = 0; this.progFails = 0;
       }
       if (d < this.progBest - 1.5) { this.progBest = d; this.progT = 0; }
       else if (d > 3 && this.mode !== 'harvest' && this.onGround) this.progT += dt;
