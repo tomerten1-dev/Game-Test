@@ -5,6 +5,7 @@ import { RARITIES, WEAPONS, rollWeaponType } from '../weapons/WeaponDefs.js';
 import { makeWeaponMesh, itemGeometry } from '../weapons/WeaponModels.js';
 import { mulberry32 } from '../core/noise.js';
 import { Loot } from './Loot.js';
+import { CONSUMABLES } from '../weapons/Items.js';
 
 const _v = new THREE.Vector3();
 const _c = new THREE.Color();
@@ -234,7 +235,8 @@ export class Events {
     const w = new Weapon(rollWeaponType('rare'), Math.random() < 0.4 ? 4 : 3);
     items.push({ type: 'weapon', weapon: w }, Loot.ammoFor(w), Loot.ammoFor(w));
     items.push({ type: 'consumable', ctype: Math.random() < 0.5 ? 'bigshield' : 'medkit', count: 1 });
-    items.push({ type: 'consumable', ctype: Math.random() < 0.7 ? 'grenade' : 'launchpad', count: Math.random() < 0.7 ? 3 : 1 });
+    const extra = ['grenade', 'grenade', 'smoke', 'impulse', 'fire', 'launchpad'][Math.floor(Math.random() * 6)];
+    items.push({ type: 'consumable', ctype: extra, count: CONSUMABLES[extra].stack });
     items.push({ type: 'mat', matType: 'metal', amount: 60 });
     items.forEach((it, i) => {
       const a = (i / items.length) * Math.PI * 2;

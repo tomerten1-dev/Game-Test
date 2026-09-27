@@ -71,7 +71,7 @@ Production build: `npm run build` (output in `dist/`), preview it with `npm run 
 ## Loot & world events
 
 - **Weapons:** assault rifle, shotgun, SMG and pistol (hitscan), plus a **sniper rifle** (heavy ammo, bullets travel and drop, right-click for a scope, 2.5× headshots) and a **rocket launcher** (splash damage that wrecks builds). Sniper and rockets are rare on the floor and common in rare chests and supply drops.
-- **Grenades** (click to throw, they bounce and go off after ~2 s) and **launch pads** (click to place, step on it to fly up and glide).
+- **Throwables** (click to throw, they bounce and go off after a short fuse): **grenades** explode; **smoke grenades** leave a cloud for ~12 s that bots can't see through; **impulse grenades** fling everyone nearby (no damage); **fire flasks** leave a patch of fire for ~6 s that burns players and wooden builds. **Launch pads** (click to place, step on it to fly up and glide).
 - **Rare chests** (purple, ~1 in 8) drop two weapons and grenades.
 - **Supply drops** float down under a blue balloon three times a match inside the next safe zone. They leave blue smoke and hold an epic or legendary weapon, heals, grenades or a launch pad, and 60 metal.
 - **Jump pads** (cyan discs around the island) bounce you high with no fall damage.
@@ -134,7 +134,7 @@ src/
   weapons/   Weapon stats & rarities, weapon instances, procedural gun models, hitscan combat
   effects/   Pooled muzzle flashes, tracers, particles, damage numbers, elimination bursts
   ui/        HUD, minimap, menus, touch controls
-public/models/        models: chars/ (KayKit heroes), kk/ (KayKit world), env/ (Kenney), nature/ (Quaternius), guns/ (Styloo)
+public/models/        models: chars/ (KayKit heroes), kk/ (KayKit world), env/ (Kenney), nature/ (Quaternius), guns/ (Styloo), trees/ (Elijah Cobden)
 ```
 
 ## Tech notes
@@ -151,9 +151,10 @@ public/models/        models: chars/ (KayKit heroes), kk/ (KayKit world), env/ (
 - **Life:** wind-swaying trees and palms, falling leaves, birds, fountain spray, chest sparkles, dust puffs, skydive speed lines, victory confetti.
 - **Assets (CC0 unless noted):**
   - **KayKit** by Kay Lousberg: characters and animations, medieval buildings (homes, tavern, blacksmith, market, church, towers, windmills, castle), the modern downtown of Pebble City (City Builder Bits: buildings, roads, parked cars, street lights), café and porch furniture (Furniture Bits), pine trees, rocks, clouds, crates, barrels, sacks, tents, flags, lumber and the treasure chest. See `public/models/kk/CREDITS.md`.
-  - **Kenney:** palms, rock spires and the pistol/SMG blasters. See `public/models/env/CREDITS.md`.
-  - **Styloo Guns Asset Pack** (provided by the project owner; see its itch.io page for the license): the assault rifle, burst rifle, sniper rifle and the ammo boxes. See `public/models/guns/CREDITS.md`.
+  - **Kenney:** palms and rock spires. See `public/models/env/CREDITS.md`.
+  - **Styloo Guns Asset Pack** (provided by the project owner; see its itch.io page for the license): every gun, the grenades, ammo boxes and rounds, and the vault's weapon board. See `public/models/guns/CREDITS.md`.
+  - **Elijah Cobden Stylized Trees Pack** (provided by the project owner; see its itch.io page for the license): detailed oaks, columnar trees and pines near the camera, willows, swiggly trees and dead trees. See `public/models/trees/CREDITS.md`.
   - **Quaternius Stylized Nature:** painted leafy trees (shown near the camera; cheaper trees stand in far away), flowering bushes and clover. See `public/models/nature/CREDITS.md`.
-  - **Procedural:** round/autumn trees, bushes, grass, the shotguns, the rocket launcher, the bus, fences, fountains and lamps are built from low-poly shapes.
+  - **Procedural:** far-away round/autumn trees, bushes, grass, the bus, fences, fountains and lamps are built from low-poly shapes.
   - **Audio:** all sounds are synthesized with Web Audio.
 

@@ -19,6 +19,7 @@ export class World {
   constructor(scene, renderer, models) {
     this.models = models;
     this.scene = scene;
+    this.smokes = []; // active smoke clouds {x, y, z, r}, kept by Projectiles
     this.colliders = new Colliders();
     this.terrain = new Terrain();
     scene.add(this.terrain.buildMesh());
@@ -210,6 +211,11 @@ export class World {
     const len = Math.hypot(dx, dy, dz);
     if (len < 1e-3) return true;
     _o.copy(a); _d.set(dx / len, dy / len, dz / len);
+    // smoke clouds block sight
+    for (const s of this.smokes) {
+      const t = Math.max(0, Math.min(len, (s.x - a.x) * _d.x + (s.y - a.y) * _d.y + (s.z - a.z) * _d.z));
+      if ((a.x + _d.x * t - s.x) ** 2 + (a.y + _d.y * t - s.y) ** 2 + (a.z + _d.z * t - s.z) ** 2 < s.r * s.r) return false;
+    }
     return this.raycast(_o, _d, len - 0.3, _hit) === null;
   }
 }

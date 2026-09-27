@@ -56,6 +56,7 @@ export class Foliage {
     this.nature = models ? new Nature(scene, models, quality) : null;
     if (this.nature && !this.nature.ready) this.nature = null;
     this.roundTrees = [];
+    this.pineTrees = [];
     this._trees();
     this._rocks();
     if (models) { this._palms(); this._spires(); if (VARIANT.cacti) this._cacti(); }
@@ -65,6 +66,10 @@ export class Foliage {
         (a, b, c) => { const pt = this._candidate(a, b, c); return pt && { x: pt.x, y: pt.h, z: pt.z }; },
         (x, z, cell) => this._free(x, z, cell), this.rand,
         quality.trees > 300 ? { bushes: Math.round(170 * AREA_SCALE), clovers: Math.round(360 * AREA_SCALE) } : { bushes: Math.round(60 * AREA_SCALE), clovers: Math.round(100 * AREA_SCALE) },
+      );
+      this.featureTrees = this.nature.scatterFeatureTrees(
+        (a, b, c, x, z) => { const pt = x === undefined ? this._candidate(a, b, c) : this._candidateAt(x, z, a, b, c); return pt && { x: pt.x, y: pt.h, z: pt.z }; },
+        (x, z, cell) => this._free(x, z, cell), this.rand, this.colliders, TREE_GREENS,
       );
     } else this._bushes();
     this._grass();
@@ -80,6 +85,12 @@ export class Foliage {
   _inTown(x, z, pad = 6) {
     for (const t of TOWNS) if (Math.hypot(x - t.x, z - t.z) < t.r + pad) return true;
     return false;
+  }
+
+  _candidateAt(x, z, minH, maxH, minNy) {
+    const h = this.terrain.heightAt(x, z);
+    if (h < minH || h > maxH || this.terrain.normalAt(x, z).y < minNy || this._inTown(x, z, 2)) return null;
+    return { x, z, h };
   }
 
   _candidate(minH, maxH, minNy) {
@@ -134,6 +145,9 @@ export class Foliage {
         const H = 7 + sc * 3.5;
         const ks = H / info.size.y;
         const shade = (0.85 + r() * 0.25) * (VARIANT.pineShade || 1);
+        this.pineTrees.push({ x: c.x, y: c.h, z: c.z, yaw, height: H * 1.05, variant: Math.floor(r() * 16), type, idx: kkPines[type].length,
+          color: PINE_GREENS[Math.floor(r() * PINE_GREENS.length)].clone().multiplyScalar(shade * 1.25),
+          mat: new THREE.Matrix4().compose(new THREE.Vector3(c.x, c.h - 0.2, c.z), new THREE.Quaternion().setFromAxisAngle(up, yaw), new THREE.Vector3(ks, ks, ks)) });
         kkPines[type].push({ x: c.x, y: c.h - 0.2, z: c.z, rot: yaw, scale: ks, colors: { hexagons_medieval: new THREE.Color(shade, shade * (0.95 + r() * 0.1), shade) } });
         this.colliders.add({ kind: 'circle', x: c.x, z: c.z, r: 0.45, y0: c.h - 2, y1: c.h + H, tree: true });
         this.occluders.push({ x: c.x, y: c.h + H * 0.45, z: c.z, r: info.size.x * ks * 0.42 });
@@ -180,7 +194,8 @@ export class Foliage {
     this.treeCount = nT;
     if (useKK) {
       const mat = (part) => { const mm = part.material.clone(); mm.roughness = 0.8; addWind(mm, { amount: 0.04, pivot: 0.15, speed: 1.1 }); return mm; };
-      for (const [type, list] of Object.entries(kkPines)) if (list.length) this.scene.add(this.models.instanced(type, list, { material: mat }));
+      this.kkPineGroups = {};
+      for (const [type, list] of Object.entries(kkPines)) if (list.length) this.scene.add(this.kkPineGroups[type] = this.models.instanced(type, list, { material: mat }));
     }
   }
 
@@ -482,6 +497,14 @@ export class Foliage {
     this.trunkIM.instanceMatrix.needsUpdate = true;
     this.roundIM.instanceMatrix.needsUpdate = true;
     this._shown = shown;
+    // KayKit pines near the camera become the detailed Stylized Trees pines
+    if (!this.kkPineGroups || !this.nature.pineDetail.length) return;
+    const pShown = this.nature.updateLOD(this.pineTrees, cam, this.nature.pineDetail);
+    const pPrev = this._pShown || new Set();
+    const set = (t, mat) => { for (const im of this.kkPineGroups[t.type].children) { im.setMatrixAt(t.idx, mat); im.instanceMatrix.needsUpdate = true; } };
+    for (const i of pPrev) if (!pShown.has(i)) set(this.pineTrees[i], this.pineTrees[i].mat);
+    for (const i of pShown) if (!pPrev.has(i)) set(this.pineTrees[i], zero);
+    this._pShown = pShown;
   }
 
   update(dt, t, focus, cam) {

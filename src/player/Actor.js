@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Character } from './Character.js';
 import { makeGlider } from './Glider.js';
 import { damp, dampAngle } from '../core/noise.js';
-import { makeWeaponMesh, makePickaxeMesh } from '../weapons/WeaponModels.js';
+import { makeWeaponMesh, makePickaxeMesh, makeThrowableMesh } from '../weapons/WeaponModels.js';
 import { Pickaxe, Consumable, CONSUMABLES, MAT_CAP } from '../weapons/Items.js';
 
 export const RUN_SPEED = 6.4;
@@ -170,7 +170,7 @@ export class Actor {
     this.throwCd = this.game.time + 0.7;
     const from = this.chest(new THREE.Vector3()).addScaledVector(dir, 0.6);
     from.y += 0.4;
-    this.game.projectiles.throwGrenade(this, from, dir);
+    this.game.projectiles.throwGrenade(this, from, dir, it.def.throw);
     this.swingT = 0.4;
     this.consumeHeld();
     return true;
@@ -538,6 +538,7 @@ export class Actor {
     if (this.buildMode) this.character.setWeapon(null);
     else if (h && h.isGun) this.character.setWeapon(applyWrap(makeWeaponMesh(h.type, h.rarity), this.wrap));
     else if (h && h.isPickaxe) this.character.setWeapon(makePickaxeMesh(), true);
+    else if (h?.def?.throw) this.character.setWeapon(makeThrowableMesh(h.type, 1.2));
     else this.character.setWeapon(null);
   }
 

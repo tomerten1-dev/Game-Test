@@ -87,21 +87,28 @@ function build(type, rarity) {
   return { geo, muzzle, foregrip };
 }
 
-// Kenney CC0 blasters for pistol / SMG, Styloo rifles for AR / burst / sniper; shotguns and the rocket stay procedural.
+// Styloo gun models for every gun (procedural fallback if they fail to load).
 let models = null;
 export function setWeaponModels(m) { models = m; }
 const KENNEY = {
-  pistol: { name: 'blaster', length: 0.42, rotY: Math.PI },
-  smg: { name: 'blaster-repeater', length: 0.52, rotY: Math.PI },
+  pistol: { name: 'guns/pew', length: 0.42, rotY: -Math.PI / 2, textured: true },
+  smg: { name: 'guns/mac10', length: 0.5, rotY: -Math.PI / 2, textured: true },
   ar: { name: 'guns/ak47', length: 0.95, rotY: -Math.PI / 2, textured: true },
   burst: { name: 'guns/ak47variant', length: 0.95, rotY: -Math.PI / 2, textured: true },
   sniper: { name: 'guns/awp', length: 1.25, rotY: -Math.PI / 2, textured: true },
+  pump: { name: 'guns/shotgun', length: 0.95, rotY: Math.PI / 2, textured: true },
+  shotgun: { name: 'guns/shotgun', length: 0.88, rotY: Math.PI / 2, textured: true },
+  rocket: { name: 'guns/rocket', length: 1.15, rotY: Math.PI / 2, textured: true },
 };
+// Higher-rarity launchers get the fancier models.
+const RARITY_MODEL = { rocket: { 4: { name: 'guns/rocketvariant' }, 5: { name: 'guns/quadrocket', rotY: -Math.PI / 2, length: 1.05 } } };
 const kenneyMats = new Map();
 const stripeCache = new Map();
 
 function buildKenney(type, rarity) {
-  const cfg = KENNEY[type];
+  const base = KENNEY[type];
+  const alt = RARITY_MODEL[type]?.[rarity];
+  const cfg = alt && models.get(alt.name) ? { ...base, ...alt } : base;
   const info = models.get(cfg.name);
   if (!info) return null;
   const along = cfg.rotY % Math.PI === 0 ? info.size.z : info.size.x;
@@ -162,6 +169,43 @@ export function makeItemMesh(kind) {
   const m = new THREE.Mesh(itemGeometry(kind), material);
   m.castShadow = true;
   return m;
+}
+
+// Styloo throwables (grenade, smoke, impulse, fire flask), scaled up so they read in the world.
+const THROWABLE_MODEL = { grenade: 'guns/nade', smoke: 'guns/smoke', impulse: 'guns/flashbang', fire: 'guns/incendiary' };
+export function makeThrowableMesh(kind, scale = 2.2) {
+  const name = THROWABLE_MODEL[kind];
+  if (!name || !models?.get(name)) return null;
+  const inner = models.instance(name);
+  inner.scale.setScalar(scale);
+  inner.position.y = -models.get(name).size.y * scale * 0.5;
+  const g = new THREE.Group();
+  g.add(inner);
+  g.userData.muzzle = new THREE.Vector3();
+  g.userData.foregrip = 0;
+  return g;
+}
+
+// Styloo bullets: a few rounds of the ammo type stood on the pickup.
+const BULLET_MODEL = { light: 'guns/bullet_light', medium: 'guns/bullet_medium', shells: 'guns/bullet_shells', heavy: 'guns/bullet_heavy' };
+export function makeAmmoPickupMesh(ammoType) {
+  const box = makeAmmoBoxMesh(1.6);
+  if (!box) return null;
+  const g = new THREE.Group();
+  g.add(box);
+  const name = BULLET_MODEL[ammoType];
+  const info = name && models.get(name);
+  if (info) {
+    const s = 0.16 / info.size.y;
+    const top = models.get('guns/ammobox').size.y * 1.6;
+    for (let i = 0; i < 3; i++) {
+      const b = models.instance(name);
+      b.scale.setScalar(s);
+      b.position.set((i - 1) * 0.07, top, 0);
+      g.add(b);
+    }
+  }
+  return g;
 }
 
 // Styloo ammo box for ammo pickups (null if not loaded).

@@ -4,7 +4,7 @@ import { TOWNS } from './Terrain.js';
 import { Weapon } from '../weapons/Weapon.js';
 import { RARITIES, rollRarity, rollWeaponType } from '../weapons/WeaponDefs.js';
 import { itemGeometry } from '../weapons/WeaponModels.js';
-import { makeWeaponMesh, makeAmmoBoxMesh } from '../weapons/WeaponModels.js';
+import { makeWeaponMesh, makeAmmoBoxMesh, makeAmmoPickupMesh, makeThrowableMesh } from '../weapons/WeaponModels.js';
 import { mulberry32 } from '../core/noise.js';
 import { AMMO, MATS, CONSUMABLES } from '../weapons/Items.js';
 
@@ -253,7 +253,8 @@ export class Loot {
 
   static randomConsumable() {
     const r = Math.random();
-    const type = r < 0.3 ? 'bandage' : r < 0.48 ? 'smallshield' : r < 0.68 ? 'bigshield' : r < 0.82 ? 'medkit' : r < 0.96 ? 'grenade' : 'launchpad';
+    const type = r < 0.28 ? 'bandage' : r < 0.45 ? 'smallshield' : r < 0.63 ? 'bigshield' : r < 0.76 ? 'medkit'
+      : r < 0.85 ? 'grenade' : r < 0.89 ? 'smoke' : r < 0.93 ? 'impulse' : r < 0.97 ? 'fire' : 'launchpad';
     return { type: 'consumable', ctype: type, count: CONSUMABLES[type].stack };
   }
 
@@ -300,9 +301,13 @@ export class Loot {
       mesh.position.y = 0.3;
       color = MATS[item.matType].color;
     } else if (item.type === 'ammo') {
-      mesh = makeAmmoBoxMesh(2.2) || new THREE.Mesh(this.itemGeo.ammo, this.itemMat);
+      mesh = makeAmmoPickupMesh(item.ammoType) || new THREE.Mesh(this.itemGeo.ammo, this.itemMat);
       mesh.position.y = 0.3;
       color = AMMO[item.ammoType].color;
+    } else if (makeThrowableMesh(item.ctype)) {
+      mesh = makeThrowableMesh(item.ctype, 2.6);
+      mesh.position.y = 0.4;
+      color = CONSUMABLES[item.ctype].color;
     } else {
       const geo = { bandage: this.itemGeo.bandage, medkit: this.itemGeo.med, smallshield: this.itemGeo.small, bigshield: this.itemGeo.shield, grenade: itemGeometry('grenade'), launchpad: itemGeometry('launchpad') }[item.ctype];
       mesh = new THREE.Mesh(geo, this.itemMat);

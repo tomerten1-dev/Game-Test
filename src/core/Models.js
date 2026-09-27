@@ -18,12 +18,15 @@ const KK = [
 ].map((n) => `kk/${n}`);
 export const ENV_MODELS = [
   'palm-long', 'palm-short', 'formation-large-stone', 'formation-stone',
-  'blaster', 'blaster-repeater',
   // Styloo "Guns Asset Pack" (user-provided), see public/models/guns/CREDITS.md
-  'guns/ak47', 'guns/ak47variant', 'guns/awp', 'guns/ammobox',
+  ...['ak47', 'ak47variant', 'awp', 'ammobox', 'pew', 'mac10', 'shotgun', 'rocket', 'rocketvariant', 'quadrocket', 'nade', 'smoke', 'incendiary', 'flashbang',
+    'bullet_light', 'bullet_medium', 'bullet_shells', 'bullet_heavy', 'board'].map((n) => `guns/${n}`),
   ...KK,
   // Quaternius "Stylized Nature" (CC0), textures assigned in world/Nature.js
   'nature/CommonTree_1', 'nature/CommonTree_3', 'nature/Bush_Common_Flowers', 'nature/Clover_1', 'nature/Clover_2',
+  // Elijah Cobden "Stylized Trees Pack" (user-provided), see public/models/trees/CREDITS.md
+  ...['STOak1', 'STOak2', 'STOak3', 'STOak5', 'STColumnar1', 'STColumnar3', 'STColumnar5', 'STPine1', 'STPine2', 'STPine3', 'STPine4', 'STPine5', 'STPine6', 'STPine7',
+    'STWillow1', 'STWillow2', 'STWillow3', 'STSwiggly1', 'STSwiggly2', 'STSwiggly3', 'STSwiggly4'].map((n) => `trees/${n}`),
 ];
 
 // Loads GLBs and flattens each into "parts" (one merged geometry per material),

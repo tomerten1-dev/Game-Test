@@ -22,6 +22,9 @@ export const CONSUMABLES = {
   bigshield: { name: 'Shield Potion', shield: 50, cap: 100, time: 4.5, max: 3, stack: 1, icon: '⛊', color: '#3d8dff' },
   // thrown / placed items share the consumable stack logic
   grenade: { name: 'Grenade', throw: 'grenade', max: 6, stack: 3, icon: '●', color: '#8fd16a', damage: 70, radius: 5, fuse: 2.2 },
+  smoke: { name: 'Smoke Grenade', throw: 'smoke', max: 4, stack: 2, icon: '☁', color: '#c9d3dc', radius: 6.5, fuse: 1.4, duration: 12 },
+  impulse: { name: 'Impulse Grenade', throw: 'impulse', max: 4, stack: 2, icon: '✺', color: '#6fd0ff', radius: 6, fuse: 1.1, push: 17 },
+  fire: { name: 'Fire Flask', throw: 'fire', max: 4, stack: 2, icon: '♨', color: '#ff8a2a', radius: 3.6, fuse: 1.2, duration: 6, dps: 14 },
   launchpad: { name: 'Launch Pad', place: 'launchpad', max: 1, stack: 1, icon: '⇑', color: '#ffcf3f' },
   keycard: { name: 'Vault Keycard', key: true, max: 1, stack: 1, icon: '⌘', color: '#ffe94d' },
 };

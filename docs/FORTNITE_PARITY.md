@@ -39,7 +39,7 @@ Legend: ✅ have · 🟡 partial · ❌ missing · Effort: S (≤½ day) · M (1
 | Hitscan AR / SMG / pistol / shotgun | ✅ | ✅ | — |
 | Sniper (projectile w/ drop, scope) | ✅ | ❌ | M |
 | Rocket launcher / explosives | ✅ | ❌ | M |
-| Grenades (throwable arc) | ✅ | ❌ | M |
+| Grenades (throwable arc) | ✅ | ✅ grenade, smoke, impulse, fire flask | M |
 | Rarity tiers grey→gold (+ mythic) | ✅ | ✅ 5 tiers | mythic optional |
 | Aim-down-sights zoom | ✅ | ✅ right click | scope overlay for sniper |
 | Bloom / first-shot accuracy / recoil | ✅ | ✅ | first-shot accuracy when still: S |

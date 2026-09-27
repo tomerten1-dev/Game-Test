@@ -633,6 +633,27 @@ export class Bot extends Actor {
       const d = Math.hypot(dx, dz);
       if (d > 1.2) { mx = dx / d; mz = dz / d; }
       wantSprint = d > 10 && (this.mode !== 'wander' || this.zoneUrgent);
+      // progress check: running back and forth in a pocket doesn't trip the speed-based stuck test,
+      // so also watch whether we get any closer; if not, sidestep + jump, then ramp over it
+      if (Math.hypot(this.goal.x - (this.progGX ?? 1e9), this.goal.z - (this.progGZ ?? 1e9)) > 6) {
+        this.progGX = this.goal.x; this.progGZ = this.goal.z; this.progBest = d; this.progT = 0; this.progFails = 0;
+      }
+      if (d < this.progBest - 1.5) { this.progBest = d; this.progT = 0; }
+      else if (d > 3 && this.mode !== 'harvest' && this.onGround) this.progT += dt;
+      if (this.progT > 3.5) {
+        this.progT = 0; this.progBest = d; this.progFails++;
+        const side = Math.random() < 0.5 ? -1 : 1;
+        this.escapeT = 1.4;
+        this.escapeX = -mz * side * 0.9 - mx * 0.45; this.escapeZ = mx * side * 0.9 - mz * 0.45;
+        this.wantJump = true;
+        if (this.progFails >= 2 && g.building?.canAfford(this)) {
+          const yaw = this.aimYaw;
+          this.aimYaw = Math.atan2(mx, mz);
+          g.building.buildRamp(this);
+          this.aimYaw = yaw;
+        }
+      }
+      if (this.escapeT > 0) { this.escapeT -= dt; mx = this.escapeX; mz = this.escapeZ; }
       // chop the tree we walked up to
       if (this.mode === 'harvest' && this.tree && d < 1.6) {
         mx = mz = 0;

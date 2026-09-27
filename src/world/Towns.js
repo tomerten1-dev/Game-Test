@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { makeWeaponMesh } from '../weapons/WeaponModels.js';
 import { mulberry32 } from '../core/noise.js';
 import { part, merge, mat } from './geomUtils.js';
 import { TOWNS, MOUNTAIN, AREA_SCALE } from './Terrain.js';
@@ -517,6 +518,27 @@ export class Towns {
     parts.push(part(new THREE.BoxGeometry(1.9, 0.25, 0.4), trim, mat(vx, gy + 3.55, vz + D / 2)));
     this.houses.push({ minX: vx - W / 2, maxX: vx + W / 2, minZ: vz - D / 2, maxZ: vz + D / 2, x: vx, z: vz, y: gy, h: H, rot: 0 });
     this.vault = { x: vx, z: vz, y: gy, door, doorCol, front: { x: vx, z: vz + D / 2 + 1.2 }, opened: false, town: t };
+    this._weaponBoard(vx, gy + 0.9, vz - D / 2 + th / 2 + 0.06);
+  }
+
+  // Weapon display board on the vault's back wall, with a sniper, a rifle and a launcher hung on it.
+  _weaponBoard(x, y, z) {
+    const info = this.models?.get('guns/board');
+    if (!info) return;
+    const s = 4.2 / info.size.x;
+    const board = this.models.instance('guns/board');
+    board.scale.setScalar(s);
+    board.position.set(x, y, z);
+    this.scene.add(board);
+    const h = info.size.y * s;
+    // [type, rarity, height on the board, scale, model length]
+    [['sniper', 4, 0.8, 2.2, 1.25], ['ar', 4, 0.55, 2.4, 0.95], ['rocket', 4, 0.25, 1.8, 1.15]].forEach(([type, rarity, fy, sc, len]) => {
+      const m = makeWeaponMesh(type, rarity);
+      m.rotation.y = Math.PI / 2;
+      m.scale.setScalar(sc);
+      m.position.set(x - len * sc * 0.33, y + h * fy, z + 0.2);
+      this.scene.add(m);
+    });
   }
 
   // Wooden walkway on posts (axis aligned). Walkable via a thin box collider.
