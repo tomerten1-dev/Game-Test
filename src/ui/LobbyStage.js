@@ -30,6 +30,16 @@ export class LobbyStage {
     this.group.add(key, back);
     this.heroRoot = new THREE.Group();
     this.group.add(this.heroRoot);
+    this._partySlots();
+    // nameplate over the hero (name, level, wins)
+    this.plate = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false }));
+    this.plate.scale.set(1.7, 0.43, 1);
+    this.plate.position.set(0, 2.35, 0);
+    this.group.add(this.plate);
+    this.idleT = 0;
+    const wake = () => { this.idleT = 0; if (this.idleDance) { this.idleDance = false; this.emoteT = 0; } };
+    window.addEventListener('pointermove', wake);
+    window.addEventListener('keydown', wake);
     this.group.visible = false;
     game.scene.add(this.group);
     this.yaw = 0.35;
@@ -44,7 +54,52 @@ export class LobbyStage {
     window.addEventListener('pointerup', () => { this.drag = null; });
   }
 
-  show(v) { this.group.visible = v; }
+  // Three empty party pads beside you (party play needs online multiplayer).
+  _partySlots() {
+    const padMat = new THREE.MeshStandardMaterial({ color: '#dfe7f5', roughness: 0.5, transparent: true, opacity: 0.85 });
+    const glow = new THREE.MeshStandardMaterial({ color: '#5fd4ff', emissive: '#2fb6ff', emissiveIntensity: 1.2, transparent: true, opacity: 0.8 });
+    const tex = (() => {
+      const c = document.createElement('canvas'); c.width = 128; c.height = 160;
+      const x = c.getContext('2d');
+      x.strokeStyle = 'rgba(255,255,255,0.9)'; x.lineWidth = 10; x.lineCap = 'round';
+      x.beginPath(); x.moveTo(64, 30); x.lineTo(64, 98); x.moveTo(30, 64); x.lineTo(98, 64); x.stroke();
+      x.fillStyle = '#ffffff'; x.font = 'bold 26px sans-serif'; x.textAlign = 'center'; x.fillText('INVITE', 64, 145);
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+    })();
+    this.pads = [];
+    for (const [x, z] of [[-2.3, -1.6], [2.3, -1.6], [0, -3.1]]) {
+      const pad = new THREE.Group();
+      const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.08, 32), padMat);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.85, 0.035, 6, 40), glow);
+      ring.rotation.x = Math.PI / 2; ring.position.y = 0.05;
+      const plus = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 1, depthWrite: false, color: "#e8f7ff" }));
+      plus.scale.set(0.8, 1.0, 1); plus.position.y = 1.0;
+      pad.add(disc, ring, plus);
+      pad.position.set(x, 0.02, z);
+      this.group.add(pad);
+      this.pads.push({ pad, plus, ring });
+    }
+  }
+
+  // name · level · wins, drawn onto the nameplate sprite
+  setPlate(name, level, wins) {
+    const key = `${name}|${level}|${wins}`;
+    if (key === this._plateKey) return;
+    this._plateKey = key;
+    const c = document.createElement('canvas'); c.width = 512; c.height = 128;
+    const x = c.getContext('2d');
+    x.fillStyle = 'rgba(10,18,40,0.6)';
+    x.beginPath(); x.roundRect(8, 12, 496, 104, 26); x.fill();
+    x.textAlign = 'center';
+    x.fillStyle = '#ffffff'; x.font = 'bold 44px sans-serif'; x.fillText(name, 256, 62);
+    x.fillStyle = '#ffd23f'; x.font = 'bold 28px sans-serif'; x.fillText(`LEVEL ${level}${wins ? `  ·  👑 ${wins}` : ''}`, 256, 100);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    this.plate.material.map?.dispose();
+    this.plate.material.map = t;
+    this.plate.material.needsUpdate = true;
+  }
+
+  show(v) { this.group.visible = v; this.idleT = 0; }
 
   // look: { hero, tint, glider: [c, accent], trail, wrap, preview: slot being previewed }
   setLook(look) {
@@ -84,6 +139,16 @@ export class LobbyStage {
     this.t += dt;
     const ch = this.character;
     if (!ch) return;
+    for (const [i, p] of (this.pads || []).entries()) {
+      p.plus.position.y = 1.0 + Math.sin(this.t * 1.6 + i) * 0.06;
+      p.ring.material.emissiveIntensity = 0.9 + Math.sin(this.t * 2 + i) * 0.4;
+    }
+    // AFK: after a while the hero starts dancing the equipped emote
+    this.idleT += dt;
+    if (this.idleT > 12 && !this.idleDance && this.emoteT <= 0 && this.idleEmote && (!this.look || !this.look.preview)) {
+      this.idleDance = true;
+      this.emote(this.idleEmote, 1e9);
+    }
     this.heroRoot.rotation.y = this.yaw + Math.sin(this.t * 0.4) * 0.08;
     const look = this.look;
     if (look?.preview === 'glider') {

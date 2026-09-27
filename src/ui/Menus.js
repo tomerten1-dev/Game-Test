@@ -149,6 +149,9 @@ export class Menus {
     if (this.tab === 'career') this.renderCareer();
     if (this.tab === 'settings') renderSettings($('#settings'), this.game);
     this.game.stage?.setLook(this.stageLook());
+    const pd = this.meta.profile.d;
+    this.game.stage?.setPlate?.('You', pd.level, pd.stats.wins);
+    if (this.game.stage) this.game.stage.idleEmote = this.meta.profile.equippedItem('emote')?.value;
   }
 
   renderLocker() {
