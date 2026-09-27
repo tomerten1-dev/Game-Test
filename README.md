@@ -1,6 +1,6 @@
 # Stormbound
 
-A browser battle royale: **you vs 19 AI heroes** on a bright, stylized island. Ride the flying Battle Bus, skydive, loot glowing chests, build walls and ramps, and be the last hero standing while the purple storm closes in.
+A browser battle royale: **you vs 19 AI heroes** on a bright, stylized island. Ride the flying Storm Bus, skydive, loot glowing chests, build walls and ramps, and be the last hero standing while the purple storm closes in.
 
 Built from scratch with **Vite + Three.js** (ES modules, plain JavaScript). No game engine.
 
@@ -51,7 +51,7 @@ The start menu and pause screen have a **Graphics** selector:
 
 ## How a match works
 
-1. The Battle Bus flies across the island at 110 m. Jump when you like (it drops you at the end otherwise).
+1. The Storm Bus flies across the island at 110 m. Jump when you like (it drops you at the end otherwise).
 2. Skydive and steer. The glider opens automatically about 35 m above the ground.
 3. Loot gold chests (weapon + shield potion / medkit + wood) and floor loot. Rarity colors: grey, green, blue, purple, gold. Rarer = more damage.
 4. The storm has 6 phases. Each waits, then shrinks toward a new circle (white ring on the minimap). Damage grows every phase.

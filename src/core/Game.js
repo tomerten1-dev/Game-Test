@@ -166,7 +166,7 @@ export class Game {
     this.rig.yaw = Math.atan2(-this.bus.vel.x, -this.bus.vel.z) + 0.6;
     this.rig.pitch = -0.25;
     this.hud.show(true);
-    this.hud.banner(isTouch ? 'Tap JUMP to drop from the Battle Bus' : 'Press SPACE to jump from the Battle Bus', 6);
+    this.hud.banner(isTouch ? 'Tap JUMP to drop from the Storm Bus' : 'Press SPACE to jump from the Storm Bus', 6);
     this.sound.play('bus');
     this.input.enabled = true;
   }

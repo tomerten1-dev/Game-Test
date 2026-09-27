@@ -4,7 +4,7 @@ Legend: ✅ have · 🟡 partial · ❌ missing · Effort: S (≤½ day) · M (1
 
 > IP note: we copy *mechanics and feel*, never Fortnite's names, logos, characters, sounds or UI art.
 > Terms to avoid shipping: "Victory Royale", "V-Bucks", "Battle Pass", "Chug Jug", "Slurp", "Battle Bus"
-> (ours becomes **Storm Bus**; the end screen already says "#1 VICTORY!").
+> (ours is now the **Storm Bus**; the end screen says "#1 VICTORY!").
 
 ---
 
