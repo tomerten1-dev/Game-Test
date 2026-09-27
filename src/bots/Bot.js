@@ -55,7 +55,14 @@ export class Bot extends Actor {
     this.ninetyCd = 0;
     this.tunnelCd = 0;
     this.coneCd = 0;
+    this.settle = 0;        // 0..1: aim settles while tracking the same target
+    this.lookYaw = 0;       // where a sound / hit came from
+    this.lookT = 0;
+    this.push = false;      // enemy is weak / reloading / healing: close in
+    this.aimHead = false;
   }
+
+  get smartLoot() { return true; }
 
   // Fresh brain for the real match (after the warm-up).
   resetAI() {
@@ -70,6 +77,8 @@ export class Bot extends Actor {
 
   onDamaged(amount, attacker) {
     if (!this.alive) return;
+    this.settle *= 0.7; // flinch
+    if (attacker && attacker !== this) { this.lookYaw = this._yawTo(attacker.pos); this.lookT = 1.5; }
     if (attacker && attacker !== this && attacker.alive) {
       if (!this.target || !this.target.alive || this.pos.distanceTo(attacker.pos) < this.pos.distanceTo(this.target.pos) * 1.3) {
         if (this.target !== attacker) this.reactionT = 0.25 + Math.random() * 0.3;
@@ -187,30 +196,46 @@ export class Bot extends Actor {
     }
     cands.sort((a, b) => a[0] - b[0]);
     const fx = Math.sin(this.aimYaw), fz = Math.cos(this.aimYaw);
-    for (let i = 0; i < Math.min(3, cands.length); i++) {
+    let bestS = Infinity, checks = 0;
+    for (let i = 0; i < cands.length && checks < 4; i++) {
       const [d, a] = cands[i];
       if (a !== this.target) {
         // must notice them: in front (or close / loud) and a per-think chance
         const dx = (a.pos.x - this.pos.x) / (d || 1), dz = (a.pos.z - this.pos.z) / (d || 1);
         const inView = dx * fx + dz * fz > 0.2 || d < 10;
         const loud = g.time - a.lastFireTime < 1 && d < 55;
-        if (!(inView || loud) || Math.random() > (loud ? 0.5 : 0.22) * (1.2 - d / (SIGHT * 1.4))) continue;
+        const shotMe = this.lastAttacker === a && g.time - this.lastHurtTime < 2;
+        if (!shotMe && (!(inView || loud) || Math.random() > (loud ? 0.5 : 0.22) * (1.2 - d / (SIGHT * 1.4)))) continue;
       }
-      if (g.world.lineOfSight(eye, a.chest(_tp))) {
-        // stick with current target unless someone is much closer
-        if (a === this.target) { best = a; bestD = d; break; }
-        if (d < bestD) { best = a; bestD = d; }
-        break;
-      }
+      checks++;
+      if (!g.world.lineOfSight(eye, a.chest(_tp))) continue;
+      // threat score (lower first): close enemies, whoever is shooting us, weak or busy enemies; stick with the current target
+      let sc = d;
+      if (a === this.target) sc -= 15;
+      if (this.lastAttacker === a && g.time - this.lastHurtTime < 3) sc -= 20;
+      const hp = a.health + a.shield;
+      if (hp < 70) sc -= 12 * (1 - hp / 70);
+      if (a.useT > 0 || a.weapon?.reloading) sc -= 6;
+      if (sc < bestS) { bestS = sc; best = a; bestD = d; }
     }
     if (best) {
-      if (best !== this.target) { this.reactionT = 0.5 + Math.random() * 0.7 * (1.3 - this.skill); this.target = best; }
+      if (best !== this.target) { this.reactionT = 0.5 + Math.random() * 0.7 * (1.3 - this.skill); this.target = best; this.settle = 0; }
       this.lastSeenT = g.time;
       this.lastSeenPos.copy(best.pos);
       this.targetVisible = true;
     } else {
       this.targetVisible = false;
       if (this.target && g.time - this.lastSeenT > 4) this.target = null;
+    }
+
+    // hearing: turn toward nearby gunfire when we have nobody to fight
+    if (!this.target && this.lookT <= 0) {
+      let loudD = 60 + this.skill * 20;
+      for (const a of g.actors) {
+        if (a === this || !a.alive || g.time - a.lastFireTime > 0.5) continue;
+        const d = a.pos.distanceTo(this.pos);
+        if (d < loudD) { loudD = d; this.lookYaw = this._yawTo(a.pos); this.lookT = 1.2; }
+      }
     }
 
     if (!this.targetVisible) this.noHealT += THINK; else this.noHealT = 0;
@@ -232,10 +257,29 @@ export class Bot extends Actor {
     const d = this.target ? this.pos.distanceTo(this.target.pos) : 10;
     const err = (0.28 + d * 0.024) * (1.45 - this.skill * 0.65);
     this.aimErr.set(Math.random() - 0.5, (Math.random() - 0.5) * 0.8, Math.random() - 0.5).multiplyScalar(err * 2);
+    this.aimHead = this.weapon?.def.key === 'sniper' ? Math.random() < 0.25 + this.skill * 0.5 : Math.random() < this.skill * 0.15;
 
     const storm = g.storm;
     const zoneGoal = this._zoneGoal();
     this.zoneUrgent = !!zoneGoal?.urgent;
+
+    // size up the fight: push weak / reloading / healing enemies, get out of fights we're losing
+    this.push = false;
+    if (this.target && this.targetVisible && armed && !this.boxed && this.useT <= 0) {
+      const my = this.health + this.shield, their = this.target.health + this.target.shield;
+      const dd = this.pos.distanceTo(this.target.pos);
+      this.push = my > 60 && dd < 40 && (their < 60 || this.target.useT > 0 || !!this.target.weapon?.reloading || their < my - 70);
+      const canHeal = this.findConsumable('heal') > 0 || this.findConsumable('shield') > 0;
+      if (my < 45 && their > my + 50 && this.retreatT <= 0 && this.buildCooldown <= 0 && Math.random() < 0.3 + this.skill * 0.5) {
+        if (g.building && this.matTotal >= 40) this._boxUp();
+        else if (canHeal) {
+          this.retreatT = 2.5 + Math.random();
+          this.hideYaw = Math.atan2(this.pos.x - this.target.pos.x, this.pos.z - this.target.pos.z);
+          _v.copy(this.pos).lerp(this.target.pos, Math.min(0.5, 5 / Math.max(1, dd)));
+          this._throwAt(['smoke'], _v);
+        }
+      }
+    }
 
     // shoot through builds the target hides behind
     this.shootWall = false;
@@ -250,22 +294,15 @@ export class Bot extends Actor {
       }
     }
 
-    // lob a grenade at enemies hiding behind builds
+    // throwables: frag / fire at enemies hiding behind builds, impulse to knock them out of a box
     this.nadeCd = (this.nadeCd || 0) - THINK;
     if (this.target && this.nadeCd <= 0 && this.useT <= 0 && !this.boxed) {
       const dd = this.pos.distanceTo(this.target.pos);
-      const gi = this.items.findIndex((it) => it?.def?.throw);
-      if (gi > 0 && dd > 6 && dd < 30 && (this.shootWall || this.target.boxed || Math.random() < 0.08)) {
-        this.nadeCd = 4 + Math.random() * 3;
-        this.switchSlot(gi);
-        const t = this.target.pos;
-        _dir.set(t.x - this.pos.x, 0, t.z - this.pos.z).normalize();
-        _dir.y = 0.08 + dd * 0.012 + (t.y - this.pos.y) / Math.max(8, dd);
-        _dir.normalize();
-        this.aimYaw = this.bodyYaw = Math.atan2(_dir.x, _dir.z);
-        this.throwHeld(_dir);
-        this._chooseWeapon(dd);
-      }
+      const hiding = this.shootWall || this.target.boxed;
+      let kinds = null;
+      if (this.target.boxed && dd > 5 && dd < 14) kinds = ['impulse', 'grenade', 'fire'];
+      else if (dd > 6 && dd < 30 && (hiding || Math.random() < 0.08)) kinds = ['grenade', 'fire'];
+      if (kinds && this._throwAt(kinds, this.target.pos)) this.nadeCd = 4 + Math.random() * 3;
     }
 
     // in a box: heal up, peek through windows, leave when it's time
@@ -312,6 +349,9 @@ export class Bot extends Actor {
     if (this.noHealT > 1.2 && !zoneGoal?.urgent) {
       let slot = this.health < 75 ? this.findConsumable('heal') : -1;
       if (slot < 0 && this.shield < 75) slot = this.findConsumable('shield');
+      // a long heal with enemies around: box up first (the box logic heals inside)
+      const long = slot > 0 && this.items[slot].def.time > 3;
+      if (long && g.building && this.matTotal >= 40 && this.buildCooldown <= 0 && this._enemyNear(35)) { this._boxUp(); if (this.boxed) return; }
       if (slot > 0) {
         this.switchSlot(slot);
         if (this.startUse()) { this.mode = 'heal'; return; }
@@ -412,6 +452,30 @@ export class Bot extends Actor {
     }
   }
 
+  // Throw the first throwable we carry of the given kinds at a point. Returns true if thrown.
+  _throwAt(kinds, at) {
+    let gi = -1;
+    for (const k of kinds) { gi = this.items.findIndex((it) => it?.def?.throw === k); if (gi > 0) break; }
+    if (gi <= 0) return false;
+    const dd = Math.hypot(at.x - this.pos.x, at.z - this.pos.z);
+    this.switchSlot(gi);
+    _dir.set(at.x - this.pos.x, 0, at.z - this.pos.z).normalize();
+    _dir.y = 0.08 + dd * 0.012 + (at.y - this.pos.y) / Math.max(8, dd);
+    _dir.normalize();
+    this.aimYaw = this.bodyYaw = Math.atan2(_dir.x, _dir.z);
+    this.throwHeld(_dir);
+    this._chooseWeapon(this.target ? this.pos.distanceTo(this.target.pos) : 30);
+    return true;
+  }
+
+  _enemyNear(r) {
+    for (const a of this.game.actors) {
+      if (a === this || !a.alive || a.state !== 'ground') continue;
+      if ((a.pos.x - this.pos.x) ** 2 + (a.pos.z - this.pos.z) ** 2 < r * r) return true;
+    }
+    return false;
+  }
+
   // Where to go for the zone, or null when there's no need to move yet.
   // Rotates early: leaves once the time left is close to the time needed to get in.
   _zoneGoal() {
@@ -489,6 +553,18 @@ export class Bot extends Actor {
     }
   }
 
+  // Empty mag mid-fight: swap to a loaded gun, else wall off (if close) and reload.
+  _outOfAmmo(tgt, d) {
+    const g = this.game;
+    const loaded = this.items.some((it, i) => i > 0 && it?.isGun && it !== this.weapon && it.ammo > 0);
+    if (loaded) { this._chooseWeapon(d); return; }
+    if (d < 25 && this.buildCooldown <= 0 && g.building?.canAfford(this) && this.onGround) {
+      this.buildCooldown = 2.5;
+      g.building.buildWallFacing(this, this._yawTo(tgt.pos));
+    }
+    g.combat.reload(this);
+  }
+
   _chooseWeapon(d) {
     let bestI = -1, bestS = -1;
     for (let i = 1; i < 6; i++) {
@@ -502,7 +578,7 @@ export class Bot extends Actor {
       else if (k === 'ar') s *= d > 15 ? 1.5 : 0.9;
       else if (k === 'sniper') s *= d > 45 ? 2.2 : d > 25 ? 1 : 0.15;
       else if (k === 'rocket') s *= d > 9 && d < 70 ? (this.shootWall || this.target?.boxed ? 2.4 : 1.1) : 0.05;
-      if (w.ammo === 0 && w.reloading) s *= 0.3;
+      if (w.ammo === 0) s *= 0.25; // swap to a loaded gun instead of reloading mid-fight
       if (s > bestS) { bestS = s; bestI = i; }
     }
     if (bestI < 0) bestI = 0;
@@ -588,16 +664,21 @@ export class Bot extends Actor {
         wantSprint = ld > 12;
       } else {
         if (d > ideal * 1.3) fwd = 1; else if (d < ideal * 0.6) fwd = -0.8;
+        // enemy is weak / reloading / healing: close the gap
+        if (this.push && !melee) fwd = d > 3.5 ? 1 : 0;
         this.strafeT -= dt;
         if (this.strafeT <= 0) { this.strafeT = 0.5 + Math.random() * (1.4 - this.skill * 0.6); this.strafeDir = Math.random() < 0.5 ? -1 : 1; }
         const sx = -dz / d, sz = dx / d;
-        const strafe = melee ? 0.3 : 0.85;
+        // snipers hold still (crouched) to line up the shot, unless they're being hit
+        const sniping = this.weapon?.def.key === 'sniper' && d > 30 && g.time - this.lastHurtTime > 1.2;
+        const strafe = melee ? 0.3 : sniping ? 0 : 0.85;
+        if (sniping) fwd = 0;
         mx = (dx / d) * fwd + sx * this.strafeDir * strafe;
         mz = (dz / d) * fwd + sz * this.strafeDir * strafe;
-        if (Math.random() < dt * (0.15 + this.skill * 0.25) && this.onGround) this.wantJump = true;
-        wantSprint = melee && d > 4;
+        if (!sniping && Math.random() < dt * (0.15 + this.skill * 0.25) && this.onGround) this.wantJump = true;
+        wantSprint = (melee && d > 4) || (this.push && d > 9);
         // crouch-peek at long range for accuracy
-        this.crouched = !melee && this.skill > 0.35 && d > 25 && fwd === 0 && this.onGround && this.slideT <= 0;
+        this.crouched = !melee && this.skill > 0.35 && (d > 25 || sniping) && fwd === 0 && this.onGround && this.slideT <= 0;
         const bld = g.building;
         this.tunnelCd -= dt; this.coneCd -= dt;
         // pushing a higher enemy under fire: walls on both sides + a cone overhead ("tunnel")
@@ -666,6 +747,12 @@ export class Bot extends Actor {
       }
     }
     if (this.mode !== 'engage' || !tgt) this.crouched = false;
+    // step out of fire
+    for (const a of g.projectiles?.areas || []) {
+      if (a.type !== 'fire') continue;
+      const fx = this.pos.x - a.pos.x, fz = this.pos.z - a.pos.z, fd = Math.hypot(fx, fz);
+      if (fd < a.r + 0.8 && Math.abs(this.pos.y - a.pos.y) < 2.5) { mx = fx / (fd || 1); mz = fz / (fd || 1); wantSprint = true; this.crouched = false; break; }
+    }
     it.sprint = wantSprint;
     // obstacle handling: detour sideways when blocked
     const ml = Math.hypot(mx, mz);
@@ -692,11 +779,24 @@ export class Bot extends Actor {
     if (this.wantJump) { it.jump = true; this.wantJump = false; }
 
     // --- aiming & shooting ---
+    this.lookT -= dt;
     if (tgt && (this.targetVisible || this.shootWall)) {
       const eye = this.eye(_eye);
-      _tp.set(tgt.pos.x, tgt.pos.y + (tgt.state === 'ground' ? 1.05 : 0.9), tgt.pos.z).add(this.aimErr);
-      // slight lead on moving targets (imperfect)
-      _tp.addScaledVector(tgt.vel, 0.08 * (0.5 + this.skill));
+      const w0 = this.weapon, key = w0?.def.key;
+      // aim settles while we keep tracking the same target; moving, airborne or a fast target spoil it
+      this.settle = Math.min(1, this.settle + dt * (0.5 + this.skill * 0.9));
+      const tSpeed = Math.hypot(tgt.vel.x, tgt.vel.z), mySpeed = Math.hypot(this.vel.x, this.vel.z);
+      const errMul = (1.35 - 0.85 * this.settle) * (mySpeed > 4 ? 1.2 : 1) * (this.onGround ? 1 : 1.3) * (1 + Math.min(0.5, tSpeed * 0.03));
+      // aim point: rockets at the feet (splash), snipers go for the head, otherwise upper body
+      const onFoot = tgt.state === 'ground';
+      const ay = !onFoot ? 0.9 : key === 'rocket' && tgt.onGround ? 0.25 : this.aimHead ? 1.5 : 1.05;
+      _tp.set(tgt.pos.x, tgt.pos.y + ay, tgt.pos.z).addScaledVector(this.aimErr, errMul);
+      // lead moving targets by the bullet's travel time and hold over for drop
+      const pr = w0?.def.projectile;
+      const dist = eye.distanceTo(_tp);
+      const tof = pr ? dist / pr.speed : 0.04;
+      _tp.addScaledVector(tgt.vel, (tof + 0.04) * (0.5 + 0.5 * this.skill));
+      if (pr?.gravity) _tp.y += 0.5 * pr.gravity * tof * tof * (0.7 + 0.3 * this.skill);
       _dir.copy(_tp).sub(eye);
       const wantYaw = Math.atan2(_dir.x, _dir.z);
       const wantPitch = Math.atan2(_dir.y, Math.hypot(_dir.x, _dir.z));
@@ -709,25 +809,36 @@ export class Bot extends Actor {
       this.reactionT -= dt;
       const d = _dir.length();
       const w = this.weapon;
-      if (this.reactionT <= 0 && w && Math.abs(dy) < 0.12 && d < w.def.range * 0.8 && !(w.def.pellets > 1 && d > 20)) {
-        // burst pacing so bots aren't lasers
-        if (this.pauseT > 0) this.pauseT -= dt;
+      const single = key === 'sniper' || key === 'pump' || key === 'shotgun' || key === 'rocket';
+      // snipers wait until the aim has settled; shotguns only fire in their range
+      const ready = key === 'sniper' ? this.settle > 0.55 && Math.abs(dy) < 0.035 : Math.abs(dy) < 0.12;
+      if (this.reactionT <= 0 && w && ready && d < w.def.range * 0.8 && !(w.def.pellets > 1 && d > 15)) {
+        // burst pacing on automatic guns so bots aren't lasers
+        if (this.pauseT > 0 && !single) this.pauseT -= dt;
         else {
           this.burstT += dt;
-          if (this.burstT > 0.7 + Math.random() * 0.7) { this.burstT = 0; this.pauseT = 0.5 + Math.random() * 0.8; }
+          if (!single && this.burstT > 0.7 + Math.random() * 0.7) { this.burstT = 0; this.pauseT = 0.5 + Math.random() * 0.8; }
           if (w.canFire()) {
             const cp = Math.cos(this.aimPitch);
             _dir.set(Math.sin(this.aimYaw) * cp, Math.sin(this.aimPitch), Math.cos(this.aimYaw) * cp);
             this.root.position.copy(this.pos);
             this.root.rotation.y = this.bodyYaw;
             this.root.updateMatrixWorld(true);
-            if (g.combat.fire(this, eye, _dir, this.muzzleWorld(_muzzle))) w.cooldown *= 1.6;
-          } else if (w.ammo <= 0) g.combat.reload(this);
+            if (g.combat.fire(this, eye, _dir, this.muzzleWorld(_muzzle))) w.cooldown *= single ? 1.15 : 1.6;
+          } else if (w.ammo <= 0) this._outOfAmmo(tgt, d);
         }
       }
     } else {
       this.aiming = false;
-      if (Math.hypot(this.vel.x, this.vel.z) > 1) this.aimYaw = Math.atan2(this.vel.x, this.vel.z);
+      this.settle = Math.max(0, this.settle - dt * 0.8);
+      const turn = (3 + this.skill * 4) * dt;
+      if (tgt && !this.targetVisible) {
+        // pre-aim where they were last seen
+        this.aimYaw += clamp(angleDiff(this.aimYaw, this._yawTo(this.lastSeenPos)), -turn, turn);
+      } else if (this.lookT > 0) {
+        // glance toward a gunshot / whoever hit us
+        this.aimYaw += clamp(angleDiff(this.aimYaw, this.lookYaw), -turn, turn);
+      } else if (Math.hypot(this.vel.x, this.vel.z) > 1) this.aimYaw = Math.atan2(this.vel.x, this.vel.z);
       this.aimPitch *= 0.9;
     }
   }

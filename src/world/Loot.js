@@ -8,6 +8,9 @@ import { makeWeaponMesh, makeAmmoBoxMesh, makeAmmoPickupMesh, makeThrowableMesh 
 import { mulberry32 } from '../core/noise.js';
 import { AMMO, MATS, CONSUMABLES } from '../weapons/Items.js';
 
+// Loadout roles smart bots try to fill: one close-range gun, one rifle, one long-range, one explosive.
+const ROLE = { shotgun: 'close', pump: 'close', smg: 'close', ar: 'mid', burst: 'mid', sniper: 'long', rocket: 'boom', pistol: 'side' };
+
 const GOLD = '#ffc233', GOLD_DARK = '#c17d11', TRIM = '#6b3f16';
 
 function chestGeometries() {
@@ -389,10 +392,14 @@ export class Loot {
         let slot;
         if (actor.isPlayer) slot = actor.slot > 0 ? actor.slot : 1;
         else {
-          // bots replace their weakest gun
+          // bots replace their weakest gun (smart bots: the weakest in the same role, else a doubled-up role)
           slot = 1;
           let worst = Infinity;
-          actor.items.forEach((it, i) => { if (i > 0 && it?.isGun && it.score < worst) { worst = it.score; slot = i; } });
+          const role = ROLE[p.weapon.type];
+          const roles = {};
+          actor.items.forEach((it) => { if (it?.isGun) roles[ROLE[it.type]] = (roles[ROLE[it.type]] || 0) + 1; });
+          const cost = (it) => it.score * (!actor.smartLoot ? 1 : ROLE[it.type] === role ? 0.3 : roles[ROLE[it.type]] > 1 || ROLE[it.type] === 'side' ? 0.6 : 1.5);
+          actor.items.forEach((it, i) => { if (i > 0 && it?.isGun && cost(it) < worst) { worst = cost(it); slot = i; } });
         }
         const old = actor.giveWeapon(p.weapon, slot);
         if (old) this.dropItem(old, actor);
@@ -479,7 +486,13 @@ export class Loot {
       let s = 0;
       if (p.type === 'weapon') {
         if (guns.some((w) => w.type === p.weapon.type && w.rarity >= p.weapon.rarity)) s = 0;
-        else s = p.weapon.score > worst * 1.1 ? 2 : 0;
+        else if (actor.smartLoot && guns.length) {
+          // fill a missing role, or upgrade the gun in the same role
+          const role = ROLE[p.weapon.type];
+          const same = guns.filter((w) => ROLE[w.type] === role);
+          if (!same.length) s = role === 'side' ? (hasFree ? 1 : 0) : 2.5;
+          else s = p.weapon.score > Math.min(...same.map((w) => w.score)) * 1.1 ? 2 : 0;
+        } else s = p.weapon.score > worst * 1.1 ? 2 : 0;
       } else if (p.type === 'consumable') {
         // carry heals for later if there's room (stack or free slot)
         const d2 = CONSUMABLES[p.ctype];
