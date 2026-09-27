@@ -250,7 +250,7 @@ export class Bot extends Actor {
       if (a === this || !a.alive || a.state === 'bus') continue;
       const d = a.pos.distanceTo(this.pos);
       if (a.hiddenIn && d > 2.5) continue; // can't see into a haystack / dumpster
-      const range = a === this.target ? SIGHT + 30 : a.isPlayer ? sight + 12 : calm < 0.4 ? 7 : sight * 0.7;
+      const range = a === this.target ? SIGHT + 30 : a.isPlayer ? sight + 12 : Math.max(22, sight * 0.85);
       if (d < range) cands.push([d, a]);
     }
     cands.sort((a, b) => a[0] - b[0]);
@@ -261,10 +261,12 @@ export class Bot extends Actor {
       if (a !== this.target) {
         // must notice them: in front (or close / loud) and a per-think chance
         const dx = (a.pos.x - this.pos.x) / (d || 1), dz = (a.pos.z - this.pos.z) / (d || 1);
-        const inView = dx * fx + dz * fz > 0.2 || d < 10;
-        const loud = g.time - a.lastFireTime < 1 && d < 55;
+        // a wide field of view, and you hear footsteps / gunfire around you
+        const inView = dx * fx + dz * fz > -0.25 || d < 12;
+        const hs = Math.hypot(a.vel.x, a.vel.z);
+        const heard = (g.time - a.lastFireTime < 1 && d < 60) || (hs > 2 && !a.crouched && d < (a.sprinting ? 30 : 20));
         const shotMe = this.lastAttacker === a && g.time - this.lastHurtTime < 2;
-        if (!shotMe && (!(inView || loud) || Math.random() > (loud ? 0.5 : 0.22) * (1.2 - d / (SIGHT * 1.4)))) continue;
+        if (!shotMe && (!(inView || heard) || Math.random() > (heard ? 0.6 : 0.4) * (1.25 - d / (SIGHT * 1.4)))) continue;
       }
       checks++;
       if (!g.world.lineOfSight(eye, a.chest(_tp))) continue;
