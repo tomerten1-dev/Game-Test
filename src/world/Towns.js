@@ -42,7 +42,7 @@ export class Towns {
       const lg = new THREE.BoxGeometry(0.42, 0.5, 0.42);
       const lm = new THREE.MeshStandardMaterial({ color: '#fff4d6', emissive: '#ffc766', emissiveIntensity: 1.6, roughness: 0.4 });
       const li = new THREE.InstancedMesh(lg, lm, this.lanterns.length);
-      this.lanterns.forEach((l, i) => li.setMatrixAt(i, mat(l.x, l.y, l.z)));
+      this.lanterns.forEach((l, i) => li.setMatrixAt(i, mat(l.x, l.y, l.z, 0, 0, 0, l.small ? 0.7 : 1, l.small ? 0.35 : 1, l.small ? 0.7 : 1)));
       li.castShadow = true;
       scene.add(li);
     }
@@ -103,8 +103,10 @@ export class Towns {
   }
 
   _town(town, parts, crates) {
+    if (town.city) return this._city(town, crates);
     const r = this.rand;
     this._fountain(town, parts);
+    this._cafe(town);
     const count = 6 + Math.floor(r() * 3);
     let placed = 0;
     const specials = [...SPECIALS].sort(() => r() - 0.5).slice(0, 2);
@@ -127,6 +129,7 @@ export class Towns {
       this._house(parts, type, scale, x, y, z, rot, w, d);
       if (r() < 0.4 && type.includes('home')) this._fence(parts, x, y, z, rot, w, d);
       if (type.includes('home')) this._flowers(parts, x, y, z, rot, w, d);
+      if (type.includes('home') && r() < 0.45) this._porch(x, z, rot, w, d);
       const col = { kind: 'box', ...box, y0: y - 3, y1: y + h, house: true };
       this.colliders.add(col);
       this.houses.push({ ...box, x, z, y, h, rot });
@@ -283,6 +286,101 @@ export class Towns {
         parts.push(part(new THREE.IcosahedronGeometry(0.13, 0), c, base.clone().multiply(mat(lx - 0.85 + i * 0.34, 0.45 + r() * 0.08, lz + (r() - 0.5) * 0.25))));
       }
     }
+  }
+
+  // Modern downtown built from KayKit City Builder Bits (12 m road/building tiles).
+  _city(t, crates) {
+    const r = this.rand;
+    const T = 12, S = T / 2; // 2-unit tiles -> 12 m
+    const y = t.y;
+    const road = (dx, dz, type, rot) => this._place(`kk/city_road_${type}`, t.x + dx, y - 0.22, t.z + dz, rot, S);
+    road(0, 0, 'junction', 0);
+    road(T, 0, 'straight', 0); road(-T, 0, 'straight', 0);
+    road(0, T, 'straight', Math.PI / 2); road(0, -T, 'straight', Math.PI / 2);
+    // buildings in the four corner blocks + four along the road ends, facing the nearest road
+    const blocks = [[T, T], [-T, T], [T, -T], [-T, -T], [2 * T, T * 0.0], [-2 * T, 0], [0, 2 * T], [0, -2 * T]];
+    const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].sort(() => r() - 0.5);
+    blocks.forEach(([dx, dz], i) => {
+      const bx = t.x + dx, bz = t.z + dz;
+      const gy = Math.min(this.terrain.heightAt(bx - 5, bz - 5), this.terrain.heightAt(bx + 5, bz + 5), this.terrain.heightAt(bx - 5, bz + 5), this.terrain.heightAt(bx + 5, bz - 5));
+      if (gy < 2) return;
+      const type = `kk/city_building_${letters[i]}`;
+      const info = this.models.get(type);
+      // face toward the road (the axis with the smaller offset)
+      const rot = Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? -Math.PI / 2 : Math.PI / 2) : (dz > 0 ? Math.PI : 0);
+      this._place(type, bx, gy - 0.45, bz, rot, S);
+      const hw = T * 0.4;
+      const box = { minX: bx - hw, maxX: bx + hw, minZ: bz - hw, maxZ: bz + hw };
+      this.colliders.add({ kind: 'box', ...box, y0: gy - 3, y1: gy + info.size.y * S, house: true });
+      this.houses.push({ ...box, x: bx, z: bz, y: gy, h: info.size.y * S, rot });
+      const fx = Math.sin(rot), fz = Math.cos(rot);
+      this.chestSpots.push({ x: bx + fx * (hw + 1.4) + fz * 3, z: bz + fz * (hw + 1.4) - fx * 3, rot });
+      // sidewalk props
+      const sx = bx + fx * (hw + 0.8), sz = bz + fz * (hw + 0.8);
+      const side = r() < 0.5 ? -3.5 : 3.5;
+      if (r() < 0.6) this._prop('kk/city_bench', sx + fz * side, sz - fx * side, 0.6, rot, 0.6);
+      if (r() < 0.5) this._prop('kk/city_firehydrant', sx - fz * side, sz + fx * side, 0.8, rot, 0.3);
+      if (r() < 0.5) this._prop('kk/city_trash_A', sx - fz * side * 0.4, sz + fx * side * 0.4, 1.0, rot, 0.4);
+    });
+    // street lights along the roads
+    for (const [dx, dz, rot] of [[T * 0.9, 4.2, 0], [-T * 0.9, -4.2, Math.PI], [4.2, -T * 0.9, -Math.PI / 2], [-4.2, T * 0.9, Math.PI / 2]]) {
+      this._prop('kk/city_streetlight', t.x + dx, t.z + dz, 5.5, rot, 0.2);
+      this.lanterns.push({ x: t.x + dx - Math.sin(rot) * 1.0, y: this.terrain.heightAt(t.x + dx, t.z + dz) + 5.2, z: t.z + dz - Math.cos(rot) * 1.0, small: true });
+    }
+    // parked cars (cover!)
+    const cars = ['taxi', 'sedan', 'hatchback', 'police', 'stationwagon'];
+    const spots = [[T * 0.7, 3.4, Math.PI / 2], [-T * 0.8, -3.4, -Math.PI / 2], [3.4, -T * 0.75, Math.PI], [-3.4, T * 0.7, 0], [T * 1.35, -3.4, Math.PI / 2]];
+    for (const [dx, dz, rot] of spots) {
+      const type = `kk/city_car_${cars[Math.floor(r() * cars.length)]}`;
+      const info = this.models.get(type);
+      const sc = 4.6 / info.size.z;
+      const cx = t.x + dx, cz = t.z + dz, gy = this.terrain.heightAt(cx, cz);
+      this._place(type, cx, gy + 0.05, cz, rot + (r() < 0.5 ? 0 : Math.PI), sc);
+      const along = Math.abs(Math.sin(rot)) > 0.5;
+      const hx = along ? 2.4 : 1.1, hz = along ? 1.1 : 2.4;
+      this.colliders.add({ kind: 'box', minX: cx - hx, maxX: cx + hx, minZ: cz - hz, maxZ: cz + hz, y0: gy - 1, y1: gy + info.size.y * sc * 0.9, crate: true });
+    }
+    // dumpsters and a water tower on the outskirts
+    for (let i = 0; i < 2; i++) {
+      const a = r() * Math.PI * 2;
+      this._prop('kk/city_dumpster', t.x + Math.cos(a) * T * 1.5, t.z + Math.sin(a) * T * 1.5, 1.6, a, 1.3);
+    }
+    const wa = r() * Math.PI * 2;
+    this._prop('kk/city_watertower', t.x + Math.cos(wa) * T * 2.4, t.z + Math.sin(wa) * T * 2.4, 13, 0, 2.2);
+    for (let i = 0; i < 3; i++) {
+      const a = r() * Math.PI * 2, d = T * (0.3 + r() * 0.25);
+      this._crateStack(crates, t.x + Math.cos(a) * d + 4, t.z + Math.sin(a) * d + 4, 1);
+    }
+    this.chestSpots.push({ x: t.x + 4.5, z: t.z + 4.5, rot: 0 });
+  }
+
+  // Outdoor café (KayKit Furniture Bits) near the plaza.
+  _cafe(t) {
+    const r = this.rand;
+    const a0 = r() * Math.PI * 2;
+    for (let k = 0; k < 2; k++) {
+      const a = a0 + k * 0.5, d = t.r * 0.24;
+      const cx = t.x + Math.cos(a) * d, cz = t.z + Math.sin(a) * d;
+      this._prop('kk/furn_table_small', cx, cz, 0.85, r() * 6, 0.5);
+      const chair = r() < 0.5 ? 'kk/furn_chair_A_wood' : 'kk/furn_chair_B_wood';
+      for (let c = 0; c < 4; c++) {
+        const ca = (c / 4) * Math.PI * 2 + a;
+        this._prop(chair, cx + Math.cos(ca) * 0.95, cz + Math.sin(ca) * 0.95, 1.0, Math.atan2(-Math.cos(ca), -Math.sin(ca)), 0);
+      }
+    }
+  }
+
+  // Porch furniture in front of homes.
+  _porch(x, z, rot, w, d) {
+    const r = this.rand;
+    const fx = Math.sin(rot), fz = Math.cos(rot), sx = Math.cos(rot), sz = -Math.sin(rot);
+    const px = x + fx * (d / 2 + 1.1) + sx * (w / 4), pz = z + fz * (d / 2 + 1.1) + sz * (w / 4);
+    const pick = r();
+    if (pick < 0.35) this._prop('kk/furn_couch_pillows', px, pz, 0.95, rot, 0.9);
+    else if (pick < 0.7) this._prop('kk/furn_armchair', px, pz, 0.95, rot + (r() - 0.5) * 0.6, 0.6);
+    else this._prop('kk/furn_lamp_standing', px, pz, 1.9, rot, 0.25);
+    const cx = x + fx * (d / 2 + 0.8) - sx * (w / 2 - 0.5), cz = z + fz * (d / 2 + 0.8) - sz * (w / 2 - 0.5);
+    this._prop(r() < 0.5 ? 'kk/furn_cactus_medium_A' : 'kk/furn_cactus_small_A', cx, cz, 0.9, r() * 6, 0.3);
   }
 
   _barrel(x, z) {

@@ -14,7 +14,7 @@ export const TOWNS = [
   { name: 'Candy Corners', x: -8, z: 18, r: 27 },
   { name: 'Breezy Bay', x: 98, z: 38, r: 25 },
   { name: 'Maple Hollow', x: -92, z: -38, r: 26 },
-  { name: 'Pebble Park', x: 14, z: -98, r: 24 },
+  { name: 'Pebble City', x: 14, z: -98, r: 26, city: true },
   { name: 'Sunset Springs', x: 88, z: -72, r: 23 },
 ];
 export const MOUNTAIN = { x: -62, z: 88, r: 62, h: 48 };

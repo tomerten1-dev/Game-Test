@@ -10,6 +10,11 @@ const KK = [
   'tree_single_A', 'tree_single_B', 'rock_single_A', 'rock_single_B', 'rock_single_C', 'rock_single_D', 'rock_single_E',
   'cloud_big', 'cloud_small', 'barrel', 'crate_A_big', 'sack', 'wheelbarrow', 'tent',
   'flag_blue', 'flag_red', 'flag_yellow', 'flag_green', 'resource_lumber', 'weaponrack', 'bucket_water', 'chest_gold',
+  // KayKit City Builder Bits + Furniture Bits (CC0)
+  'city_building_A', 'city_building_B', 'city_building_C', 'city_building_D', 'city_building_E', 'city_building_F', 'city_building_G', 'city_building_H',
+  'city_road_straight', 'city_road_junction', 'city_car_hatchback', 'city_car_police', 'city_car_sedan', 'city_car_stationwagon', 'city_car_taxi',
+  'city_streetlight', 'city_bench', 'city_firehydrant', 'city_dumpster', 'city_trash_A', 'city_watertower',
+  'furn_table_small', 'furn_chair_A_wood', 'furn_chair_B_wood', 'furn_armchair', 'furn_couch_pillows', 'furn_lamp_standing', 'furn_cactus_medium_A', 'furn_cactus_small_A',
 ].map((n) => `kk/${n}`);
 export const ENV_MODELS = [
   'palm-long', 'palm-short', 'formation-large-stone', 'formation-stone',
