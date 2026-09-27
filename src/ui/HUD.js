@@ -21,6 +21,8 @@ export class HUD {
         <div id="speedlines"></div>
         <div id="storm-tint"></div>
         <div id="hurt-flash"></div>
+        <div id="dmg-vignette"></div>
+        <div id="shield-flash"></div>
         <div id="dmg-dir"><i></i></div>
         <div id="crosshair">
           <i class="ch t"></i><i class="ch b"></i><i class="ch l"></i><i class="ch r"></i><i class="dot"></i>
@@ -137,7 +139,20 @@ export class HUD {
   hitMarker(head, kill) {
     const hm = this.el.hitmarker;
     hm.className = 'show' + (head ? ' head' : '') + (kill ? ' kill' : '');
-    this.hitT = kill ? 0.35 : 0.18;
+    this.hitT = kill ? 0.35 : head ? 0.28 : 0.18;
+    if (head || kill) {
+      // crosshair pops on headshots / eliminations
+      this.el.crosshair.classList.remove('pop'); void this.el.crosshair.offsetWidth; this.el.crosshair.classList.add('pop');
+    }
+  }
+
+  // Persistent red edges that grow with recent damage (and fade as you recover).
+  damageTaken(amount, shieldBroke) {
+    this.vig = Math.min(1, (this.vig || 0) + amount / 60);
+    if (shieldBroke) {
+      const f = this.root.querySelector('#shield-flash');
+      f.classList.remove('on'); void f.offsetWidth; f.classList.add('on');
+    }
   }
 
   hurt(attacker) {
@@ -357,6 +372,11 @@ export class HUD {
     if (!p) return;
     if (this.hitT > 0) { this.hitT -= dt; if (this.hitT <= 0) this.el.hitmarker.className = ''; }
     this._drawCompass();
+    if (this.vig > 0) {
+      this.vig = Math.max(0, this.vig - dt * 0.35);
+      const low = p.alive ? Math.max(0, (40 - p.health) / 40) * 0.5 : 0; // low health keeps a faint pulse
+      this.root.querySelector('#dmg-vignette').style.opacity = String(Math.max(this.vig, low * (0.7 + 0.3 * Math.sin(g.time * 4))));
+    }
     const boss = g.boss?.boss;
     const showBoss = !!boss && boss.alive && p.alive && p.pos.distanceTo(boss.pos) < 75;
     this.set('bossOn', this.root.querySelector('#bossbar').style, showBoss ? 'flex' : 'none', 'display');

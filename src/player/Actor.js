@@ -550,6 +550,7 @@ export class Actor {
   // --- combat state ---
   takeDamage(amount, attacker, headshot = false) {
     if (!this.alive) return 0;
+    this._shieldWas = this.shield;
     let dmg = amount;
     if (this.shield > 0) {
       const s = Math.min(this.shield, dmg);
@@ -560,7 +561,14 @@ export class Actor {
     this.lastHurtTime = this.game.time;
     this.lastAttacker = attacker;
     this.flashT = 0.25;
-    if (attacker?.isPlayer && attacker !== this) this.game.meta?.track('damage', amount);
+    if (attacker?.isPlayer && attacker !== this) {
+      this.game.meta?.track('damage', amount);
+      // you broke their shield: glassy crack + blue shards
+      if (this._shieldWas > 0 && this.shield <= 0) {
+        this.game.sound.play('shieldBreak');
+        this.game.effects.shieldBreak?.(this.chest(new THREE.Vector3()));
+      }
+    }
     if (this.health <= 0) {
       this.health = 0;
       this.die(attacker);

@@ -266,6 +266,14 @@ export class Effects {
     }
   }
 
+  shieldBreak(pos) {
+    for (let i = 0; i < 40; i++) {
+      const a = Math.random() * Math.PI * 2, u = Math.random() * 2 - 1, s = 3 + Math.random() * 5, k = Math.sqrt(1 - u * u);
+      _c.setHSL(0.56 + Math.random() * 0.05, 1, 0.6 + Math.random() * 0.25);
+      this.sparks.emit(pos.x, pos.y, pos.z, Math.cos(a) * k * s, u * s + 1, Math.sin(a) * k * s, _c, 0.45 + Math.random() * 0.3, 0.14 + Math.random() * 0.08, 8);
+    }
+  }
+
   hitSparks(pos, color) {
     for (let i = 0; i < 10; i++) {
       _c.set(i % 2 ? '#ffffff' : color);

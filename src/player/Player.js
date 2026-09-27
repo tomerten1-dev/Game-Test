@@ -43,6 +43,9 @@ export class Player extends Actor {
 
   onDamaged(amount, attacker) {
     this.game.hud.hurt(attacker);
+    const broke = this._shieldWas > 0 && this.shield <= 0;
+    this.game.hud.damageTaken(amount, broke);
+    if (broke) this.game.sound.play('shieldBreak');
     this.game.sound.play('hurt');
   }
 
