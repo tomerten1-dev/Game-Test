@@ -169,6 +169,7 @@ export class Game {
 
   // Back to the lobby from the results screen (or when starting a new match from it).
   toLobby(silent = false) {
+    this.sound.busEngine(false);
     this.dayCycle.stop();
     this.mood = applyMood(this, 'day');
     for (const a of this.actors) a.destroy();
@@ -321,6 +322,7 @@ export class Game {
 
   // Warm-up over: wipe inventories and put everyone on the bus.
   beginBus() {
+    this.sound.busEngine(false);
     this.warmup = 0;
     this.respawns = [];
     this.building.reset();
@@ -440,6 +442,7 @@ export class Game {
     }
     if (this.bus.active) {
       this.bus.setAboard(players ? aboard / players : 0);
+      this.sound.busEngine(p.state === 'bus');
       // thank the bus driver (you once; a few bots too)
       if (p.state === 'bus' && this.input.pressed('interact') && !this._thanked) {
         this._thanked = true;

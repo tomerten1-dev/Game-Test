@@ -1,4 +1,33 @@
-// Tiny Web Audio synth: every sound is generated, no audio files needed.
+// Web Audio: CC0 Kenney samples for the main sounds (public/audio), a small synth for the
+// rest and as a fallback if a sample can't be decoded.
+
+const SAMPLE_FILES = ['blaster', 'blaster_repeater', 'enemy_destroy', 'enemy_hurt', 'jump_a', 'jump_b', 'jump_c', 'land', 'walking', 'weapon_change', 'coin', 'break', 'fall', 'impact', 'engine', 'ui-tap', 'build'];
+// sound name -> [sample, playbackRate, gain, (optional) synth layer too]
+const SAMPLE_MAP = {
+  pistol: ['blaster', 1.05, 0.8],
+  smg: ['blaster_repeater', 1.2, 0.6],
+  ar: ['blaster_repeater', 0.88, 0.75, true],
+  burst: ['blaster_repeater', 1.0, 0.7, true],
+  shotgun: ['blaster', 0.62, 1.0, true],
+  pump: ['blaster', 0.55, 1.1, true],
+  sniper: ['blaster', 0.45, 1.1, true],
+  rocket: ['blaster', 0.4, 0.7, true],
+  explosion: ['impact', 0.55, 1.2, true],
+  jump: ['jump_a', 1, 0.45],
+  land: ['land', 1, 0.6],
+  fall: ['fall', 1, 0.8, true],
+  elim: ['enemy_destroy', 1, 0.8, true],
+  break: ['break', 1, 0.8],
+  pickup: ['coin', 1.1, 0.45],
+  ammo: ['coin', 1.35, 0.35],
+  buy: ['coin', 0.9, 0.6],
+  reload: ['weapon_change', 1, 0.6],
+  reloaded: ['weapon_change', 1.3, 0.45],
+  click: ['ui-tap', 1.1, 0.5],
+  build: ['build', 0.8, 0.7],
+  harvest_wood: ['build', 1.25, 0.6],
+  bounce: ['land', 1.6, 0.4],
+};
 
 export class Sound {
   constructor() {
@@ -34,6 +63,7 @@ export class Sound {
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     }
     if (this.ctx.state === 'suspended') this.ctx.resume();
+    this.loadSamples();
     return this.ctx;
   }
 
@@ -73,6 +103,52 @@ export class Sound {
       if (this._hum.pan.pan) this._hum.pan.pan.value = Math.max(-1, Math.min(1, (dx * this.right.x + dz * this.right.z) / (d || 1))) * 0.8;
     }
     this._hum.g.gain.setTargetAtTime(target, this.ctx.currentTime, 0.2);
+  }
+
+  // Fetch + decode the CC0 samples (after the audio context exists).
+  async loadSamples() {
+    if (this._loading || !this.ctx) return;
+    this._loading = true;
+    this.buffers = {};
+    await Promise.all(SAMPLE_FILES.map(async (n) => {
+      try {
+        const res = await fetch(`/audio/${n}.ogg`);
+        this.buffers[n] = await this.ctx.decodeAudioData(await res.arrayBuffer());
+      } catch { /* keep the synth version */ }
+    }));
+  }
+
+  _sample(name, t, { rate = 1, gain = 1, offset = 0, dur } = {}) {
+    const buf = this.buffers?.[name];
+    if (!buf) return false;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = rate * (0.94 + Math.random() * 0.12);
+    const g = this.ctx.createGain();
+    g.gain.value = gain;
+    src.connect(g); g.connect(this._out || this.master);
+    if (dur) {
+      g.gain.setValueAtTime(gain, t + dur * 0.7);
+      g.gain.linearRampToValueAtTime(0.0001, t + dur);
+      src.start(t, offset, dur + 0.02);
+    } else src.start(t, offset);
+    return true;
+  }
+
+  // Engine drone while riding the bus.
+  busEngine(on) {
+    if (!this.ctx || this.ctx.state !== 'running' || !this.buffers?.engine) return;
+    if (on && !this._engine) {
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.buffers.engine; src.loop = true; src.playbackRate.value = 0.7;
+      const g = this.ctx.createGain(); g.gain.value = 0.18;
+      src.connect(g); g.connect(this.master); src.start();
+      this._engine = { src, g };
+    } else if (!on && this._engine) {
+      this._engine.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.3);
+      const e = this._engine; setTimeout(() => e.src.stop(), 1200);
+      this._engine = null;
+    }
   }
 
   toggleMute() {
@@ -209,12 +285,21 @@ export class Sound {
       pan.connect(this.master);
       this._out = pan;
     }
+    // recorded CC0 sample first (footsteps use short slices of Kenney's walking loop)
+    if (name === 'step' && this.buffers?.walking) {
+      const d = this.buffers.walking.duration;
+      if (this._sample('walking', t, { rate: 1, gain: 0.9 * v, offset: Math.floor(Math.random() * (d / 0.42)) * 0.42, dur: 0.22 })) return;
+    }
+    if (name === 'jump' && this.buffers?.jump_a) { this._sample(['jump_a', 'jump_b', 'jump_c'][Math.floor(Math.random() * 3)], t, { gain: 0.45 * v }); return; }
+    const sm = SAMPLE_MAP[name];
+    if (sm && this._sample(sm[0], t, { rate: sm[1], gain: sm[2] * v }) && !sm[3]) return;
     switch (name) {
       case 'pistol':
         this._noise(t, 0.16, { freq: 3200, freqEnd: 500, gain: 0.6 * v });
         this._tone(t, 0.08, { type: 'square', freq: 220, freqEnd: 70, gain: 0.25 * v });
         break;
       case 'ar':
+      case 'burst':
         this._noise(t, 0.2, { freq: 2600, freqEnd: 400, gain: 0.65 * v });
         this._tone(t, 0.1, { type: 'sawtooth', freq: 160, freqEnd: 50, gain: 0.25 * v });
         break;
@@ -223,6 +308,7 @@ export class Sound {
         this._tone(t, 0.06, { type: 'square', freq: 260, freqEnd: 90, gain: 0.15 * v });
         break;
       case 'shotgun':
+      case 'pump':
         this._noise(t, 0.45, { freq: 1800, freqEnd: 200, gain: 0.9 * v });
         this._tone(t, 0.25, { type: 'sine', freq: 110, freqEnd: 35, gain: 0.6 * v });
         break;
