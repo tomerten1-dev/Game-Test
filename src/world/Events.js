@@ -46,11 +46,13 @@ export class Events {
     this.zones = [];     // placed shield kegs / campfires
     this.vending = [];
     this.benches = [];   // upgrade benches (materials -> weapon rarity)
+    this.hides = [];     // haystacks / dumpsters you can hide in
     this.dropIdx = 0;
     this.padMat = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.5 });
     this._createJumpPads();
     this._createVending();
     this._createBenches();
+    this._createHides();
   }
 
   // ---------- helpers ----------
@@ -251,6 +253,81 @@ export class Events {
     }
   }
 
+  // ---------- hiding spots ----------
+  _createHides() {
+    const hay = new THREE.MeshStandardMaterial({ color: '#e3c16f', roughness: 0.95 });
+    const band = new THREE.MeshStandardMaterial({ color: '#9a7a3a', roughness: 0.9 });
+    const dInfo = this.game.models?.get('kk/city_dumpster');
+    for (const t of TOWNS) {
+      const urban = t.kind === 'city' || t.kind === 'spires' || t.kind === 'factory';
+      if (urban && !dInfo) continue;
+      for (let n = 0; n < 3; n++) {
+        let spot = null;
+        for (let i = 0; i < 120 && !spot; i++) {
+          const a = i * 2.39 + n * 2.1 + 0.7, d = t.r * (0.35 + (i % 9) * 0.1);
+          const x = t.x + Math.cos(a) * d, z = t.z + Math.sin(a) * d;
+          if (this._clearSpot(x, z, 1.6, 0.85) && !this.hides.some((h) => Math.hypot(h.x - x, h.z - z) < 10)) spot = { x, z };
+        }
+        if (!spot) continue;
+        const y = this.world.heightAt(spot.x, spot.z);
+        let group;
+        if (urban) {
+          group = this.game.models.instance('kk/city_dumpster');
+          group.scale.setScalar(1.5 / dInfo.size.y);
+        } else {
+          group = new THREE.Group();
+          const bale = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 1.6, 18), hay);
+          bale.rotation.z = Math.PI / 2; bale.position.y = 0.95;
+          for (const bx of [-0.45, 0.45]) {
+            const r = new THREE.Mesh(new THREE.TorusGeometry(0.96, 0.04, 6, 24), band);
+            r.rotation.y = Math.PI / 2; r.position.set(bx, 0.95, 0);
+            group.add(r);
+          }
+          bale.castShadow = bale.receiveShadow = true;
+          group.add(bale);
+        }
+        group.rotation.y = Math.random() * Math.PI;
+        group.position.set(spot.x, y, spot.z);
+        this.scene.add(group);
+        const col = { kind: 'circle', x: spot.x, z: spot.z, r: 0.9, y0: y - 0.5, y1: y + 1.6, crate: true };
+        this.world.colliders.add(col);
+        this.hides.push({ kind: urban ? 'dumpster' : 'hay', x: spot.x, z: spot.z, y, group, col, occupant: null });
+      }
+    }
+  }
+
+  // Jump into a hiding spot: invisible to bots, can't move or shoot; jump / interact to leave.
+  hide(spot, actor) {
+    if (spot.occupant || actor.state !== 'ground') return spot.occupant ? 'Someone is already in there' : null;
+    spot.occupant = actor;
+    actor.hiddenIn = spot;
+    actor.setBuildMode?.(null);
+    actor.useT = 0;
+    actor.vel.set(0, 0, 0);
+    actor.pos.set(spot.x, spot.y + 0.2, spot.z);
+    this._rustle(spot);
+    return null;
+  }
+
+  unhide(actor) {
+    const spot = actor.hiddenIn;
+    if (!spot) return;
+    spot.occupant = null;
+    actor.hiddenIn = null;
+    const a = actor.aimYaw;
+    actor.pos.set(spot.x + Math.sin(a) * 1.6, spot.y + 1.8, spot.z + Math.cos(a) * 1.6);
+    actor.vel.set(Math.sin(a) * 3, 6, Math.cos(a) * 3);
+    actor.onGround = false;
+    actor.root.visible = true;
+    this._rustle(spot);
+  }
+
+  _rustle(spot) {
+    const c = spot.kind === 'hay' ? _fc.set('#e3c16f') : _fc.set('#3f6b4a');
+    for (let i = 0; i < 18; i++) this.game.effects.debris.emit(spot.x + (Math.random() - 0.5), spot.y + 1.4, spot.z + (Math.random() - 0.5), (Math.random() - 0.5) * 3, 2 + Math.random() * 3, (Math.random() - 0.5) * 3, c, 0.8, 0.15, 12);
+    this.game.sound.play('harvest_wood', spot.occupant?.isPlayer ? null : new THREE.Vector3(spot.x, spot.y, spot.z), { range: 30 });
+  }
+
   // Cost to take a gun from its rarity to the next one (Legendary is the top; Mythics can't be upgraded).
   static upgradeCost(w) {
     return w?.isGun && w.rarity < 4 ? UPGRADE_COST[w.rarity] : null;
@@ -415,6 +492,11 @@ export class Events {
         best = { kind: 'vending', vending: v, text: `Buy ${RARITIES[o.rarity].name} ${WEAPONS[o.type].name} · ${o.price} ${o.mat}`, rarity: o.rarity };
       }
     }
+    for (const h of this.hides) {
+      if (h.occupant) continue;
+      const d = Math.hypot(h.x - pos.x, h.z - pos.z);
+      if (d < bd + 0.8 && Math.abs(h.y - pos.y) < 2.5) { bd = d; best = { kind: 'hide', hide: h, text: `Hide in ${h.kind === 'hay' ? 'Haystack' : 'Dumpster'}` }; }
+    }
     for (const b of this.benches) {
       const d = Math.hypot(b.x - pos.x, b.z - pos.z);
       if (d < bd + 0.8 && Math.abs(b.y - pos.y) < 2.5) {
@@ -463,6 +545,7 @@ export class Events {
     this.dropIdx = 0;
     for (const z of this.zones) this.scene.remove(z.group);
     this.zones = [];
+    for (const h of this.hides) if (h.occupant) this.unhide(h.occupant);
   }
 
   update(dt, matchTime) {

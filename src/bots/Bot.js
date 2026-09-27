@@ -241,6 +241,7 @@ export class Bot extends Actor {
     for (const a of g.actors) {
       if (a === this || !a.alive || a.state === 'bus') continue;
       const d = a.pos.distanceTo(this.pos);
+      if (a.hiddenIn && d > 2.5) continue; // can't see into a haystack / dumpster
       const range = a === this.target ? SIGHT + 30 : a.isPlayer ? sight + 12 : calm < 0.4 ? 7 : sight * 0.7;
       if (d < range) cands.push([d, a]);
     }

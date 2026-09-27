@@ -34,7 +34,7 @@ export class Combat {
     const wh = this.game.world.raycast(o, d, maxT, _hit);
     if (wh) { best = wh.t; res.collider = wh.collider; res.terrain = wh.terrain; }
     for (const a of this.game.actors) {
-      if (a === ignore || !a.alive || a.state === 'bus') continue;
+      if (a === ignore || !a.alive || a.state === 'bus' || a.hiddenIn) continue;
       const p = _p.copy(a.pos);
       p.y -= a.crouchAmt * 0.3; // crouching lowers the hitboxes
       // broad phase
@@ -118,6 +118,7 @@ export class Combat {
         const kind = r.collider ? (r.collider.structure ? (r.collider.structure.mat === 'wood' ? 'wood' : 'stone') : r.collider.house ? 'stone' : r.collider.crate ? 'wood' : r.collider.tree ? 'wood' : r.collider.rock ? 'stone' : 'stone') : 'terrain';
         if (i < 4) g.effects.impact(_end.addScaledVector(_dir, -0.05), kind, _n.copy(_dir).negate());
         if (r.collider?.structure) r.collider.structure.damage(w.damage * 0.9, shooter);
+        else if (r.collider?.breakable) this.damageProp(r.collider, w.damage);
       }
     }
     for (const [target, e] of perTarget) {
@@ -202,6 +203,7 @@ export class Combat {
     }
     const c = r.collider;
     if (c?.structure) { const m = c.structure.mat || 'wood'; c.structure.damage(50, actor); g.effects.impact(_end, m === 'wood' ? 'wood' : 'stone'); g.sound.play(`harvest_${m}`, actor.isPlayer ? null : _end); return true; }
+    if (c?.breakable) this.damageProp(c, 35);
     const mat = r.terrain ? null : c?.mat || (c?.tree || c?.crate ? 'wood' : c?.rock || c?.stone ? 'stone' : c?.house ? 'wood' : null);
     g.effects.impact(_end, mat === 'wood' ? 'wood' : 'stone', _n.copy(dir).negate());
     if (mat) {
@@ -211,5 +213,12 @@ export class Combat {
       g.sound.play(`harvest_${mat}`, actor.isPlayer ? null : _end, { range: 50 });
     } else if (actor.isPlayer) g.sound.play('impact');
     return mat || true;
+  }
+
+  damageProp(c, amount) {
+    const b = c.breakable;
+    if (!b || b.broken) return;
+    b.hp -= amount;
+    if (b.hp <= 0) this.game.world.towns.breakProp(c, this.game);
   }
 }

@@ -603,6 +603,12 @@ export class Game {
       const dir = this.camera.getWorldDirection(_dir);
       this.pings.ping(_origin.copy(this.camera.position).addScaledVector(dir, this.rig.curDist), dir);
     }
+    // hidden in a haystack / dumpster: only leaving is possible
+    if (p.hiddenIn) {
+      this.hud.prompt?.(`Hidden · Jump or ${(this.input.keyFor('interact') || 'E').replace(/^Key/, '')} to leave`);
+      if (input.pressed('jump') || input.pressed('interact')) this.events.unhide(p);
+      return;
+    }
     if (this.updateBuild(dt)) return;
     if (p.state === 'ground') {
       const near = this.events.nearestInteractable(p.pos) || this.boss.nearestInteractable(p) || this.loot.nearestInteractable(p.pos);
@@ -613,6 +619,7 @@ export class Game {
         if (near.kind === 'supply') this.events.openSupply(near.supply, p);
         else if (near.kind === 'vault') { const msg = this.boss.openVault(p); if (msg) this.hud.toast?.(msg); }
         else if (near.kind === 'vending') { const msg = this.events.buy(near.vending, p); if (msg) this.hud.toast?.(msg); }
+        else if (near.kind === 'hide') { const msg = this.events.hide(near.hide, p); if (msg) this.hud.toast?.(msg); }
         else if (near.kind === 'bench') { const msg = this.events.upgrade(near.bench, p); this.hud.toast?.(msg || `Upgraded to ${p.held.name}`); }
         else if (near.kind === 'chest') this.loot.openChest(near.chest, p);
         else if (near.kind === 'ammobox') this.loot.openAmmoBox(near.box, p);

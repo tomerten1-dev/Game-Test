@@ -11,6 +11,9 @@ const SPECIALS = ['tavern_red', 'tavern_blue', 'blacksmith_yellow', 'blacksmith_
 const WINDMILLS = ['kk/windmill_yellow', 'kk/windmill_green'];
 const FLAGS = ['kk/flag_blue', 'kk/flag_red', 'kk/flag_yellow', 'kk/flag_green'];
 
+// Props that break when hit (and sometimes drop loot).
+const BREAKABLE = /furn_|sack|bucket|wheelbarrow|barrel|crate|city_trash|city_bench|city_firehydrant|city_dumpster|weaponrack/;
+
 export class Towns {
   constructor(scene, terrain, colliders, models) {
     this.scene = scene;
@@ -38,8 +41,9 @@ export class Towns {
     mesh.name = 'foundations';
     scene.add(mesh);
 
-    for (const c of crates) this._place(c.type, c.x, c.y, c.z, c.rot, c.scale);
-    for (const [type, pl] of this.props) if (pl.length) scene.add(models.instanced(type, pl));
+    for (const c of crates) { const i = this._place(c.type, c.x, c.y, c.z, c.rot, c.scale); c.col?.breakable?.idx.push(i); }
+    this.propGroups = new Map();
+    for (const [type, pl] of this.props) if (pl.length) { const g = models.instanced(type, pl); this.propGroups.set(type, g); scene.add(g); }
     if (this.lanterns.length) {
       const lg = new THREE.BoxGeometry(0.42, 0.5, 0.42);
       const lm = new THREE.MeshStandardMaterial({ color: '#fff4d6', emissive: '#ffc766', emissiveIntensity: 1.6, roughness: 0.4 });
@@ -53,7 +57,28 @@ export class Towns {
 
   _place(type, x, y, z, rot = 0, scale = 1) {
     if (!this.props.has(type)) this.props.set(type, []);
-    this.props.get(type).push({ x, y, z, rot, scale });
+    return this.props.get(type).push({ x, y, z, rot, scale }) - 1;
+  }
+
+  // Furniture, crates, barrels and street clutter break (pickaxe, bullets, explosions) and may drop loot.
+  breakProp(c, game) {
+    const b = c.breakable;
+    if (!b || b.broken) return;
+    b.broken = true;
+    this.colliders.remove(c);
+    const g = this.propGroups?.get(b.type);
+    const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+    if (g) for (const im of g.children) { for (const i of b.idx) im.setMatrixAt(i, zero); im.instanceMatrix.needsUpdate = true; }
+    const x = c.kind === 'circle' ? c.x : (c.minX + c.maxX) / 2, z = c.kind === 'circle' ? c.z : (c.minZ + c.maxZ) / 2;
+    const y = c.y0 + 1;
+    const col = new THREE.Color(c.mat === 'metal' ? '#9fb3c8' : '#b07a45');
+    for (let i = 0; i < 22; i++) game.effects.debris.emit(x + (Math.random() - 0.5), y + Math.random(), z + (Math.random() - 0.5), (Math.random() - 0.5) * 5, Math.random() * 5, (Math.random() - 0.5) * 5, col, 0.9, 0.2, 14);
+    game.sound.play('break', new THREE.Vector3(x, y, z));
+    if (game.warmup <= 0 && Math.random() < b.loot) {
+      const r = Math.random();
+      const item = r < 0.45 ? game.loot.constructor.randomConsumable() : r < 0.8 ? { type: 'ammo', ammoType: ['light', 'medium', 'shells', 'heavy'][Math.floor(Math.random() * 4)], amount: 12 } : { type: 'mat', matType: 'wood', amount: 20 };
+      game.loot.spawnPickup(item, new THREE.Vector3(x, y, z), new THREE.Vector3((Math.random() - 0.5) * 2, 4, (Math.random() - 0.5) * 2));
+    }
   }
 
   // Place a prop on the ground scaled to a target height (m), with an optional round collider.
@@ -64,8 +89,12 @@ export class Towns {
     if (y < 1) return;
     for (const h of this.houses) if (x > h.minX - 0.4 && x < h.maxX + 0.4 && z > h.minZ - 0.4 && z < h.maxZ + 0.4) return;
     const s = height / info.size.y;
-    this._place(type, x, y - 0.02, z, rot, s);
-    if (colR) this.colliders.add({ kind: 'circle', x, z, r: colR, y0: y - 1, y1: y + height, crate: true, mat: mat || (type.includes('city_') ? 'metal' : undefined) });
+    const idx = this._place(type, x, y - 0.02, z, rot, s);
+    if (colR) {
+      const c = { kind: 'circle', x, z, r: colR, y0: y - 1, y1: y + height, crate: true, mat: mat || (type.includes('city_') ? 'metal' : undefined) };
+      if (BREAKABLE.test(type)) c.breakable = { type, idx: [idx], hp: 90, loot: 0.35 };
+      this.colliders.add(c);
+    }
   }
 
   // A castle tower on a hill as a landmark.
@@ -213,7 +242,9 @@ export class Towns {
       const sz = this.models.get(type).size;
       crates.push({ type, x, y: y + i * 1.2 - 0.02, z, rot, scale: 1.2 / sz.y });
     }
-    this.colliders.add({ kind: 'box', minX: x - 0.6, maxX: x + 0.6, minZ: z - 0.6, maxZ: z + 0.6, y0: y - 1, y1: y + n * 1.2, crate: true });
+    const col = { kind: 'box', minX: x - 0.6, maxX: x + 0.6, minZ: z - 0.6, maxZ: z + 0.6, y0: y - 1, y1: y + n * 1.2, crate: true, breakable: { type: 'kk/crate_A_big', idx: [], hp: 80 + n * 50, loot: 0.5 } };
+    this.colliders.add(col);
+    for (let i = crates.length - n; i < crates.length; i++) crates[i].col = col;
   }
 
   _scatterCrates(crates) {
@@ -638,8 +669,8 @@ export class Towns {
     for (const h of this.houses) if (x > h.minX - 0.6 && x < h.maxX + 0.6 && z > h.minZ - 0.6 && z < h.maxZ + 0.6) return;
     const info = this.models.get('kk/barrel');
     const s = 1.1 / info.size.y;
-    this._place('kk/barrel', x, y - 0.02, z, this.rand() * 6, s);
-    this.colliders.add({ kind: 'circle', x, z, r: info.size.x * s * 0.5, y0: y - 1, y1: y + 1.1, crate: true });
+    const idx = this._place('kk/barrel', x, y - 0.02, z, this.rand() * 6, s);
+    this.colliders.add({ kind: 'circle', x, z, r: info.size.x * s * 0.5, y0: y - 1, y1: y + 1.1, crate: true, breakable: { type: 'kk/barrel', idx: [idx], hp: 90, loot: 0.3 } });
   }
 
   _house(parts, type, scale, x, y, z, rot) {

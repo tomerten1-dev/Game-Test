@@ -353,6 +353,7 @@ export class Actor {
     }
     if (this.state === 'ground' && this.mantleT > 0) { this._updateMantle(dt); return; }
     if (this.state === 'ground' && this.grapple) { this._updateGrapple(dt); return; }
+    if (this.hiddenIn) { this.vel.set(0, 0, 0); this.sprinting = false; return; }
     if (this.state === 'ground') {
       const mlen = Math.hypot(it.mx, it.mz);
       if (this.emote && (mlen > 0.2 || it.jump || this.slideT > 0)) this.emote = null;
@@ -547,6 +548,7 @@ export class Actor {
     // LOD: off-screen / far characters are hidden and skip animation; the rest animate at a
     // rate that drops with distance (keeps 100 players affordable).
     const d = this.distToCam;
+    if (this.hiddenIn) { this.root.visible = false; return; }
     if (!this.isPlayer && this.state !== 'bus') {
       _sph.center.set(this.pos.x, this.pos.y + 1, this.pos.z);
       const visible = !this.hiddenCorpse && d < 300 && (!this.game.frustum || this.game.frustum.intersectsSphere(_sph));
@@ -667,6 +669,7 @@ export class Actor {
 
   die(killer) {
     if (!this.alive) return;
+    if (this.hiddenIn) this.game.events?.unhide(this);
     this.alive = false;
     this.setState('dead');
     this.beamT = this.isPlayer ? 0 : 1.1; // bots dissolve upward shortly after going down

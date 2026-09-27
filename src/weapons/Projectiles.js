@@ -219,6 +219,7 @@ export class Projectiles {
       const c = r.collider;
       g.effects.impact(pt, c?.structure ? (c.structure.mat === 'wood' ? 'wood' : 'stone') : c ? 'stone' : 'terrain', _n.copy(_dir).negate());
       if (c?.structure) c.structure.damage(p.damage, owner);
+      else if (c?.breakable) g.combat.damageProp(c, p.damage);
     }
     this._remove(p);
   }
@@ -272,6 +273,9 @@ export function explode(game, pos, owner, damage, radius, structureDamage) {
       fx.damageNumber(a.chest(_pt), dealt, false, shieldBefore > 0);
       game.hud?.hitMarker(false, !a.alive);
     }
+  }
+  for (const c of game.world.colliders.query(pos.x - radius, pos.x + radius, pos.z - radius, pos.z + radius, [])) {
+    if (c.breakable && !c.breakable.broken) game.world.towns.breakProp(c, game);
   }
   for (const s of [...game.building.structures]) {
     const b = s.box;
