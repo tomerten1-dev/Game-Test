@@ -1,0 +1,275 @@
+import * as THREE from 'three';
+import { Simplex2D, smoothstep, lerp, clamp } from '../core/noise.js';
+
+// Smooth fbm island. Heights live in a grid; heightAt() is bilinear so gameplay
+// and the rendered mesh always agree.
+
+export const WORLD_HALF = 230;   // grid covers [-230, 230]
+export const CELL = 2;            // meters between samples
+export const ISLAND_RADIUS = 170;
+export const WATER_LEVEL = 0;
+
+export const TOWNS = [
+  { name: 'Candy Corners', x: -8, z: 18, r: 27 },
+  { name: 'Breezy Bay', x: 98, z: 38, r: 25 },
+  { name: 'Maple Hollow', x: -92, z: -38, r: 26 },
+  { name: 'Pebble Park', x: 14, z: -98, r: 24 },
+  { name: 'Sunset Springs', x: 88, z: -72, r: 23 },
+];
+export const MOUNTAIN = { x: -62, z: 88, r: 62, h: 48 };
+
+const C = (hex) => new THREE.Color(hex);
+export const PALETTE = {
+  deep: C('#2f8f9d'),
+  shallow: C('#8fd3c1'),
+  wetSand: C('#e0c98f'),
+  sand: C('#f2dfa6'),
+  grassA: C('#5dbb46'),
+  grassB: C('#a3d65c'),
+  dirt: C('#d8bf8a'),
+  rock: C('#8f8b86'),
+  rockDark: C('#6c6966'),
+  snow: C('#f4f7fb'),
+};
+
+export class Terrain {
+  constructor(seed = 1337) {
+    this.noise = new Simplex2D(seed);
+    this.n = Math.round((WORLD_HALF * 2) / CELL) + 1;
+    this.heights = new Float32Array(this.n * this.n);
+    this.grass = new Float32Array(this.n * this.n); // 0..1 grass density
+    this.variation = new Float32Array(this.n * this.n); // 0..1 color variation
+    this._generate();
+  }
+
+  rawHeight(x, z) {
+    const nz = this.noise;
+    const d = Math.hypot(x, z);
+    const coast = ISLAND_RADIUS + nz.fbm(x * 0.006 + 11.3, z * 0.006 - 4.1, 3) * 26;
+    const mask = 1 - smoothstep(0.8, 1.03, d / coast);
+    const hills = (nz.fbm(x * 0.0105, z * 0.0105, 4) * 0.5 + 0.5) * 13;
+    const detail = nz.fbm(x * 0.05, z * 0.05, 3) * 1.1;
+    const md = Math.hypot(x - MOUNTAIN.x, z - MOUNTAIN.z) / MOUNTAIN.r;
+    let mt = 0;
+    if (md < 1) {
+      const fall = 1 - smoothstep(0, 1, md);
+      mt = Math.pow(fall, 1.25) * MOUNTAIN.h * (0.7 + 0.55 * nz.ridged(x * 0.022, z * 0.022, 4));
+    }
+    return lerp(-7.5, 3.2 + hills + detail + mt, mask);
+  }
+
+  _generate() {
+    const n = this.n;
+    const h = this.heights;
+    for (let j = 0; j < n; j++) {
+      for (let i = 0; i < n; i++) {
+        const x = -WORLD_HALF + i * CELL, z = -WORLD_HALF + j * CELL;
+        h[j * n + i] = this.rawHeight(x, z);
+      }
+    }
+    // flatten towns
+    for (const t of TOWNS) {
+      t.y = Math.max(3.2, this.rawHeight(t.x, t.z));
+      // average the area so the plateau sits naturally
+      let sum = 0, cnt = 0;
+      for (let a = 0; a < 16; a++) {
+        const ang = (a / 16) * Math.PI * 2;
+        sum += this.rawHeight(t.x + Math.cos(ang) * t.r * 0.6, t.z + Math.sin(ang) * t.r * 0.6); cnt++;
+      }
+      t.y = Math.max(3.2, (t.y + sum / cnt) / 2);
+      for (let j = 0; j < n; j++) {
+        for (let i = 0; i < n; i++) {
+          const x = -WORLD_HALF + i * CELL, z = -WORLD_HALF + j * CELL;
+          const d = Math.hypot(x - t.x, z - t.z);
+          if (d > t.r * 1.6) continue;
+          const w = 1 - smoothstep(t.r * 0.85, t.r * 1.55, d);
+          h[j * n + i] = lerp(h[j * n + i], t.y, w);
+        }
+      }
+    }
+    // biome masks
+    for (let j = 0; j < n; j++) {
+      for (let i = 0; i < n; i++) {
+        const k = j * n + i;
+        const x = -WORLD_HALF + i * CELL, z = -WORLD_HALF + j * CELL;
+        const y = h[k];
+        const ny = this._gridNormalY(i, j);
+        const variation = clamp(this.noise.fbm(x * 0.03 + 50, z * 0.03 - 20, 3) * 0.8 + 0.5, 0, 1);
+        this.variation[k] = variation;
+        let g = smoothstep(2.0, 3.0, y) * smoothstep(0.72, 0.86, ny) * (1 - smoothstep(26, 32, y));
+        for (const t of TOWNS) {
+          const d = Math.hypot(x - t.x, z - t.z);
+          g *= smoothstep(t.r * 0.72, t.r * 0.95, d);
+        }
+        // patchy meadows
+        g *= clamp(0.55 + this.noise.fbm(x * 0.045 - 7, z * 0.045 + 3, 2) * 1.1, 0, 1);
+        this.grass[k] = g;
+      }
+    }
+  }
+
+  _h(i, j) {
+    const n = this.n;
+    i = i < 0 ? 0 : i >= n ? n - 1 : i;
+    j = j < 0 ? 0 : j >= n ? n - 1 : j;
+    return this.heights[j * n + i];
+  }
+
+  _gridNormalY(i, j) {
+    const dx = this._h(i + 1, j) - this._h(i - 1, j);
+    const dz = this._h(i, j + 1) - this._h(i, j - 1);
+    const nx = -dx, ny = 2 * CELL, nz = -dz;
+    return ny / Math.hypot(nx, ny, nz);
+  }
+
+  heightAt(x, z) {
+    const fx = (x + WORLD_HALF) / CELL, fz = (z + WORLD_HALF) / CELL;
+    const n = this.n;
+    if (fx < 0 || fz < 0 || fx >= n - 1 || fz >= n - 1) return -7.5;
+    const i = Math.floor(fx), j = Math.floor(fz);
+    const tx = fx - i, tz = fz - j;
+    const h = this.heights;
+    const a = h[j * n + i], b = h[j * n + i + 1], c = h[(j + 1) * n + i], d = h[(j + 1) * n + i + 1];
+    return (a * (1 - tx) + b * tx) * (1 - tz) + (c * (1 - tx) + d * tx) * tz;
+  }
+
+  normalAt(x, z, out = new THREE.Vector3()) {
+    const e = 1.0;
+    const dx = this.heightAt(x + e, z) - this.heightAt(x - e, z);
+    const dz = this.heightAt(x, z + e) - this.heightAt(x, z - e);
+    return out.set(-dx, 2 * e, -dz).normalize();
+  }
+
+  sampleGrid(arr, x, z) {
+    const n = this.n;
+    const i = clamp(Math.round((x + WORLD_HALF) / CELL), 0, n - 1);
+    const j = clamp(Math.round((z + WORLD_HALF) / CELL), 0, n - 1);
+    return arr[j * n + i];
+  }
+
+  isLand(x, z, minH = 1.5) { return this.heightAt(x, z) > minH; }
+
+  colorAt(i, j, out) {
+    const n = this.n, k = j * n + i;
+    const x = -WORLD_HALF + i * CELL, z = -WORLD_HALF + j * CELL;
+    const y = this.heights[k];
+    const ny = this._gridNormalY(i, j);
+    const P = PALETTE;
+    out.copy(P.grassA).lerp(P.grassB, this.variation[k]);
+    // dry / dirt patches where there is little grass
+    const g = this.grass[k];
+    out.lerp(P.dirt, (1 - smoothstep(0.15, 0.6, g)) * 0.35 * smoothstep(2.5, 3.5, y));
+    // towns: warm dirt plaza
+    for (const t of TOWNS) {
+      const d = Math.hypot(x - t.x, z - t.z);
+      out.lerp(P.dirt, (1 - smoothstep(t.r * 0.55, t.r * 0.9, d)) * 0.85);
+    }
+    // rock on steep slopes / high ground
+    const rockW = Math.max((1 - smoothstep(0.66, 0.8, ny)) * smoothstep(3, 6, y), smoothstep(24, 33, y));
+    const rockC = _tmp.copy(P.rock).lerp(P.rockDark, clamp(this.variation[k] * 1.3 - 0.2, 0, 1));
+    out.lerp(rockC, rockW);
+    out.lerp(P.snow, smoothstep(44, 50, y));
+    // beach
+    out.lerp(P.sand, 1 - smoothstep(1.3, 2.6, y));
+    out.lerp(P.wetSand, 1 - smoothstep(-0.2, 0.7, y));
+    out.lerp(P.shallow, 1 - smoothstep(-2.0, -0.4, y));
+    out.lerp(P.deep, 1 - smoothstep(-6.5, -2.5, y));
+    return out;
+  }
+
+  buildMesh() {
+    const n = this.n;
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(n * n * 3);
+    const nor = new Float32Array(n * n * 3);
+    const col = new Float32Array(n * n * 3);
+    const c = new THREE.Color();
+    for (let j = 0; j < n; j++) {
+      for (let i = 0; i < n; i++) {
+        const k = j * n + i;
+        pos[k * 3] = -WORLD_HALF + i * CELL;
+        pos[k * 3 + 1] = this.heights[k];
+        pos[k * 3 + 2] = -WORLD_HALF + j * CELL;
+        const dx = this._h(i + 1, j) - this._h(i - 1, j);
+        const dz = this._h(i, j + 1) - this._h(i, j - 1);
+        const l = Math.hypot(dx, 2 * CELL, dz);
+        nor[k * 3] = -dx / l; nor[k * 3 + 1] = (2 * CELL) / l; nor[k * 3 + 2] = -dz / l;
+        this.colorAt(i, j, c);
+        col[k * 3] = c.r; col[k * 3 + 1] = c.g; col[k * 3 + 2] = c.b;
+      }
+    }
+    const idx = new Uint32Array((n - 1) * (n - 1) * 6);
+    let p = 0;
+    for (let j = 0; j < n - 1; j++) {
+      for (let i = 0; i < n - 1; i++) {
+        const a = j * n + i, b = a + 1, cc = a + n, d = cc + 1;
+        idx[p++] = a; idx[p++] = cc; idx[p++] = b;
+        idx[p++] = b; idx[p++] = cc; idx[p++] = d;
+      }
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    geo.computeBoundingSphere();
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.receiveShadow = true;
+    mesh.castShadow = true;
+    mesh.name = 'terrain';
+    this.mesh = mesh;
+    return mesh;
+  }
+
+  // RGBA half-float texture: R = height, G = grass density, B = color variation.
+  buildDataTexture() {
+    const n = this.n;
+    const data = new Uint16Array(n * n * 4);
+    const toHalf = THREE.DataUtils.toHalfFloat;
+    for (let k = 0; k < n * n; k++) {
+      data[k * 4] = toHalf(this.heights[k]);
+      data[k * 4 + 1] = toHalf(this.grass[k]);
+      data[k * 4 + 2] = toHalf(this.variation[k]);
+      data[k * 4 + 3] = toHalf(1);
+    }
+    const tex = new THREE.DataTexture(data, n, n, THREE.RGBAFormat, THREE.HalfFloatType);
+    tex.magFilter = THREE.LinearFilter;
+    tex.minFilter = THREE.LinearFilter;
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  // Top-down colored image for the minimap.
+  buildMinimapCanvas(size = 256) {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = size;
+    const ctx = cv.getContext('2d');
+    const img = ctx.createImageData(size, size);
+    const c = new THREE.Color();
+    const n = this.n;
+    for (let py = 0; py < size; py++) {
+      for (let px = 0; px < size; px++) {
+        const i = Math.round((px / (size - 1)) * (n - 1));
+        const j = Math.round((py / (size - 1)) * (n - 1));
+        const y = this.heights[j * n + i];
+        if (y < WATER_LEVEL) {
+          c.set('#3cb4e6').lerp(PALETTE.deep, smoothstep(-1, -7, y) * 0.6);
+        } else {
+          this.colorAt(i, j, c);
+          // fake hill shading
+          const sh = this._h(i + 1, j) - this._h(i - 1, j + 1);
+          c.multiplyScalar(clamp(1 - sh * 0.08, 0.7, 1.25));
+        }
+        const o = (py * size + px) * 4;
+        img.data[o] = Math.min(255, Math.round(Math.pow(c.r, 1 / 2.2) * 255));
+        img.data[o + 1] = Math.min(255, Math.round(Math.pow(c.g, 1 / 2.2) * 255));
+        img.data[o + 2] = Math.min(255, Math.round(Math.pow(c.b, 1 / 2.2) * 255));
+        img.data[o + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return cv;
+  }
+}
+
+const _tmp = new THREE.Color();

@@ -1,0 +1,19 @@
+:root {
+  --title: 'Lilita One', 'Arial Rounded MT Bold', system-ui, sans-serif;
+  --num: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --teal: #2ee6c9;
+  --shield: #3fa7ff;
+  --health: #5fe04a;
+  --storm: #b44cff;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1830; color: #fff; font-family: var(--num); -webkit-user-select: none; user-select: none; touch-action: none; -webkit-tap-highlight-color: transparent; }
+#app { position: fixed; inset: 0; }
+#app canvas { display: block; width: 100%; height: 100%; }
+#ui { position: fixed; inset: 0; pointer-events: none; }
+#loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: radial-gradient(ellipse at 50% 30%, #3b7be8, #1a2f6b 70%); z-index: 50; transition: opacity 0.5s; }
+#loading.hide { opacity: 0; pointer-events: none; }
+.load-title { font-family: var(--title); font-size: clamp(48px, 10vw, 110px); letter-spacing: 2px; color: #fff; text-shadow: 0 6px 0 #1b2c66, 0 10px 30px rgba(0,0,0,0.35); }
+.load-bar { width: min(360px, 70vw); height: 14px; border-radius: 10px; background: rgba(255,255,255,0.2); overflow: hidden; }
+#load-fill { height: 100%; width: 5%; background: linear-gradient(90deg, #ffd23f, #ff9f1c); border-radius: 10px; transition: width 0.3s; }
+#load-text { font-size: 20px; font-weight: 600; letter-spacing: 1px; opacity: 0.9; }
