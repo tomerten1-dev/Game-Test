@@ -8,7 +8,7 @@ export class Player extends Actor {
     this._addBackpack();
   }
 
-  // Little backpack with a glowing antenna so your robot stands out.
+  // Little backpack with a glowing antenna so your hero stands out.
   _addBackpack() {
     const g = new THREE.Group();
     const bodyMat = new THREE.MeshStandardMaterial({ color: '#1a8f86', roughness: 0.5, metalness: 0.2 });

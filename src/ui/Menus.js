@@ -80,7 +80,7 @@ export class Menus {
     $('end-rank').textContent = `#${place}`;
     $('end-title').textContent = victory ? 'VICTORY!' : 'ELIMINATED';
     $('end-title').className = 'logo' + (victory ? ' gold' : ' red');
-    $('end-sub').textContent = victory ? 'Last robot standing on Stormbound Island' : `Eliminated by ${killer || 'the storm'} — placed #${place}`;
+    $('end-sub').textContent = victory ? 'Last hero standing on Stormbound Island' : `Eliminated by ${killer || 'the storm'} — placed #${place}`;
     $('end-kills').textContent = kills;
     $('end-time').textContent = `${Math.floor(time / 60)}:${String(Math.floor(time % 60)).padStart(2, '0')}`;
     $('end-place').textContent = `#${place}`;
