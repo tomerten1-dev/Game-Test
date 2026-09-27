@@ -6,8 +6,8 @@ import { RARITIES, rollRarity, rollWeaponType } from '../weapons/WeaponDefs.js';
 import { itemGeometry } from '../weapons/WeaponModels.js';
 import { makeWeaponMesh, makeAmmoBoxMesh, makeAmmoPickupMesh, makeThrowableMesh } from '../weapons/WeaponModels.js';
 import { mulberry32 } from '../core/noise.js';
-import { makeConsumableMesh } from './ItemMeshes.js';
-import { AMMO, MATS, CONSUMABLES, Consumable } from '../weapons/Items.js';
+import { makeConsumableMesh, makeMedallionMesh, makeGoldMesh, makeCrownMesh } from './ItemMeshes.js';
+import { AMMO, MATS, CONSUMABLES, Consumable, MEDALLIONS } from '../weapons/Items.js';
 
 // Loadout roles smart bots try to fill: one close-range gun, one rifle, one long-range, one explosive.
 const ROLE = { shotgun: 'close', pump: 'close', smg: 'close', ar: 'mid', burst: 'mid', sniper: 'long', rocket: 'boom', pistol: 'side' };
@@ -122,6 +122,8 @@ function beamTexture() {
 const _v = new THREE.Vector3();
 function g_toastPickup(game, p, count = p.count) {
   if (p.type === 'weapon') { game.hud?.pickupNote?.(`+ ${p.weapon.name}`, RARITIES[p.weapon.rarity].color); return; }
+  if (p.type === 'gold') { game.hud?.pickupNote?.(`+${p.amount} Gold`, '#ffd23f'); return; }
+  if (p.type === 'medallion' || p.type === 'crown') return;
   if (p.type === 'consumable') { game.hud?.pickupNote?.(`+${count - (p.alive ? p.count : 0)} ${CONSUMABLES[p.ctype].name}`, CONSUMABLES[p.ctype].color); return; }
   game.hud?.pickupNote?.(`+${p.amount} ${p.type === 'ammo' ? AMMO[p.ammoType].name : MATS[p.matType].name}`, p.type === 'ammo' ? AMMO[p.ammoType].color : MATS[p.matType].color);
 }
@@ -241,6 +243,7 @@ export class Loot {
     if (w) types.add(w.def.ammoType);
     const all = Object.keys(AMMO).filter((t) => t !== 'heavy');
     while (types.size < 2) types.add(all[Math.floor(Math.random() * all.length)]);
+    if (Math.random() < 0.4) this.spawnPickup({ type: 'gold', amount: 10 }, _v.set(b.x, b.y + 0.6, b.z), new THREE.Vector3(0, 4.5, 0));
     [...types].forEach((t, i) => {
       const a = b.group.rotation.y + (i - 0.5) * 0.9;
       this.spawnPickup({ type: 'ammo', ammoType: t, amount: AMMO[t].box }, _v.set(b.x, b.y + 0.6, b.z), new THREE.Vector3(Math.sin(a) * 2, 4.5, Math.cos(a) * 2));
@@ -354,6 +357,20 @@ export class Loot {
       mesh = makeAmmoPickupMesh(item.ammoType) || new THREE.Mesh(this.itemGeo.ammo, this.itemMat);
       mesh.position.y = 0.3;
       color = AMMO[item.ammoType].color;
+    } else if (item.type === 'medallion') {
+      mesh = makeMedallionMesh(MEDALLIONS[item.key].color);
+      mesh.position.y = 0.75;
+      color = MEDALLIONS[item.key].color;
+    } else if (item.type === 'crown') {
+      mesh = makeCrownMesh();
+      mesh.scale.setScalar(2.2);
+      mesh.position.y = 0.5;
+      color = '#ffd23f';
+    } else if (item.type === 'gold') {
+      mesh = makeGoldMesh();
+      mesh.scale.setScalar(1.3);
+      mesh.position.y = 0.1;
+      color = '#ffd23f';
     } else if (makeConsumableMesh(item.ctype)) {
       mesh = makeConsumableMesh(item.ctype);
       mesh.scale.multiplyScalar(1.25);
@@ -371,7 +388,7 @@ export class Loot {
     // rarity light beam + base ring
     // soft rarity light: thin and faint (it only has to catch your eye, not light up the area)
     // grey barely shows, gold stands out
-    const rar = item.type === 'weapon' ? item.weapon.rarity : 1;
+    const rar = item.type === 'weapon' ? item.weapon.rarity : item.type === 'medallion' || item.type === 'crown' ? 5 : 1;
     const bh = 1.4 + rar * 0.35;
     const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.2, bh, 10, 1, true), new THREE.MeshBasicMaterial({ map: beamTexture(), color, transparent: true, opacity: 0.08 + rar * 0.06, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     beam.position.y = bh / 2;
@@ -399,6 +416,9 @@ export class Loot {
 
   label(p) {
     if (p.type === 'weapon') return p.weapon.name;
+    if (p.type === 'medallion') return MEDALLIONS[p.key].name;
+    if (p.type === 'crown') return 'Victory Crown';
+    if (p.type === 'gold') return `Gold x${p.amount}`;
     if (p.type === 'consumable') return `${CONSUMABLES[p.ctype].name} x${p.count}`;
     if (p.type === 'ammo') return `${AMMO[p.ammoType].name} x${p.amount}`;
     return `${MATS[p.matType].name} x${p.amount}`;
@@ -423,6 +443,7 @@ export class Loot {
     // like Fortnite: a weapon + ammo + materials, and sometimes a heal / utility item
     if (c.rare || Math.random() < 0.6) out.push(Loot.randomConsumable());
     out.push({ type: 'mat', matType: ['wood', 'wood', 'stone', 'metal'][Math.floor(Math.random() * 4)], amount: 30 });
+    out.push({ type: 'gold', amount: c.rare ? 70 + Math.floor(Math.random() * 40) : 25 + Math.floor(Math.random() * 25) });
     const fwd = c.group.rotation.y;
     out.forEach((it, i) => {
       const a = fwd + (i - (out.length - 1) / 2) * 0.55;
@@ -482,6 +503,17 @@ export class Loot {
     } else if (p.type === 'mat') {
       actor.addMat(p.matType, p.amount);
       if (actor.isPlayer) g.sound.play('pickup');
+    } else if (p.type === 'gold') {
+      actor.gold = Math.min(9999, actor.gold + p.amount);
+      if (actor.isPlayer) g.sound.play('coin');
+    } else if (p.type === 'crown') {
+      actor.setCrown(true);
+      if (actor.isPlayer) { g.sound.play('supply'); g.hud?.banner('You picked up the Victory Crown! Win to keep it', 3); }
+    } else if (p.type === 'medallion') {
+      actor.medallions.add(p.key);
+      const m = MEDALLIONS[p.key];
+      if (actor.isPlayer) { g.sound.play('supply'); g.hud?.banner(`${m.name} · ${m.perk}`, 3); g.hud?.toast?.('Medallion carriers show up on everyone\'s map'); }
+      else g.hud?.feedNote?.(`${actor.name} picked up ${m.name}`, m.color);
     }
     this._removePickup(p);
     return null;
@@ -507,7 +539,8 @@ export class Loot {
     const items = actor.isPlayer && this.game.meta?.profile?.d?.settings?.autoPickup !== false;
     for (const p of this.pickups) {
       if (!p.alive || !p.settled) continue;
-      if (p.type !== 'ammo' && p.type !== 'mat' && !(items && this._fits(p, actor))) continue;
+      if (p.type !== 'ammo' && p.type !== 'mat' && p.type !== 'gold' && p.type !== 'medallion' && p.type !== 'crown' && !(items && this._fits(p, actor))) continue;
+      if (p.type === 'crown' && actor.crowned) continue;
       if (!actor.isPlayer && p.type === 'ammo') continue;
       // your own drops: ammo/mats come back after a moment, items you threw away never auto-return
       if (p.droppedBy === actor && (p.thrown && p.age < 2.5 || p.type === 'weapon' || p.type === 'consumable')) continue;
@@ -537,6 +570,10 @@ export class Loot {
     });
     if (!actor.infiniteAmmo) for (const [t, n] of Object.entries(actor.ammo)) if (n > 0) items.push({ type: 'ammo', ammoType: t, amount: n });
     for (const [t, n] of Object.entries(actor.mats)) if (n > 0) items.push({ type: 'mat', matType: t, amount: n });
+    if (actor.gold > 0) items.push({ type: 'gold', amount: actor.gold });
+    for (const k of actor.medallions || []) items.push({ type: 'medallion', key: k });
+    if (actor.crowned) { items.push({ type: 'crown' }); actor.setCrown(false); }
+    actor.gold = 0; actor.medallions?.clear();
     if (!actor.isPlayer && Math.random() < 0.5) items.push(Loot.randomConsumable());
     items.forEach((it, i) => {
       const a = (i / items.length) * Math.PI * 2;
@@ -611,7 +648,7 @@ export class Loot {
       if (d < bd && Math.abs(b.y - pos.y) < 2.5) { bd = d; best = { kind: 'ammobox', box: b }; }
     }
     for (const p of this.pickups) {
-      if (!p.alive || p.type === 'ammo' || p.type === 'mat') continue;
+      if (!p.alive || p.type === 'ammo' || p.type === 'mat' || p.type === 'gold' || p.type === 'crown' || p.type === 'medallion') continue;
       const d = Math.hypot(p.pos.x - pos.x, p.pos.z - pos.z);
       if (d < bd && Math.abs(p.pos.y - pos.y) < 2.5) { bd = d; best = { kind: 'pickup', pickup: p }; }
     }

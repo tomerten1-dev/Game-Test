@@ -15,6 +15,14 @@ export const MATS = {
 };
 export const MAT_CAP = 999;
 
+// Boss medallions: a perk while you carry one, but every carrier shows up on everyone's map.
+export const MEDALLIONS = {
+  shield: { name: "Foreman's Medallion", perk: 'Shield regenerates', color: '#6cc4ff', icon: '⛊' },
+  surge: { name: "Tide's Medallion", perk: 'Endless tactical sprint', color: '#39e0c9', icon: '➤' },
+  reload: { name: "Warden's Medallion", perk: 'Reload 60% faster', color: '#ff6b5d', icon: '↻' },
+  bloom: { name: "Bloom's Medallion", perk: 'Health regenerates', color: '#7dff8a', icon: '✚' },
+};
+
 export const CONSUMABLES = {
   bandage: { name: 'Bandages', heal: 15, cap: 75, time: 3.2, max: 15, stack: 5, icon: '✚', color: '#f2efe6' },
   medkit: { name: 'Medkit', heal: 100, cap: 100, time: 6, max: 3, stack: 1, icon: '✚', color: '#ff5a5f' },

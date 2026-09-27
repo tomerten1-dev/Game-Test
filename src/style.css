@@ -523,3 +523,10 @@ body.touch #loot-card { left: auto; right: 12px; top: 30%; width: 160px; font-si
 #obj-hp[data-mat="stone"] .oh-fill { background: linear-gradient(90deg, #9aa3ad, #e7ebef); }
 #obj-hp[data-mat="metal"] .oh-fill { background: linear-gradient(90deg, #6f8fb0, #c9dcef); }
 #obj-hp .oh-num { font-family: var(--num); font-weight: 800; font-size: 14px; color: #fff; -webkit-text-stroke: 1px rgba(20,20,40,0.85); }
+/* gold + medallions */
+#mats .gold-chip { display: flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 6px; background: rgba(255,210,63,0.14); border: 2px solid rgba(255,210,63,0.35); color: #ffe08a; }
+.gold-icon { width: 18px; height: 12px; border-radius: 2px; background: linear-gradient(180deg, #fff1a8, #ffc93c 55%, #c98a10); clip-path: polygon(18% 0, 82% 0, 100% 100%, 0 100%); box-shadow: 0 1px 0 rgba(0,0,0,0.4); }
+#medals { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
+#medals .medal { display: flex; align-items: center; gap: 8px; }
+#medals .medal span { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff6c2, #ffc93c 55%, #b07a10); color: var(--c); font-size: 14px; font-weight: 900; box-shadow: 0 0 10px var(--c), inset 0 0 0 2px rgba(255,255,255,0.5); text-shadow: 0 1px 1px rgba(0,0,0,0.6); }
+#medals .medal b { font-size: 13px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }

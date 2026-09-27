@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { makeCrownMesh } from '../world/ItemMeshes.js';
 import { Character } from './Character.js';
 import { makeGlider } from './Glider.js';
 import { damp, dampAngle } from '../core/noise.js';
@@ -76,6 +77,9 @@ export class Actor {
     this.slot = 0;
     this.ammo = { light: 0, medium: 0, shells: 0, heavy: 0, rockets: 0 };
     this.mats = { wood: 0, stone: 0, metal: 0 };
+    this.gold = 0;               // gold bars (spent at vending machines and upgrade benches)
+    this.medallions = new Set(); // boss medallions carried
+    this.crowned = false;        // wearing the Victory Crown
     this.infiniteAmmo = !isPlayer; // bots don't track reserve ammo
     this.crouched = false;
     this.crouchAmt = 0;
@@ -438,6 +442,30 @@ export class Actor {
 
   heightAboveGround() { return this.pos.y - this.game.world.groundAt(this.pos.x, this.pos.z, this.pos.y); }
 
+  // Put the Victory Crown on (or take it off): a gold crown on the head bone.
+  setCrown(on) {
+    this.crowned = on;
+    if (on && !this.crownMesh) {
+      const c = makeCrownMesh();
+      const ch = this.character;
+      c.position.set(0, ch.headTop ?? 1.62, 0);
+      ch.root.add(c);
+      ch.root.updateMatrixWorld(true);
+      if (ch.head) ch.head.attach(c);
+      this.crownMesh = c;
+    }
+    if (this.crownMesh) this.crownMesh.visible = on;
+  }
+
+  // Medallion perks that tick: shield / health regeneration after a few seconds without damage.
+  _tickMedallions(dt) {
+    const m = this.medallions;
+    if (!m.size || !this.alive) return;
+    const calm = this.game.time - this.lastHurtTime > 3;
+    if (m.has('shield') && calm && this.shield < 100) this.shield = Math.min(100, this.shield + 5 * dt);
+    if (m.has('bloom') && calm && this.health < 100) this.health = Math.min(100, this.health + 4 * dt);
+  }
+
   // Slurp-style regeneration: health first, then shield.
   _tickRegen(dt) {
     const r = this.regen;
@@ -454,6 +482,7 @@ export class Actor {
 
   updateMovement(dt) {
     this._tickRegen(dt);
+    this._tickMedallions(dt);
     if (this.game.zeroBuild && this.alive && this.overshield < OVERSHIELD && this.game.time - this.lastHurtTime > 6) this.overshield = Math.min(OVERSHIELD, this.overshield + 12 * dt);
     const world = this.game.world;
     const it = this.intent;
@@ -476,7 +505,7 @@ export class Actor {
       this.sprinting = !!it.sprint && !this.crouched && this.useT <= 0 && mlen > 0.3 && (fwdDot > 0.3 || !this.aiming) && !this.aiming;
       // tactical sprint burns stamina; it refills after a short breather
       this.tacSprint = this.sprinting && this.stamina > 0 && this.onGround;
-      if (this.tacSprint) { this.stamina = Math.max(0, this.stamina - STAMINA_DRAIN * dt); this.staminaIdle = 0; }
+      if (this.tacSprint) { if (!this.medallions.has('surge')) this.stamina = Math.max(0, this.stamina - STAMINA_DRAIN * dt); this.staminaIdle = 0; }
       else if ((this.staminaIdle += dt) > 0.8) this.stamina = Math.min(100, this.stamina + STAMINA_REGEN * dt);
       let speed = this.sprinting ? (this.tacSprint ? TAC_SPRINT_SPEED : SPRINT_SPEED) : this.crouched ? CROUCH_SPEED : RUN_SPEED;
       if (this.useT > 0 && !this.useItem?.def.mobile) speed = Math.min(speed, 3.2);

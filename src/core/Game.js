@@ -315,7 +315,7 @@ export class Game {
       this.touch?.show(false);
       if (document.pointerLockElement) document.exitPointerLock();
       const alive = Math.max(0, (this.deathInfo?.time ?? this.time) - this.matchStart);
-      const rewards = this.meta.finishMatch({ place, timeAlive: alive });
+      const rewards = this.meta.finishMatch({ place, timeAlive: alive, crowned: !!this.player?.crowned });
       this.menus.showEnd({ victory, place, killer: killer?.name, cause: p.deathCause, kills: p.kills, time: alive, rewards });
       this.sound.music(victory ? 'victory' : 'defeat');
     }, delay);
@@ -409,6 +409,7 @@ export class Game {
       a.setBuildMode?.(null);
       for (const k of Object.keys(a.ammo)) a.ammo[k] = 0;
       for (const k of Object.keys(a.mats)) a.mats[k] = 0;
+      a.gold = 0; a.medallions?.clear(); a.setCrown?.(false);
       a.health = 100; a.shield = 0; a.kills = 0; a.emote = null; a.crouched = false; a.dmgDealt = 0;
       a.vel.set(0, 0, 0);
       a.setState('bus');
@@ -416,6 +417,10 @@ export class Game {
       a.resetAI?.();
     }
     for (const b of this.bots) this._planDrop(b);
+    // the Victory Crown: you keep it from your last win, and one bot starts wearing one
+    if (this.meta.profile.d.crowned) this.player.setCrown(true);
+    const cb = this.bots.filter((b) => !b.npc)[Math.floor(Math.random() * this.bots.filter((b) => !b.npc).length)];
+    cb?.setCrown(true);
     this.boss.reset();
     this.boss.spawn();
     const wx = this.weather.roll({ snow: VARIANT.weather === 'snow', desert: VARIANT_KEY === 'desert' });
@@ -557,7 +562,7 @@ export class Game {
     for (const a of this.actors) {
       a.updateMovement(dt);
       for (const w of a.items) {
-        const ev = w && w.update(dt);
+        const ev = w && w.update(dt, a.medallions?.has('reload') ? 1.6 : 1);
         if (ev === 'reloaded') { a.finishReload(w); if (a.isPlayer) this.sound.play('reloaded'); }
         else if (ev === 'shell') {
           a.finishReload(w, 1);
@@ -1010,7 +1015,7 @@ export class Game {
       }
       return;
     }
-    if (killer?.isPlayer && actor !== killer) this.meta.track('kill');
+    if (killer?.isPlayer && actor !== killer) { this.meta.track('kill'); if (killer.crowned) this.meta.track('crownKill'); }
     if (killer && killer !== actor) killer.kills++;
     this.hud.killFeed?.(killer, actor);
     this.loot?.dropInventory(actor);

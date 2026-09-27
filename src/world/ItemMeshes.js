@@ -132,3 +132,42 @@ export function makeConsumableMesh(ctype) {
   const t = templates.get(ctype);
   return t ? t.clone() : null;
 }
+
+// A boss medallion: gold disc with a glowing gem in the perk's colour, standing on its edge.
+export function makeMedallionMesh(color) {
+  const g = new THREE.Group();
+  const gold = plain('#ffcf4a', 0.25, 0.9);
+  g.add(mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.06, 28), gold, 0, 0, 0, Math.PI / 2));
+  g.add(mesh(new THREE.TorusGeometry(0.34, 0.035, 8, 28), plain('#fff0a8', 0.2, 0.9)));
+  g.add(mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.1, 6), liquid(color, 'med' + color), 0, 0, 0, Math.PI / 2));
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    g.add(mesh(new THREE.BoxGeometry(0.05, 0.05, 0.08), gold, Math.cos(a) * 0.25, Math.sin(a) * 0.25, 0));
+  }
+  return g;
+}
+
+// A small stack of gold bars.
+export function makeGoldMesh() {
+  const g = new THREE.Group();
+  const bar = new THREE.CylinderGeometry(0.1, 0.14, 0.09, 4, 1);
+  bar.rotateY(Math.PI / 4); bar.scale(1.6, 1, 0.8);
+  const m = mat('goldbar', { color: '#ffc93c', roughness: 0.22, metalness: 1, emissive: '#6b4a00', emissiveIntensity: 0.5 });
+  for (const [x, y, z, r] of [[-0.13, 0.045, 0, 0], [0.13, 0.045, 0.02, 0.1], [0, 0.135, 0.01, 1.57]]) g.add(mesh(bar, m, x, y, z, 0, r, 0));
+  return g;
+}
+
+// The Victory Crown: gold band with points and gems.
+export function makeCrownMesh() {
+  const g = new THREE.Group();
+  const gold = mat('crowngold', { color: '#ffc93c', roughness: 0.2, metalness: 1, emissive: '#7a5200', emissiveIntensity: 0.6 });
+  g.add(mesh(new THREE.CylinderGeometry(0.2, 0.19, 0.12, 20, 1, true), gold, 0, 0.06, 0));
+  const gems = ['#ff4d6d', '#4dd2ff', '#7dff8a', '#b86bff', '#ffe94d'];
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    g.add(mesh(new THREE.ConeGeometry(0.055, 0.16, 4), gold, Math.cos(a) * 0.19, 0.2, Math.sin(a) * 0.19));
+    g.add(mesh(new THREE.SphereGeometry(0.025, 8, 6), gold, Math.cos(a) * 0.19, 0.29, Math.sin(a) * 0.19));
+    g.add(mesh(new THREE.OctahedronGeometry(0.035), liquid(gems[i], 'crown' + i), Math.cos(a) * 0.2, 0.06, Math.sin(a) * 0.2));
+  }
+  return g;
+}

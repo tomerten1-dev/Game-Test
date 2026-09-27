@@ -3,7 +3,7 @@ import { keyLabel } from '../core/Input.js';
 import { RARITIES } from '../weapons/WeaponDefs.js';
 import { Minimap } from './Minimap.js';
 import { TOWNS } from '../world/Terrain.js';
-import { AMMO } from '../weapons/Items.js';
+import { AMMO, MEDALLIONS } from '../weapons/Items.js';
 
 const angleDelta = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
 
@@ -62,6 +62,7 @@ export class HUD {
         </div>
 
         <div id="bottom-left">
+          <div id="medals"></div>
           <div class="bar-row overshield hidden" id="os-row"><span class="bar-ico">◈</span><div class="bar"><div class="fill" id="os-fill"></div></div><span class="bar-num" id="os-num">0</span></div>
           <div class="bar-row shield"><span class="bar-ico">⛊</span><div class="bar"><div class="fill" id="shield-fill"></div></div><span class="bar-num" id="shield-num">0</span></div>
           <div class="bar-row stamina" id="stamina-row"><span class="bar-ico">⚡</span><div class="bar"><div class="fill" id="stamina-fill"></div></div></div>
@@ -85,6 +86,7 @@ export class HUD {
             <div class="mat" data-m="wood" title="Wood"><span class="mat-icon wood"></span><span id="mat-wood">0</span></div>
             <div class="mat" data-m="stone" title="Stone"><span class="mat-icon stone"></span><span id="mat-stone">0</span></div>
             <div class="mat" data-m="metal" title="Metal"><span class="mat-icon metal"></span><span id="mat-metal">0</span></div>
+            <div class="gold-chip" title="Gold bars: spend them at vending machines and upgrade benches"><span class="gold-icon"></span><span id="gold-n">0</span></div>
           </div>
         </div>
       </div>`);
@@ -527,6 +529,13 @@ export class HUD {
       s.querySelector('.count').textContent = it?.isConsumable ? String(it.count) : '';
     });
     for (const k of ['wood', 'stone', 'metal']) this.set('mat' + k, this.el.mats[k], String(p.mats[k]));
+    this.set('gold', this.el.gold || (this.el.gold = document.getElementById('gold-n')), String(p.gold || 0));
+    const mk = [...(p.medallions || [])].join(',');
+    if (this.cache.medals !== mk) {
+      this.cache.medals = mk;
+      const el = document.getElementById('medals');
+      el.innerHTML = [...(p.medallions || [])].map((k) => { const m = MEDALLIONS[k]; return `<div class="medal" style="--c:${m.color}" title="${m.name}: ${m.perk}"><span>${m.icon}</span><b>${m.perk}</b></div>`; }).join('');
+    }
     const bm = p.buildMode || '';
     if (this.cache.bm !== bm) {
       this.cache.bm = bm;

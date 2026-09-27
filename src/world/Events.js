@@ -12,9 +12,9 @@ const _c = new THREE.Color();
 const _fc = new THREE.Color();
 const DROP_TIMES = [90, 220, 350, 460]; // seconds after the bus leaves
 const FALL_SPEED = 5.5;
-const VEND_PRICES = [0, 0, 100, 200, 300]; // by rarity (rare+)
+const VEND_PRICES = [0, 0, 150, 300, 500]; // gold, by rarity (rare+)
 // upgrade bench: cost to go from rarity i to i + 1
-const UPGRADE_COST = { 0: ['wood', 100], 1: ['stone', 150], 2: ['metal', 200], 3: ['metal', 300] };
+const UPGRADE_COST = { 0: ['gold', 100], 1: ['gold', 200], 2: ['gold', 300], 3: ['gold', 400] }; // gold bars per step
 const VEND_MATS = ['wood', 'stone', 'metal'];
 
 function labelTexture(lines, colors) {
@@ -248,7 +248,7 @@ export class Events {
       const rot = Math.atan2(t.x - spot.x, t.z - spot.z);
       g.rotation.y = rot;
       g.position.set(spot.x, y, spot.z);
-      const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture(['UPGRADE BENCH', 'Materials → rarity'], ['#ffb52b', '#ffffff']), transparent: true, depthWrite: false }));
+      const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture(['UPGRADE BENCH', 'Gold → rarity'], ['#ffb52b', '#ffffff']), transparent: true, depthWrite: false }));
       label.scale.set(2.6, 0.95, 1); label.position.set(0, 2.4, 0); g.add(label);
       this.scene.add(g);
       this.world.colliders.add({ kind: 'box', minX: spot.x - 1.1, maxX: spot.x + 1.1, minZ: spot.z - 1.1, maxZ: spot.z + 1.1, y0: y - 0.5, y1: y + 1.05, crate: true });
@@ -344,6 +344,7 @@ export class Events {
     l.opened = true;
     const items = [];
     for (const m of ['wood', 'stone', 'metal']) items.push({ type: 'mat', matType: m, amount: 200 });
+    items.push({ type: 'gold', amount: 150 });
     for (const [a, n] of [['light', 60], ['medium', 60], ['heavy', 12], ['shells', 15]]) items.push({ type: 'ammo', ammoType: a, amount: n });
     const heal = ['chug', 'slurp', 'bigshield', 'medkit'][Math.floor(Math.random() * 4)];
     items.push({ type: 'consumable', ctype: heal, count: CONSUMABLES[heal].stack });
@@ -466,9 +467,9 @@ export class Events {
     const cost = Events.upgradeCost(w);
     if (!w?.isGun) return 'Hold the weapon you want to upgrade';
     if (!cost) return w.rarity >= 5 ? "Mythic weapons can't be upgraded" : 'Already Legendary';
-    const [mat, n] = cost;
-    if (actor.mats[mat] < n) return `Need ${n} ${mat}`;
-    actor.mats[mat] -= n;
+    const [, n] = cost;
+    if (actor.gold < n) return `Need ${n} gold (you have ${actor.gold})`;
+    actor.gold -= n;
     const nw = new Weapon(w.type, w.rarity + 1);
     nw.ammo = Math.max(w.ammo, Math.min(nw.def.mag, w.ammo));
     actor.items[actor.slot] = nw;
@@ -501,15 +502,15 @@ export class Events {
     m.scale.setScalar(1.6);
     v.show.add(m);
     v.label.material.map?.dispose();
-    v.label.material.map = labelTexture([`${RARITIES[o.rarity].name} ${WEAPONS[o.type].name}`, `${o.price} ${o.mat}`], [RARITIES[o.rarity].color, '#ffffff']);
+    v.label.material.map = labelTexture([`${RARITIES[o.rarity].name} ${WEAPONS[o.type].name}`, `${o.price} gold`], [RARITIES[o.rarity].color, '#ffffff']);
     v.label.material.needsUpdate = true;
   }
 
   buy(v, actor) {
     if (this.game.warmup > 0) return 'Vending opens when the match starts';
     const o = v.offers[v.i];
-    if (actor.mats[o.mat] < o.price) return `Need ${o.price} ${o.mat}`;
-    actor.mats[o.mat] -= o.price;
+    if (actor.gold < o.price) return `Need ${o.price} gold (you have ${actor.gold})`;
+    actor.gold -= o.price;
     const w = new Weapon(o.type, o.rarity);
     const f = [Math.sin(v.rot), Math.cos(v.rot)];
     const at = _v.set(v.x + f[0] * 1.3, v.y + 0.8, v.z + f[1] * 1.3);
@@ -567,6 +568,7 @@ export class Events {
     const extra = ['grenade', 'grenade', 'smoke', 'impulse', 'fire', 'launchpad'][Math.floor(Math.random() * 6)];
     items.push({ type: 'consumable', ctype: extra, count: CONSUMABLES[extra].stack });
     items.push({ type: 'mat', matType: 'metal', amount: 60 });
+    items.push({ type: 'gold', amount: 100 });
     items.forEach((it, i) => {
       const a = (i / items.length) * Math.PI * 2;
       loot.spawnPickup(it, _v.set(s.x, s.ground + 1, s.z), new THREE.Vector3(Math.cos(a) * 2.6, 5, Math.sin(a) * 2.6));
@@ -616,7 +618,7 @@ export class Events {
       if (d < bd + 0.6 && Math.abs(v.y - pos.y) < 2.5) {
         const o = v.offers[v.i];
         bd = d;
-        best = { kind: 'vending', vending: v, text: `Buy ${RARITIES[o.rarity].name} ${WEAPONS[o.type].name} · ${o.price} ${o.mat}`, rarity: o.rarity };
+        best = { kind: 'vending', vending: v, text: `Buy ${RARITIES[o.rarity].name} ${WEAPONS[o.type].name} · ${o.price} gold`, rarity: o.rarity };
       }
     }
     for (const h of this.hides) {
@@ -642,7 +644,7 @@ export class Events {
         best = {
           kind: 'bench', bench: b, rarity: w?.isGun ? Math.min(4, w.rarity + (cost ? 1 : 0)) : 4,
           text: !w?.isGun ? 'Upgrade Bench · hold a weapon' : !cost ? `${w.name} · can't upgrade further`
-            : `Upgrade to ${RARITIES[w.rarity + 1].name} ${WEAPONS[w.type].name} · ${cost[1]} ${cost[0]}`,
+            : `Upgrade to ${RARITIES[w.rarity + 1].name} ${WEAPONS[w.type].name} · ${cost[1]} gold`,
         };
       }
     }
@@ -667,7 +669,9 @@ export class Events {
     for (const b of this.benches) out.push({ x: b.x, z: b.z, color: '#ffb52b', shape: 'vending' });
     for (const p of this.pads) if (p.kind === 'jump') out.push({ x: p.x, z: p.z, color: '#39e0ff', shape: 'dot' });
     const boss = this.game.boss;
-    if (boss?.boss?.alive) out.push({ x: boss.boss.pos.x, z: boss.boss.pos.z, color: '#ff8a2a', shape: 'square' });
+    for (const b of boss?.bosses || []) if (b.alive) out.push({ x: b.pos.x, z: b.pos.z, color: b.bossCfg.color, shape: 'square' });
+    // medallion carriers are revealed to everyone
+    for (const a of this.game.actors) if (a.alive && !a.npc && !a.isPlayer && a.medallions?.size) out.push({ x: a.pos.x, z: a.pos.z, color: '#ffd23f', shape: 'medal' });
     const v = boss?.vault;
     if (v && !v.opened) out.push({ x: v.x, z: v.z, color: '#ffe94d', shape: 'vending' });
     return out;

@@ -18,7 +18,8 @@ export class Weapon {
 
   get rarityInfo() { return RARITIES[this.rarity]; }
   get damage() { return this.def.damage * RARITIES[this.rarity].mult; }
-  get name() { return `${RARITIES[this.rarity].name} ${this.def.name}`; }
+  // mythics carry their boss's name ("The Foreman's Burst Rifle")
+  get name() { return this.title || `${RARITIES[this.rarity].name} ${this.def.name}`; }
 
   // Rough power score for bots comparing loot.
   get score() {
@@ -27,12 +28,13 @@ export class Weapon {
     return base * RARITIES[this.rarity].mult * (d.key === 'pistol' ? 0.6 : 1);
   }
 
-  update(dt) {
+  // reloadMul > 1 speeds up reloading only (the Warden's medallion)
+  update(dt, reloadMul = 1) {
     this.cooldown = Math.max(0, this.cooldown - dt);
     this.drawT = Math.max(0, this.drawT - dt);
     this.bloom = Math.max(0, this.bloom - this.def.recover * dt);
     if (this.reloading) {
-      this.reloadT -= dt;
+      this.reloadT -= dt * reloadMul;
       if (this.reloadT <= 0) {
         // shotguns load one shell at a time (the owner decides whether to keep going)
         if (this.def.shellReload) return 'shell';

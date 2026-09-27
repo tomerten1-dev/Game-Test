@@ -188,6 +188,7 @@ export class MapScreen {
       ctx.beginPath();
       if (ic.shape === 'square') ctx.rect(ix - r, iy - r, r * 2, r * 2);
       else if (ic.shape === 'vending') ctx.roundRect(ix - r * 0.7, iy - r, r * 1.4, r * 2, r * 0.3);
+      else if (ic.shape === 'medal') { ctx.arc(ix, iy, r * 0.95, 0, Math.PI * 2); ctx.moveTo(ix + r * 0.45, iy); ctx.arc(ix, iy, r * 0.45, 0, Math.PI * 2); }
       else ctx.arc(ix, iy, r * 0.6, 0, Math.PI * 2);
       ctx.fill(); ctx.stroke();
     }

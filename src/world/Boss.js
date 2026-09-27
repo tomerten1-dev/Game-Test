@@ -2,11 +2,21 @@ import * as THREE from 'three';
 import { Bot } from '../bots/Bot.js';
 import { Weapon } from '../weapons/Weapon.js';
 import { Loot } from './Loot.js';
+import { TOWNS } from './Terrain.js';
+import { MEDALLIONS } from '../weapons/Items.js';
 
 const _v = new THREE.Vector3();
 
-// The Foreman: an NPC boss guarding Rusty Works with a few guards. He drops the Vault Keycard;
-// the vault next door holds mythic and legendary loot. NPCs never count as players.
+// Bosses: NPCs guarding a town with a couple of guards. Each carries a named mythic weapon and a
+// medallion (a perk for whoever carries it, but carriers show up on everyone's map). The Foreman
+// at Rusty Works also drops the Vault Keycard. NPCs never count as players.
+export const BOSSES = [
+  { medal: 'shield', name: 'The Foreman', town: 'Rusty Works', color: '#ff8a2a', char: 'Barbarian', mythic: ['burst', "The Foreman's Burst Rifle"], side: ['pump', 4], guards: ['pump', 'ar', 'ar'], keycard: true },
+  { medal: 'surge', name: 'Captain Tide', town: 'Salty Pier', color: '#39e0c9', char: 'Rogue', mythic: ['pump', "Captain Tide's Pump"], side: ['smg', 4], guards: ['smg', 'ar'] },
+  { medal: 'reload', name: 'The Warden', town: 'Pebble City', color: '#ff6b5d', char: 'Knight', mythic: ['sniper', "The Warden's Sniper"], side: ['ar', 4], guards: ['ar', 'shotgun'] },
+  { medal: 'bloom', name: 'Lady Bloom', town: 'Maple Hollow', color: '#7dff8a', char: 'Mage', mythic: ['smg', "Lady Bloom's SMG"], side: ['shotgun', 4], guards: ['shotgun', 'ar'] },
+];
+
 export class BossEvent {
   constructor(game) {
     this.game = game;
@@ -18,28 +28,39 @@ export class BossEvent {
 
   spawn() {
     const g = this.game, v = this.vault;
-    if (!v) return;
-    const home = { x: v.front.x - 6, z: v.front.z + 4, r: 32 };
-    const boss = new Bot(g, 'The Foreman', '#ff8a2a', 0.95, 'Barbarian');
-    boss.npc = 'boss';
-    boss.health = 400; boss.maxHealth = 400; boss.shield = 200;
-    boss.character.root.scale.setScalar(1.3);
-    boss.items[1] = new Weapon('burst', 5);
-    boss.items[2] = new Weapon('pump', 4);
-    this._place(boss, home, 0);
-    boss.leash = home;
-    this.boss = boss;
-    const guards = [];
-    for (let i = 0; i < 3; i++) {
-      const gd = new Bot(g, `Rusty Guard ${i + 1}`, '#8a96a3', 0.55, 'Knight');
-      gd.npc = 'guard';
-      gd.health = 150; gd.maxHealth = 150;
-      gd.items[1] = new Weapon(i === 1 ? 'pump' : 'ar', 2);
-      gd.leash = home;
-      this._place(gd, home, (i + 1) * 2.1);
-      guards.push(gd);
+    this.bosses = [];
+    this.npcs = [];
+    for (const cfg of BOSSES) {
+      const t = TOWNS.find((x) => x.name === cfg.town);
+      if (!t) continue;
+      if (cfg.keycard && !v) continue;
+      const home = cfg.keycard ? { x: v.front.x - 6, z: v.front.z + 4, r: 32 } : { x: t.x + 5, z: t.z + 3, r: t.r };
+      const boss = new Bot(g, cfg.name, cfg.color, 0.95, cfg.char);
+      boss.npc = 'boss';
+      boss.bossCfg = cfg;
+      boss.health = 400; boss.maxHealth = 400; boss.shield = 200;
+      boss.character.root.scale.setScalar(1.3);
+      const my = new Weapon(cfg.mythic[0], 5);
+      my.title = cfg.mythic[1];
+      boss.items[1] = my;
+      boss.items[2] = new Weapon(cfg.side[0], cfg.side[1]);
+      boss.medallions.add(cfg.medal);
+      boss.gold = 300;
+      this._place(boss, home, 0);
+      boss.leash = home;
+      this.bosses.push(boss);
+      if (cfg.keycard) this.boss = boss;
+      this.npcs.push(boss);
+      cfg.guards.forEach((wt, i) => {
+        const gd = new Bot(g, `${cfg.town.split(' ')[0]} Guard ${i + 1}`, '#8a96a3', 0.55, 'Knight');
+        gd.npc = 'guard';
+        gd.health = 150; gd.maxHealth = 150;
+        gd.items[1] = new Weapon(wt, 2);
+        gd.leash = home;
+        this._place(gd, home, (i + 1) * 2.1);
+        this.npcs.push(gd);
+      });
     }
-    this.npcs = [boss, ...guards];
     for (const n of this.npcs) { n.switchSlot(1); g.actors.push(n); g.bots.push(n); }
   }
 
@@ -49,14 +70,16 @@ export class BossEvent {
     a.landTime = -999;
   }
 
-  // Boss drops: keycard, his mythic, shields.
+  // Boss drops (on top of their inventory: mythic, medallion, gold): shields, and the keycard.
   onDeath(a) {
     const loot = this.game.loot;
     if (a.npc !== 'boss') return;
     const at = _v.copy(a.pos).setY(a.pos.y + 1);
-    loot.spawnPickup({ type: 'consumable', ctype: 'keycard', count: 1 }, at, new THREE.Vector3(0, 5, 0));
+    const cfg = a.bossCfg || BOSSES[0];
+    if (cfg.keycard) loot.spawnPickup({ type: 'consumable', ctype: 'keycard', count: 1 }, at, new THREE.Vector3(0, 5, 0));
     loot.spawnPickup({ type: 'consumable', ctype: 'bigshield', count: 2 }, at, new THREE.Vector3(2, 4, 1));
-    this.game.hud.banner('The Foreman is down! Grab the Vault Keycard', 3);
+    const who = a.killer?.isPlayer ? 'You took down' : `${a.killer?.name || 'Someone'} took down`;
+    this.game.hud.banner(`${who} ${cfg.name}! ${MEDALLIONS[cfg.medal].name} dropped${cfg.keycard ? ' · and the Vault Keycard' : ''}`, 3.5);
   }
 
   // Vault door: needs a keycard in the inventory.
@@ -106,6 +129,7 @@ export class BossEvent {
 
   reset() {
     this.npcs = [];
+    this.bosses = [];
     this.boss = null;
     const v = this.vault;
     if (v && v.opened) {

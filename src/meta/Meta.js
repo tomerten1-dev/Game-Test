@@ -64,6 +64,7 @@ export class Meta {
     else if (event === 'heal') m.heals += amount;
     else if (event === 'circle') m.circles += amount;
     else if (event === 'land') m.landed = extra;
+    else if (event === 'crownKill') m.crownKills = (m.crownKills || 0) + amount;
     if (event === 'chest' || event === 'supply') g.hud.pickupNote(`+${event === 'chest' ? 40 : 100} XP`, '#ffd23f');
     for (const q of [...this.ensureQuests(), ...this.ensureWeekly()]) {
       if (q.done) continue;
@@ -82,13 +83,16 @@ export class Meta {
   }
 
   // Wrap up: stats, XP, coins and level-ups. Returns the breakdown for the results screen.
-  finishMatch({ place, timeAlive }) {
+  finishMatch({ place, timeAlive, crowned = false }) {
     if (!this.match) this.startMatch();
     if (place <= 10) this._questEvent('top10');
     if (place === 1) this._questEvent('win');
     const m = this.match;
     this.match = null;
-    const s = { ...m, place, timeAlive };
+    const s = { ...m, place, timeAlive, crowned };
+    // win to earn (or keep) the crown for the next match
+    this.p.d.crowned = place === 1;
+    if (place === 1 && crowned) this.p.d.stats.crownedWins = (this.p.d.stats.crownedWins || 0) + 1;
     const rewards = matchRewards(s);
     const st = this.p.d.stats;
     st.matches++;

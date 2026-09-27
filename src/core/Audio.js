@@ -456,6 +456,10 @@ export class Sound {
         this._noise(t, 0.35, { type: 'highpass', freq: 900, freqEnd: 300, gain: 0.9 });
         this._noise(t + 0.05, 3, { type: 'lowpass', freq: 500, freqEnd: 60, gain: 0.8, attack: 0.05 });
         break;
+      case 'coin': // gold pickup: two bright pings
+        this._tone(t, 0.12, { type: 'triangle', freq: 1568, gain: 0.12 });
+        this._tone(t + 0.07, 0.2, { type: 'triangle', freq: 2093, gain: 0.12 });
+        break;
       case 'kick': // body thump
         this._noise(t, 0.12, { type: 'lowpass', freq: 700, gain: 0.6 * v });
         this._tone(t, 0.14, { type: 'sine', freq: 140, freqEnd: 60, gain: 0.4 * v });

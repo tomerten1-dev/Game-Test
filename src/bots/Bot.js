@@ -504,11 +504,11 @@ export class Bot extends Actor {
       }
     }
     // spare materials and a bench nearby: upgrade the best gun
-    if (armed && this.matTotal >= 250 && (this.benchCd || 0) < g.time && g.events?.benches?.length) {
+    if (armed && this.gold >= 100 && (this.benchCd || 0) < g.time && g.events?.benches?.length) {
       const bench = g.events.nearestBench(this.pos, 35);
       const gun = this.items.filter((it) => it?.isGun && it.rarity < 4).sort((a, b) => b.score - a.score)[0];
       const cost = gun && g.events.constructor.upgradeCost(gun);
-      if (bench && cost && this.mats[cost[0]] >= cost[1]) {
+      if (bench && cost && this.gold >= cost[1]) {
         this.mode = 'upgrade';
         this.setGoal(bench.x, bench.z);
         if (Math.hypot(bench.x - this.pos.x, bench.z - this.pos.z) < 2.6) {
@@ -529,6 +529,21 @@ export class Bot extends Actor {
         return;
       }
       const calm = Math.min(1, (g.time - this.landTime) / 140);
+      // medallion carriers are on everyone's map: confident bots go after them
+      if (this.skill > 0.45 && calm > 0.5 && !this.medallions.size) {
+        for (const a of g.actors) {
+          if (a === this || !a.alive || a.npc || !a.medallions?.size || a.state !== 'ground') continue;
+          const dd = a.pos.distanceTo(this.pos);
+          if (dd < 170 && (!storm || storm.isSafe(a.pos.x, a.pos.z, 10)) &&
+              g.bots.filter((o) => o.mode === 'hunt' && o.alive && (o.huntPos.x - a.pos.x) ** 2 + (o.huntPos.z - a.pos.z) ** 2 < 1600).length < 4) {
+            this.huntPos.copy(a.pos);
+            this.huntT = 14;
+            this.mode = 'hunt';
+            this.setGoal(a.pos.x, a.pos.z);
+            return;
+          }
+        }
+      }
       for (const a of g.actors) {
         if (a === this || !a.alive || g.time - a.lastFireTime > 0.6) continue;
         const dd = a.pos.distanceTo(this.pos);

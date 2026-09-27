@@ -80,7 +80,7 @@ export class Towns {
     game.sound.play('break', new THREE.Vector3(x, y, z));
     if (game.warmup <= 0 && Math.random() < b.loot) {
       const r = Math.random();
-      const item = r < 0.45 ? game.loot.constructor.randomConsumable() : r < 0.8 ? { type: 'ammo', ammoType: ['light', 'medium', 'shells', 'heavy'][Math.floor(Math.random() * 4)], amount: 12 } : { type: 'mat', matType: 'wood', amount: 20 };
+      const item = r < 0.2 ? { type: 'gold', amount: 15 } : r < 0.5 ? game.loot.constructor.randomConsumable() : r < 0.8 ? { type: 'ammo', ammoType: ['light', 'medium', 'shells', 'heavy'][Math.floor(Math.random() * 4)], amount: 12 } : { type: 'mat', matType: 'wood', amount: 20 };
       game.loot.spawnPickup(item, new THREE.Vector3(x, y, z), new THREE.Vector3((Math.random() - 0.5) * 2, 4, (Math.random() - 0.5) * 2));
     }
   }
