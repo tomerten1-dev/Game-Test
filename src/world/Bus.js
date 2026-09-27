@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { MAP_SCALE } from './Terrain.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 
 export const BUS_HEIGHT = 110;
@@ -192,10 +193,10 @@ export class Bus {
     if (mode === 'surf') return this._launchSurf();
     const a = Math.random() * Math.PI * 2;
     const dx = Math.cos(a), dz = Math.sin(a);
-    const off = (Math.random() - 0.5) * 160;
+    const off = (Math.random() - 0.5) * 160 * MAP_SCALE;
     const px = -dz * off, pz = dx * off;
-    this.start.set(-dx * 420 + px, BUS_HEIGHT, -dz * 420 + pz);
-    this.end.set(dx * 420 + px, BUS_HEIGHT, dz * 420 + pz);
+    this.start.set(-dx * 420 * MAP_SCALE + px, BUS_HEIGHT, -dz * 420 * MAP_SCALE + pz);
+    this.end.set(dx * 420 * MAP_SCALE + px, BUS_HEIGHT, dz * 420 * MAP_SCALE + pz);
     this.length = this.start.distanceTo(this.end);
     this.vel.set(dx * SPEED, 0, dz * SPEED);
     this.progress = 0;
@@ -229,7 +230,7 @@ export class Bus {
     const a = Math.random() * Math.PI * 2;
     const dx = -Math.cos(a), dz = -Math.sin(a); // heading in toward the middle
     this.start.set(Math.cos(a) * 460, 5, Math.sin(a) * 460);
-    this.end.set(Math.cos(a) * 290, 5, Math.sin(a) * 290);
+    this.end.set(Math.cos(a) * 290 * MAP_SCALE, 5, Math.sin(a) * 290 * MAP_SCALE);
     this.length = this.start.distanceTo(this.end);
     this.vel.set(dx * 14, 0, dz * 14);
     this.side = new THREE.Vector3(-dz, 0, dx);
@@ -257,7 +258,7 @@ export class Bus {
   surfPos(lat, out) { return out.copy(this.pos).addScaledVector(this.side, lat).setY(this.pos.y + Math.sin(this.progress * 40 + lat) * 0.3); }
 
   // Doors open once the bus is over (or about to be over) the island. Surfers can't bail early.
-  get canDrop() { return this.active && this.mode !== 'surf' && this.pos.length() < 350; }
+  get canDrop() { return this.active && this.mode !== 'surf' && this.pos.length() < 350 * MAP_SCALE; }
 
   // steer: -1..1 (driver input, 'drive' mode). onRing(ring) fires when a ring is flown through.
   update(dt, t, steer = 0, onRing = null) {

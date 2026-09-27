@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PALETTE } from './Terrain.js';
+import { PALETTE, BIOMES } from './Terrain.js';
 import { MOODS } from './TimeOfDay.js';
 
 // Seasonal island variants. Chosen in Settings (or by calendar on "Auto"); the island is
@@ -39,5 +39,6 @@ export const VARIANT = VARIANTS[VARIANT_KEY];
 
 // Apply colour overrides before the terrain / foliage are generated.
 if (VARIANT.palette) for (const [k, v] of Object.entries(VARIANT.palette)) PALETTE[k]?.set(v);
+BIOMES.on = VARIANT_KEY === 'summer';
 if (VARIANT.day) Object.assign(MOODS.day, VARIANT.day);
 export const tint = (list, fallback) => (list ? list.map((c) => new THREE.Color(c)) : fallback);

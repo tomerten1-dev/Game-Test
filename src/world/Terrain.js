@@ -5,14 +5,16 @@ import { SHADOW } from './Bake.js';
 // Smooth fbm island. Heights live in a grid; heightAt() is bilinear so gameplay
 // and the rendered mesh always agree.
 
-export const WORLD_HALF = 400;   // grid covers [-400, 400]
+// Everything island-sized scales with MAP_SCALE (the island grew 1.3x: ~780 m of land across).
+export const MAP_SCALE = 1.3;
+export const WORLD_HALF = 520;   // grid covers [-520, 520]
 export const CELL = 2.5;          // meters between samples
-export const ISLAND_RADIUS = 300;
+export const ISLAND_RADIUS = 390;
 export const AREA_SCALE = (ISLAND_RADIUS / 170) ** 2; // vs. the original 20-player island
 export const WATER_LEVEL = 0;
 
 // Named places. `kind` picks the builder in Towns.js (village by default).
-export const TOWNS = [
+const RAW_TOWNS = [
   { name: 'Candy Corners', x: -14, z: 30, r: 28 },
   { name: 'Breezy Bay', x: 172, z: 70, r: 26 },
   { name: 'Maple Hollow', x: -165, z: -62, r: 27 },
@@ -25,7 +27,27 @@ export const TOWNS = [
   { name: 'Windy Farms', x: 110, z: -238, r: 28, kind: 'farm' },
   { name: 'Pine Hollow', x: -238, z: 70, r: 24 },
 ];
-export const MOUNTAIN = { x: -125, z: 150, r: 85, h: 58 };
+export const TOWNS = RAW_TOWNS.map((t) => ({ ...t, x: Math.round(t.x * MAP_SCALE), z: Math.round(t.z * MAP_SCALE) }));
+export const MOUNTAIN = { x: -125 * MAP_SCALE, z: 150 * MAP_SCALE, r: 95, h: 62 };
+// small islands off the coast (reach them by gliding, swimming or a launch)
+export const ISLANDS = [
+  { name: 'Gull Isle', x: 440, z: 150, r: 26 },
+  { name: 'Coral Cay', x: -150, z: -445, r: 24 },
+  { name: 'Lone Rock', x: -455, z: -120, r: 22 },
+];
+// a tunnel cut through the mountain (floor heights are filled in when the terrain is generated)
+export const TUNNELS = [{ name: 'Mountain Tunnel', ax: MOUNTAIN.x - 125, az: MOUNTAIN.z, bx: MOUNTAIN.x + 120, bz: MOUNTAIN.z, w: 6 }]; // runs along x (axis-aligned roof colliders)
+
+// Biomes on the default (summer) island: snowy north, grassland in the middle, desert south.
+// Variant.js switches them off for the all-winter / all-desert islands.
+export const BIOMES = { on: true };
+export function biomeAt(x, z) {
+  if (!BIOMES.on) return { snow: 0, desert: 0 };
+  const R = ISLAND_RADIUS;
+  return { snow: 1 - smoothstep(-0.66 * R, -0.46 * R, z), desert: smoothstep(0.46 * R, 0.66 * R, z) };
+}
+const SNOW_GROUND = [new THREE.Color('#eef4fb'), new THREE.Color('#dbe7f3')];
+const DESERT_GROUND = [new THREE.Color('#e3c58a'), new THREE.Color('#d6b274')];
 
 const C = (hex) => new THREE.Color(hex);
 export const PALETTE = {
@@ -65,7 +87,14 @@ export class Terrain {
       const fall = 1 - smoothstep(0, 1, md);
       mt = Math.pow(fall, 1.2) * MOUNTAIN.h * (0.78 + 0.34 * nz.ridged(x * 0.013, z * 0.013, 3)) + nz.fbm(x * 0.06, z * 0.06, 2) * 1.2 * fall;
     }
-    return lerp(-7.5, 3.2 + hills + detail + mt, mask);
+    let h = lerp(-7.5, 3.2 + hills + detail + mt, mask);
+    for (const is of ISLANDS) {
+      const d = Math.hypot(x - is.x, z - is.z) / is.r;
+      if (d >= 1.25) continue;
+      const m = 1 - smoothstep(0.55, 1.2, d);
+      h = Math.max(h, lerp(-7.5, 3.4 + (1 - d) * 5 + detail, m));
+    }
+    return h;
   }
 
   _generate() {
@@ -97,6 +126,23 @@ export class Terrain {
           h[j * n + i] = lerp(h[j * n + i], t.y, w);
           // lake basin: shallow water in the middle of the town ring
           if (t.kind === 'lake') h[j * n + i] = lerp(h[j * n + i], -1.1, 1 - smoothstep(t.r * 0.32, t.r * 0.56, d));
+        }
+      }
+    }
+    // tunnels: a flat-floored cut through the mountain (roofed over in Landmarks.js)
+    for (const t of TUNNELS) {
+      t.ay = Math.max(3.2, this.rawHeight(t.ax, t.az)); t.by = Math.max(3.2, this.rawHeight(t.bx, t.bz));
+      const dx = t.bx - t.ax, dz = t.bz - t.az, L = Math.hypot(dx, dz);
+      for (let j = 0; j < n; j++) {
+        for (let i = 0; i < n; i++) {
+          const x = -WORLD_HALF + i * CELL, z = -WORLD_HALF + j * CELL;
+          const u = ((x - t.ax) * dx + (z - t.az) * dz) / (L * L);
+          if (u < -0.02 || u > 1.02) continue;
+          const side = Math.abs(((x - t.ax) * -dz + (z - t.az) * dx) / L);
+          if (side > t.w) continue;
+          const floor = lerp(t.ay, t.by, clamp(u, 0, 1));
+          const k = j * n + i;
+          if (h[k] > floor) h[k] = lerp(h[k], floor, 1 - smoothstep(t.w - 2.5, t.w, side));
         }
       }
     }
@@ -132,6 +178,8 @@ export class Terrain {
         g *= 1 - this.path[k];
         // patchy meadows
         g *= clamp(0.55 + this.noise.fbm(x * 0.045 - 7, z * 0.045 + 3, 2) * 1.1, 0, 1);
+        const bio = biomeAt(x, z);
+        g *= (1 - 0.8 * bio.snow) * (1 - 0.7 * bio.desert); // little grass in the snow and the desert
         this.grass[k] = g;
       }
     }
@@ -185,6 +233,9 @@ export class Terrain {
     const ny = this._gridNormalY(i, j);
     const P = PALETTE;
     out.copy(P.grassA).lerp(P.grassB, this.variation[k]);
+    const bio = biomeAt(x, z);
+    if (bio.snow > 0) out.lerp(_tmp.copy(SNOW_GROUND[0]).lerp(SNOW_GROUND[1], this.variation[k]), bio.snow);
+    if (bio.desert > 0) out.lerp(_tmp.copy(DESERT_GROUND[0]).lerp(DESERT_GROUND[1], this.variation[k]), bio.desert);
     // dry / dirt patches where there is little grass
     const g = this.grass[k];
     out.lerp(P.dirt, (1 - smoothstep(0.15, 0.6, g)) * 0.35 * smoothstep(2.5, 3.5, y));

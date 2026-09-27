@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Landmarks } from './Landmarks.js';
 import { Traversal } from './Traversal.js';
 import { Terrain, WATER_LEVEL, WORLD_HALF } from './Terrain.js';
 import './Variant.js'; // seasonal colour overrides (must run before the island is generated)
@@ -46,6 +47,7 @@ export class World {
     this.clouds = new Clouds(scene, 26, models);
     this.towns = new Towns(scene, this.terrain, this.colliders, models);
     this.traversal = new Traversal(scene, this.terrain, this.colliders, this.towns);
+    this.landmarks = new Landmarks(scene, this.terrain, this.colliders, this.towns, models);
     this.foliage = new Foliage(scene, this.terrain, this.colliders, models, this.heightTex);
     this.destructibles = this.foliage.destr;
     const t0 = performance.now();

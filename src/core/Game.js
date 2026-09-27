@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { World } from '../world/World.js';
-import { TOWNS } from '../world/Terrain.js';
+import { TOWNS, MAP_SCALE } from '../world/Terrain.js';
 import { CharacterAssets, Q_TYPES } from '../player/Character.js';
 import { Player } from '../player/Player.js';
 import { CameraRig } from '../player/CameraRig.js';
@@ -475,7 +475,7 @@ export class Game {
 
   _warmupSpot() {
     for (let i = 0; i < 40; i++) {
-      const a = Math.random() * Math.PI * 2, d = 20 + Math.sqrt(Math.random()) * 250;
+      const a = Math.random() * Math.PI * 2, d = (20 + Math.sqrt(Math.random()) * 250) * MAP_SCALE;
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
       if (this.world.heightAt(x, z) > 2.5 && this.world.terrain.normalAt(x, z).y > 0.8 && !this.world.colliders.query(x - 4, x + 4, z - 4, z + 4, []).length) return [x, z];
     }
@@ -576,7 +576,7 @@ export class Game {
         const t = towns[Math.floor(Math.random() * towns.length)];
         x = t.x + (Math.random() - 0.5) * t.r * 1.2; z = t.z + (Math.random() - 0.5) * t.r * 1.2;
       } else {
-        const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * 260;
+        const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * 260 * MAP_SCALE;
         x = Math.cos(a) * d; z = Math.sin(a) * d;
       }
       if (w.heightAt(x, z) > 2.2) break;

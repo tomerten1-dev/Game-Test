@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { TOWNS, WORLD_HALF } from './Terrain.js';
+import { TOWNS, WORLD_HALF, MAP_SCALE } from './Terrain.js';
 import { Weapon } from '../weapons/Weapon.js';
 import { RARITIES, WEAPONS, rollWeaponType, EXOTIC, EXOTICS, MOD_COST } from '../weapons/WeaponDefs.js';
 import { Character } from '../player/Character.js';
@@ -91,7 +91,7 @@ export class Events {
     const arrowGeo = new THREE.ConeGeometry(0.35, 0.5, 3);
     let n = 0;
     for (let i = 0; i < 600 && n < 24; i++) {
-      const a = r() * Math.PI * 2, d = 30 + r() * 250;
+      const a = r() * Math.PI * 2, d = (30 + r() * 250) * MAP_SCALE;
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
       if (!this._clearSpot(x, z, 3) || this.pads.some((p) => Math.hypot(p.x - x, p.z - z) < 40)) continue;
       const y = this.world.heightAt(x, z);

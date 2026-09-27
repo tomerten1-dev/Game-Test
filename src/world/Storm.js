@@ -3,10 +3,10 @@ import * as THREE from 'three';
 // 12 zones like Fortnite: 1 damage a second for the early circles, 12 a second by circle 6 and 20 by circle 8;
 // the last four circles move instead of just shrinking.
 export const STORM_PHASES = [
-  { wait: 60, shrink: 45, radius: 220, dmg: 1 },
-  { wait: 45, shrink: 38, radius: 165, dmg: 1 },
-  { wait: 40, shrink: 34, radius: 120, dmg: 1 },
-  { wait: 35, shrink: 30, radius: 88, dmg: 1 },
+  { wait: 60, shrink: 50, radius: 290, dmg: 1 },
+  { wait: 45, shrink: 40, radius: 210, dmg: 1 },
+  { wait: 40, shrink: 34, radius: 145, dmg: 1 },
+  { wait: 35, shrink: 30, radius: 95, dmg: 1 },
   { wait: 30, shrink: 25, radius: 62, dmg: 5 },
   { wait: 25, shrink: 22, radius: 44, dmg: 12 },
   { wait: 22, shrink: 20, radius: 30, dmg: 15 },
@@ -17,7 +17,7 @@ export const STORM_PHASES = [
   { wait: 12, shrink: 20, radius: 0, dmg: 20 },
 ];
 export const MOVING_FROM = STORM_PHASES.length - 4;
-const START_RADIUS = 440;
+const START_RADIUS = 580;
 
 const vert = /* glsl */ `
 varying vec2 vUv;
@@ -106,7 +106,7 @@ export class Storm {
       const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * maxOff;
       const x = center.x + Math.cos(a) * r, z = center.y + Math.sin(a) * r;
       const nearCenter = moving && Math.hypot(x - center.x, z - center.y) < radius * 0.6;
-      if (this.terrain.heightAt(x, z) > 2.2 && Math.hypot(x, z) < 250 && !nearCenter) return out.set(x, z);
+      if (this.terrain.heightAt(x, z) > 2.2 && Math.hypot(x, z) < 325 && !nearCenter) return out.set(x, z);
     }
     return out.copy(center);
   }

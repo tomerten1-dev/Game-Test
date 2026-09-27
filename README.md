@@ -1,6 +1,6 @@
 # Stormbound
 
-A browser battle royale: **you vs 19 AI heroes** on a bright, stylized island. Ride the flying Storm Bus, skydive, loot glowing chests, build walls and ramps, and be the last hero standing while the purple storm closes in.
+A browser battle royale: **you vs 99 AI heroes** on a bright, stylized island. Ride the flying Storm Bus, skydive, loot glowing chests, build walls and ramps, and be the last hero standing while the purple storm closes in.
 
 Built from scratch with **Vite + Three.js** (ES modules, plain JavaScript). No game engine.
 
@@ -150,6 +150,8 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 - **Bot build fights:** under fire, skilled bots throw up a wall and fight from behind it, edit-peeking through it: a window for normal shots, a half wall to shoot up at a higher enemy, a wide arch for close shotgun shots, closed again after each peek. Boxed bots rebuild walls that get shot out, peek the same way, and take height with quick 90s; in the open they 90 up when you have height on them, ramp-rush (ramp + cover wall) toward a higher enemy, and box up next to an enemy who is boxed. They harvest more materials as the match goes on.
 
 ## Seasons
+
+**The island** is about 780 m of land across (1.3× bigger than before) with **three biomes** on the default Summer island: snowy pine forests in the north (Windy Farms, Pebble City), grassland in the middle and a cactus desert in the south (Salty Pier). There are three **offshore islands** (Gull Isle, Coral Cay, Lone Rock) with chests, six small **named landmarks** between the towns (Camp Cod, Old Windmill, Water Tower, Lumber Camp, Flag Hill, Lookout Ruin), each with a chest, and a lantern-lit **Mountain Tunnel** running under the mountain. Landmark names show on the map when you zoom in.
 
 **Settings → Island season** picks the island: *Summer*, *Winter* (snow, frosted trees, falling snow, pale sky) or *Desert* (sand, dry scrub, saguaro cacti, warm sky). *Auto* uses Winter from December to February and Summer otherwise. The island is generated on load, so the change applies after the reload button.
 

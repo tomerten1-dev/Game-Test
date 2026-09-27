@@ -3,7 +3,7 @@ import { Houses, YARD } from './Houses.js';
 import { makeWeaponMesh } from '../weapons/WeaponModels.js';
 import { mulberry32 } from '../core/noise.js';
 import { part, merge, mat } from './geomUtils.js';
-import { TOWNS, MOUNTAIN, AREA_SCALE } from './Terrain.js';
+import { TOWNS, MOUNTAIN, AREA_SCALE, MAP_SCALE } from './Terrain.js';
 
 // KayKit Medieval buildings (CC0). Uniform world scale keeps proportions consistent.
 const KK_SCALE = 9.5;
@@ -303,7 +303,7 @@ export class Towns {
   _scatterCrates(crates) {
     const r = this.rand;
     for (let i = 0; i < Math.round(18 * AREA_SCALE); i++) {
-      const a = r() * Math.PI * 2, d = 25 + r() * 250;
+      const a = r() * Math.PI * 2, d = (25 + r() * 250) * MAP_SCALE;
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
       const h = this.terrain.heightAt(x, z);
       if (h < 2.5 || h > 25 || this.terrain.normalAt(x, z).y < 0.9) continue;

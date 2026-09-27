@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { TOWNS, MOUNTAIN } from './Terrain.js';
+import { TOWNS, MOUNTAIN, MAP_SCALE } from './Terrain.js';
 import { mulberry32 } from '../core/noise.js';
 
 // Ways to get around the island (Fortnite-style):
@@ -51,7 +51,7 @@ export class Traversal {
   _towers(r) {
     const spots = [];
     for (let i = 0; i < 900 && spots.length < 4; i++) {
-      const a = r() * Math.PI * 2, d = 50 + r() * 230;
+      const a = r() * Math.PI * 2, d = (50 + r() * 230) * MAP_SCALE;
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
       const h = this.terrain.heightAt(x, z);
       if (h < 6 || h > 34 || this.terrain.normalAt(x, z).y < 0.93) continue;
@@ -159,7 +159,7 @@ export class Traversal {
   _balloons(r) {
     const cols = [['#ff5a4f', '#ffd23f'], ['#3d8dff', '#ffffff'], ['#5bd43b', '#ffe94d']];
     for (let i = 0, tries = 0; i < 3 && tries < 600; tries++) {
-      const a = r() * Math.PI * 2, d = 60 + r() * 200;
+      const a = r() * Math.PI * 2, d = (60 + r() * 200) * MAP_SCALE;
       const x = Math.cos(a) * d, z = Math.sin(a) * d, h = this.terrain.heightAt(x, z);
       if (h < 3 || h > 30 || this.terrain.normalAt(x, z).y < 0.95 || !this._clearOf(x, z, 10)) continue;
       if (this.balloons.some((b) => Math.hypot(b.x - x, b.z - z) < 80)) continue;

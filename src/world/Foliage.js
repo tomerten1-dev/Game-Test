@@ -4,14 +4,16 @@ import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferG
 import { addWind, WIND } from '../effects/Shaders.js';
 import { mulberry32, smoothstep } from '../core/noise.js';
 import { jitter, gradientY } from './geomUtils.js';
-import { TOWNS, WORLD_HALF, ISLAND_RADIUS, PALETTE, AREA_SCALE } from './Terrain.js';
+import { TOWNS, WORLD_HALF, ISLAND_RADIUS, PALETTE, AREA_SCALE, BIOMES, biomeAt } from './Terrain.js';
 import { quality } from '../core/device.js';
 import { Nature } from './Nature.js';
-import { VARIANT, tint } from './Variant.js';
+import { VARIANT, VARIANTS, tint } from './Variant.js';
 
 const TREE_GREENS = tint(VARIANT.treeGreens, ['#4caf50', '#5fc25a', '#3f9e4c', '#78cc5c', '#56b84e'].map((c) => new THREE.Color(c)));
 const AUTUMN = tint(VARIANT.autumn, ['#f39a34', '#e9722c', '#f4b83f', '#d9582b'].map((c) => new THREE.Color(c)));
 const PINE_GREENS = tint(VARIANT.pineGreens, ['#2f7d52', '#3a915e', '#2b6f49', '#44a066'].map((c) => new THREE.Color(c)));
+// biome tree colours on the default island
+const SNOW_TREES = tint(VARIANTS.winter.treeGreens), SNOW_PINES = tint(VARIANTS.winter.pineGreens), DESERT_TREES = tint(VARIANTS.desert.treeGreens);
 
 function roundCanopyGeo(rand) {
   const parts = [];
@@ -64,7 +66,7 @@ export class Foliage {
     if (this.nature) this.nature.destr = this.destr;
     this._trees();
     this._rocks();
-    if (models) { this._palms(); this._spires(); if (VARIANT.cacti) this._cacti(); }
+    if (models) { this._palms(); this._spires(); if (VARIANT.cacti || BIOMES.on) this._cacti(); }
     if (this.nature) {
       this.nature.occluders = this.occluders;
       this.nature.scatterUndergrowth(
@@ -141,7 +143,9 @@ export class Foliage {
       const f = forest.fbm(c.x * 0.018 + 100, c.z * 0.018, 3);
       if (f < -0.15 && r() > 0.15) continue;
       if (!this._free(c.x, c.z, 4)) continue;
-      const pine = c.h > 16 ? r() < 0.8 : r() < 0.3;
+      const bio = biomeAt(c.x, c.z);
+      if (bio.desert > 0.5 && r() < 0.75) continue; // few trees in the desert
+      const pine = bio.snow > 0.5 ? r() < 0.85 : c.h > 16 ? r() < 0.8 : r() < 0.3;
       const sc = (pine ? 1.0 : 0.9) + r() * 0.7;
       const trunkH = (pine ? 1.4 : 2.1) * sc;
       const yaw = r() * Math.PI * 2;
@@ -152,7 +156,7 @@ export class Foliage {
         const ks = H / info.size.y;
         const shade = (0.85 + r() * 0.25) * (VARIANT.pineShade || 1);
         this.pineTrees.push({ x: c.x, y: c.h, z: c.z, yaw, height: H * 1.05, variant: Math.floor(r() * 16), type, idx: kkPines[type].length,
-          color: PINE_GREENS[Math.floor(r() * PINE_GREENS.length)].clone().multiplyScalar(shade * 1.25),
+          color: ((pg) => pg[Math.floor(r() * pg.length)])(bio.snow > 0.5 ? SNOW_PINES : PINE_GREENS).clone().multiplyScalar(shade * 1.25),
           mat: new THREE.Matrix4().compose(new THREE.Vector3(c.x, c.h - 0.2, c.z), new THREE.Quaternion().setFromAxisAngle(up, yaw), new THREE.Vector3(ks, ks, ks)) });
         kkPines[type].push({ x: c.x, y: c.h - 0.2, z: c.z, rot: yaw, scale: ks, colors: { hexagons_medieval: new THREE.Color(shade, shade * (0.95 + r() * 0.1), shade) } });
         const hcol = { kind: 'circle', x: c.x, z: c.z, r: 0.45, y0: c.h - 2, y1: c.h + H, tree: true };
@@ -170,7 +174,8 @@ export class Foliage {
       if (pine) {
         m.compose(p.set(c.x, c.h + trunkH * 0.75, c.z), q, s.set(sc, sc * (1 + r() * 0.3), sc));
         pines.setMatrixAt(nP, m);
-        pines.setColorAt(nP, col.copy(PINE_GREENS[Math.floor(r() * PINE_GREENS.length)]));
+        const pg = bio.snow > 0.5 ? SNOW_PINES : PINE_GREENS;
+        pines.setColorAt(nP, col.copy(pg[Math.floor(r() * pg.length)]));
         this.occluders.push({ x: c.x, y: c.h + trunkH * 0.75 + 1.4 * sc, z: c.z, r: 1.45 * sc });
         nP++;
       } else {
@@ -180,7 +185,8 @@ export class Foliage {
         this.roundTrees.push({ x: c.x, y: c.h, z: c.z, yaw, height: 6.2 + sc * 2.4, variant: nR, color: null, trunkIdx: nT - 1, canopyIdx: nR, trunkMat: null, canopyMat: m.clone() });
         this.occluders.push({ x: c.x, y: c.h + trunkH + cs * 0.75, z: c.z, r: cs * 1.55 });
         const autumn = r() < 0.13;
-        const base = autumn ? AUTUMN[Math.floor(r() * AUTUMN.length)] : TREE_GREENS[Math.floor(r() * TREE_GREENS.length)];
+        const greens = bio.snow > 0.5 ? SNOW_TREES : bio.desert > 0.5 ? DESERT_TREES : TREE_GREENS;
+        const base = autumn && bio.snow < 0.5 ? AUTUMN[Math.floor(r() * AUTUMN.length)] : greens[Math.floor(r() * greens.length)];
         rounds.setColorAt(nR, col.copy(base).multiplyScalar(0.9 + r() * 0.2));
         this.roundTrees[this.roundTrees.length - 1].color = col.clone();
         nR++;
@@ -319,6 +325,7 @@ export class Foliage {
     for (let i = 0; i < 3000 && n < max; i++) {
       const c = this._candidate(2.4, 26, 0.85);
       if (!c || !this._free(c.x, c.z, 4)) continue;
+      if (!VARIANT.cacti && biomeAt(c.x, c.z).desert < 0.6) continue; // on the default island: desert biome only
       const H = 2.6 + r() * 3.2;
       q.setFromAxisAngle(up, r() * Math.PI * 2);
       m.compose(p.set(c.x, c.h - 0.1, c.z), q, sc.set(H * 0.55, H, H * 0.55));
