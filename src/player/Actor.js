@@ -86,7 +86,7 @@ export class Actor {
       return;
     }
     if (this.state === 'ground') {
-      const speed = this.inWater ? RUN_SPEED * 0.6 : RUN_SPEED;
+      const speed = this.inWater ? RUN_SPEED * (this.groundY < -1.2 ? 0.5 : 0.65) : RUN_SPEED;
       const k = this.onGround ? 14 : 3;
       this.vel.x = damp(this.vel.x, it.mx * speed, k, dt);
       this.vel.z = damp(this.vel.z, it.mz * speed, k, dt);

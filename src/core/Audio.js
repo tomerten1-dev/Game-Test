@@ -77,9 +77,8 @@ export class Sound {
   }
 
   play(name, pos = null, opts = {}) {
-    if (this.muted) return;
-    const ctx = this.ensure();
-    if (!ctx) return;
+    if (this.muted || !this.ctx || this.ctx.state !== 'running') return;
+    const ctx = this.ctx;
     const t = ctx.currentTime;
     const v = pos ? this._vol(pos, opts.range || 110) : 1;
     if (v <= 0.01) return;

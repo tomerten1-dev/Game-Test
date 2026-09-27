@@ -76,7 +76,9 @@ export class Combat {
       if (i % 2 === 0 || def.pellets === 1) g.effects.tracer(muzzle, _end, shooter.isPlayer ? '#fff2b0' : '#ffd08a', def.pellets > 1 ? 0.03 : 0.045);
       if (r.actor) {
         const fall = 1 - 0.4 * Math.min(1, Math.max(0, (r.t - def.falloffStart) / (def.range - def.falloffStart)));
-        const dmg = w.damage * fall * (r.head ? 1.5 : 1);
+        // bots trade damage a bit slower with each other so matches last longer
+        const botVsBot = !shooter.isPlayer && !r.actor.isPlayer ? 0.45 : 1;
+        const dmg = w.damage * fall * (r.head ? 1.5 : 1) * botVsBot;
         let e = perTarget.get(r.actor);
         if (!e) { e = { dmg: 0, head: false, point: _end.clone() }; perTarget.set(r.actor, e); }
         e.dmg += dmg;

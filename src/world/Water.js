@@ -30,7 +30,8 @@ function makeWaterNormalMap(size = 256) {
   ctx.putImageData(img, 0, 0);
   const tex = new THREE.CanvasTexture(cv);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(90, 90);
+  tex.repeat.set(60, 60);
+  tex.anisotropy = 4;
   tex.colorSpace = THREE.NoColorSpace;
   return tex;
 }
@@ -40,12 +41,12 @@ export class Water {
     this.normalMap = makeWaterNormalMap();
     const mat = new THREE.MeshStandardMaterial({
       color: '#1f9fd6',
-      roughness: 0.06,
+      roughness: 0.14,
       metalness: 0.05,
       transparent: true,
       opacity: 0.78,
       normalMap: this.normalMap,
-      normalScale: new THREE.Vector2(0.35, 0.35),
+      normalScale: new THREE.Vector2(0.18, 0.18),
       envMapIntensity: 1.2,
     });
     const geo = new THREE.PlaneGeometry(2400, 2400, 1, 1);

@@ -72,15 +72,28 @@ export class Bot extends Actor {
     if (this.target && (!this.target.alive || this.target.state === 'bus')) this.target = null;
     const eye = this.eye(_eye);
     let best = null, bestD = SIGHT;
+    // aggression ramps up after landing: early on bots mostly loot
+    if (this.landTime === undefined) this.landTime = g.time;
+    const calm = Math.min(1, (g.time - this.landTime) / 100);
+    const sight = 22 + (SIGHT - 22) * calm;
     const cands = [];
     for (const a of g.actors) {
       if (a === this || !a.alive || a.state === 'bus') continue;
       const d = a.pos.distanceTo(this.pos);
-      if (d < SIGHT + (a === this.target ? 30 : 0)) cands.push([d, a]);
+      const range = a === this.target ? SIGHT + 30 : a.isPlayer ? sight + 10 : sight * 0.8;
+      if (d < range) cands.push([d, a]);
     }
     cands.sort((a, b) => a[0] - b[0]);
+    const fx = Math.sin(this.aimYaw), fz = Math.cos(this.aimYaw);
     for (let i = 0; i < Math.min(3, cands.length); i++) {
       const [d, a] = cands[i];
+      if (a !== this.target) {
+        // must notice them: in front (or close / loud) and a per-think chance
+        const dx = (a.pos.x - this.pos.x) / (d || 1), dz = (a.pos.z - this.pos.z) / (d || 1);
+        const inView = dx * fx + dz * fz > 0.2 || d < 10;
+        const loud = g.time - a.lastFireTime < 1 && d < 55;
+        if (!(inView || loud) || Math.random() > (loud ? 0.5 : 0.22) * (1.2 - d / (SIGHT * 1.4))) continue;
+      }
       if (g.world.lineOfSight(eye, a.chest(_tp))) {
         // stick with current target unless someone is much closer
         if (a === this.target) { best = a; bestD = d; break; }

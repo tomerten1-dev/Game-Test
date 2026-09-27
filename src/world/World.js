@@ -116,7 +116,7 @@ export class World {
     const ox = pos.x, oz = pos.z;
     let nx = pos.x + vel.x * dt, nz = pos.z + vel.z * dt;
     // deep water blocks walking (only near water level)
-    if (pos.y < 2 && this.isDeepWater(nx, nz)) {
+    if (pos.y < 2 && !this.isDeepWater(ox, oz) && this.isDeepWater(nx, nz)) {
       if (!this.isDeepWater(nx, oz)) nz = oz;
       else if (!this.isDeepWater(ox, nz)) nx = ox;
       else { nx = ox; nz = oz; }

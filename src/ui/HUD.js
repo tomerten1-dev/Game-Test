@@ -14,6 +14,7 @@ export class HUD {
           <i class="ch t"></i><i class="ch b"></i><i class="ch l"></i><i class="ch r"></i><i class="dot"></i>
           <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
         </div>
+        <div id="banner"></div>
         <div id="reload-ring" class="hidden"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16"/></svg><span>RELOADING</span></div>
         <div id="bottom-right">
           <div id="ammo"><span id="ammo-cur">0</span><span id="ammo-max">/0</span></div>
@@ -33,6 +34,7 @@ export class HUD {
       reloadCircle: root.querySelector('#reload-ring circle'),
       stormTint: root.querySelector('#storm-tint'),
       hurt: root.querySelector('#hurt-flash'),
+      banner: root.querySelector('#banner'),
     };
     this.el.slots.innerHTML = [0, 1, 2].map((i) => `<div class="slot" data-slot="${i}"><span class="key">${i + 1}</span><span class="icon"></span></div>`).join('');
     this.slotEls = [...this.el.slots.querySelectorAll('.slot')];
@@ -54,6 +56,22 @@ export class HUD {
     hm.className = head ? 'show head' : 'show';
     if (kill) hm.className += ' kill';
     this.hitT = 0.18;
+  }
+
+  banner(text, seconds = 3) {
+    const b = this.el.banner;
+    b.textContent = text;
+    b.classList.remove('show');
+    void b.offsetWidth;
+    b.classList.add('show');
+    clearTimeout(this._bannerT);
+    this._bannerT = setTimeout(() => b.classList.remove('show'), seconds * 1000);
+  }
+
+  stormTint(on) {
+    if (this.cache.storm === on) return;
+    this.cache.storm = on;
+    this.el.stormTint.classList.toggle('on', on);
   }
 
   hurt() {
