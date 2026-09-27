@@ -42,7 +42,8 @@ function pineCanopyGeo() {
 }
 
 export class Foliage {
-  constructor(scene, terrain, colliders, models) {
+  constructor(scene, terrain, colliders, models, heightTex) {
+    this.heightTex = heightTex;
     this.models = models;
     this.scene = scene;
     this.terrain = terrain;
@@ -296,7 +297,7 @@ export class Foliage {
       uSize: { value: size },
       uRadius: { value: radius },
       uHalf: { value: WORLD_HALF },
-      uHeightTex: { value: this.terrain.buildDataTexture() },
+      uHeightTex: { value: this.heightTex || this.terrain.buildDataTexture() },
       uGrassA: { value: PALETTE.grassA.clone() },
       uGrassB: { value: PALETTE.grassB.clone() },
     };

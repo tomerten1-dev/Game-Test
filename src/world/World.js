@@ -36,10 +36,11 @@ export class World {
     pmrem.dispose();
 
     this.lighting = new Lighting(scene);
-    this.water = new Water(scene);
+    this.heightTex = this.terrain.buildDataTexture();
+    this.water = new Water(scene, this.heightTex);
     this.clouds = new Clouds(scene);
     this.towns = new Towns(scene, this.terrain, this.colliders, models);
-    this.foliage = new Foliage(scene, this.terrain, this.colliders, models);
+    this.foliage = new Foliage(scene, this.terrain, this.colliders, models, this.heightTex);
   }
 
   update(dt, t, focus, camera) {
