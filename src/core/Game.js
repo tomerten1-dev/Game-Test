@@ -603,6 +603,12 @@ export class Game {
       const dir = this.camera.getWorldDirection(_dir);
       this.pings.ping(_origin.copy(this.camera.position).addScaledVector(dir, this.rig.curDist), dir);
     }
+    // no shooting or building while swimming
+    if (p.swimming) {
+      if (p.buildMode) p.setBuildMode(null);
+      this.hud.prompt?.(null);
+      return;
+    }
     // hidden in a haystack / dumpster: only leaving is possible
     if (p.hiddenIn) {
       this.hud.prompt?.(`Hidden · Jump or ${(this.input.keyFor('interact') || 'E').replace(/^Key/, '')} to leave`);

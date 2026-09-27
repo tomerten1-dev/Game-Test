@@ -917,7 +917,7 @@ export class Bot extends Actor {
 
     // --- aiming & shooting ---
     this.lookT -= dt;
-    if (tgt && (this.targetVisible || this.shootWall)) {
+    if (tgt && (this.targetVisible || this.shootWall) && !this.swimming) {
       const eye = this.eye(_eye);
       const w0 = this.weapon, key = w0?.def.key;
       // aim settles while we keep tracking the same target; moving, airborne or a fast target spoil it

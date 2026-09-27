@@ -12,6 +12,7 @@ import { Colliders, rayBox, rayCylinder, raySphere, rayRamp, rampSurfaceY } from
 export const GRAVITY = 24;
 const STEP = 0.55;
 const DEEP_WATER = -1.3;
+const SWIM_FLOAT = WATER_LEVEL - 1.0; // feet height while swimming (head stays above the surface)
 
 const _list = [];
 
@@ -124,13 +125,7 @@ export class World {
   moveBody(body, dt, gravityScale = 1) {
     const pos = body.pos, vel = body.vel;
     const ox = pos.x, oz = pos.z;
-    let nx = pos.x + vel.x * dt, nz = pos.z + vel.z * dt;
-    // deep water blocks walking (only near water level)
-    if (pos.y < 2 && !this.isDeepWater(ox, oz) && this.isDeepWater(nx, nz)) {
-      if (!this.isDeepWater(nx, oz)) nz = oz;
-      else if (!this.isDeepWater(ox, nz)) nx = ox;
-      else { nx = ox; nz = oz; }
-    }
+    const nx = pos.x + vel.x * dt, nz = pos.z + vel.z * dt;
     pos.x = nx; pos.z = nz;
     body.blocked = this.resolveHorizontal(pos, body.radius, body.height);
     // keep inside world bounds
@@ -141,7 +136,10 @@ export class World {
     vel.y -= GRAVITY * gravityScale * dt;
     const feetBefore = pos.y;
     pos.y += vel.y * dt;
-    const ground = this.groundAt(pos.x, pos.z, Math.max(feetBefore, pos.y), body.radius);
+    let ground = this.groundAt(pos.x, pos.z, Math.max(feetBefore, pos.y), body.radius);
+    // deep water: float at swimming depth unless something solid is under us
+    body.swimming = ground <= WATER_LEVEL - 0.85 && this.isDeepWater(pos.x, pos.z);
+    if (body.swimming) ground = SWIM_FLOAT;
     const wasGround = body.onGround;
     if (pos.y <= ground) {
       pos.y = ground;

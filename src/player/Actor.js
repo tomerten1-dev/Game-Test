@@ -18,6 +18,7 @@ const GLIDE_HEIGHT = 35;
 // Shared body for the player and bots: state machine, physics, animation, health.
 const _tc = new THREE.Color();
 const _sph = new THREE.Sphere(new THREE.Vector3(), 2.2);
+const _sc = new THREE.Color();
 const _mq = [];
 
 // Cosmetic weapon wrap: recolour the gun body (keeps the rarity stripe).
@@ -366,7 +367,13 @@ export class Actor {
       else if ((this.staminaIdle += dt) > 0.8) this.stamina = Math.min(100, this.stamina + STAMINA_REGEN * dt);
       let speed = this.sprinting ? (this.tacSprint ? TAC_SPRINT_SPEED : SPRINT_SPEED) : this.crouched ? CROUCH_SPEED : RUN_SPEED;
       if (this.useT > 0 && !this.useItem?.def.mobile) speed = Math.min(speed, 3.2);
-      if (this.inWater) speed *= this.groundY < -1.2 ? 0.5 : 0.65;
+      if (this.swimming) {
+        // swimming: steady strokes, a bit faster when "sprinting"; no crouch / slide
+        speed = it.sprint ? 5.8 : 4.4;
+        this.crouched = false; this.slideT = 0; this.sprinting = false; this.tacSprint = false;
+        if (!this._wasSwimming) { this.setBuildMode?.(null); if (this.distToCam < 40) this.game.effects.dust(this.pos, 8, 1.2); }
+      } else if (this.inWater) speed *= 0.65;
+      this._wasSwimming = this.swimming;
       // flung by a shockwave: keep the momentum instead of braking in the air
       if (this.flungT > 0) this.flungT -= dt;
       const k = this.onGround ? 14 : this.flungT > 0 ? 0.35 : 3;
@@ -517,7 +524,17 @@ export class Actor {
         ch.setPose(armed ? `${hand}_Ranged_Aiming` : 'Idle', upperArmed, 0.2);
       }
       if (this.onGround && this._wasAir) { this._wasAir = false; this.landT = 0.2; ch.setPose('Jump_Land', upperArmed, 0.08, 1.4); }
-      ch.model.rotation.x = damp(ch.model.rotation.x, this.slideT > 0 ? -0.75 : 0, 10, dt);
+      // swimming: a forward-leaning stroke when moving, upright treading water when still
+      if (this.swimming && this.alive && !emoting && !this.victory) {
+        const moving = hspeed > 1;
+        ch.setPose(moving ? 'Running_A' : 'Jump_Idle', null, 0.25, moving ? 0.75 : 0.6);
+        ch.model.rotation.x = damp(ch.model.rotation.x, moving ? 1.05 : 0.15, 6, dt);
+        ch.model.position.y = damp(ch.model.position.y, ch.footOffset + (moving ? 0.62 : 0.15) + Math.sin(this.game.time * 3 + this.pos.x) * 0.05, 6, dt);
+        if (moving && this.distToCam < 35) {
+          this._splashT = (this._splashT || 0) - dt;
+          if (this._splashT <= 0) { this._splashT = 0.12; _sc.setRGB(0.85, 0.95, 1); this.game.effects.debris.emit(this.pos.x + (Math.random() - 0.5), 0.05, this.pos.z + (Math.random() - 0.5), (Math.random() - 0.5) * 2, 1.5 + Math.random(), (Math.random() - 0.5) * 2, _sc, 0.5, 0.18, 9, 0.8); }
+        }
+      } else ch.model.rotation.x = damp(ch.model.rotation.x, this.slideT > 0 ? -0.75 : 0, 10, dt);
     } else if (this.state === 'skydive') {
       if (hspeed > 1) this.bodyYaw = dampAngle(this.bodyYaw, Math.atan2(this.vel.x, this.vel.z), 4, dt);
       ch.setPose('Jump_Idle', null, 0.3);
@@ -539,7 +556,7 @@ export class Actor {
       ch.flash((1 - k) * 1.5);
       if (this.beamT <= 0) { this.root.visible = false; this.root.scale.setScalar(s); ch.flash(0); this.hiddenCorpse = true; }
     }
-    if (this.state === 'ground' || this.state === 'dead') ch.model.position.y = damp(ch.model.position.y, ch.footOffset - this.crouchAmt * 0.3 - (this.slideT > 0 ? 0.25 : 0), 10, dt);
+    if ((this.state === 'ground' && !this.swimming) || this.state === 'dead') ch.model.position.y = damp(ch.model.position.y, ch.footOffset - this.crouchAmt * 0.3 - (this.slideT > 0 ? 0.25 : 0), 10, dt);
     this.root.rotation.y = this.bodyYaw;
 
     // Damage flash
