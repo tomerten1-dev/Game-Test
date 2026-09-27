@@ -44,6 +44,9 @@ import { VARIANT, VARIANT_KEY } from '../world/Variant.js';
 import { Snowfall } from '../effects/Weather.js';
 import { WeatherSystem } from '../effects/WeatherFX.js';
 import { BossEvent } from '../world/Boss.js';
+import { Fire } from '../world/Fire.js';
+import { ModBench } from '../ui/ModBench.js';
+import { WEAPONS } from '../weapons/WeaponDefs.js';
 
 const WARMUP_TIME = 20;
 import { isTouch } from './device.js';
@@ -101,6 +104,7 @@ export class Game {
     this.loot = new Loot(this);
     this.building = new Building(this);
     this.projectiles = new Projectiles(this);
+    this.fire = new Fire(this);
     this.events = new Events(this);
     this.traps = new Traps(this);
     this.homes = this.world.towns.homes;
@@ -120,6 +124,7 @@ export class Game {
     this.pings = new Pings(this, ui);
     this.map = new MapScreen(ui, this);
     this.inv = new Inventory(ui, this);
+    this.modBench = new ModBench(ui, this);
     this.stormFX = new StormFX(this.scene);
     this.mood = applyMood(this, 'day'); // variant sky for the lobby too
     this.snow = VARIANT.weather === 'snow' ? new Snowfall(this.scene) : null;
@@ -191,6 +196,7 @@ export class Game {
     this.effects.clear();
     this.building.reset();
     this.projectiles.reset();
+    this.fire.reset();
     this.pings.reset();
     this.storm.reset();
     this.hud.show(false);
@@ -240,6 +246,19 @@ export class Game {
     if (v && (this.state !== 'playing' || !this.player?.alive || this.map.open)) return;
     if (this.inv.open === v) return;
     this.inv.show(v);
+    this.input.reset();
+    if (!isTouch) {
+      if (v && document.pointerLockElement) { this._mapUnlock = true; document.exitPointerLock(); }
+      else if (!v && this.state === 'playing') this.input.requestLock();
+    }
+  }
+
+  // Mod bench screen: frees the mouse like the inventory; closes when you walk away.
+  toggleModBench(v = !this.modBench.open) {
+    if (v && (this.state !== 'playing' || !this.player?.alive || this.map.open || this.inv.open)) return;
+    if (this.modBench.open === v) return;
+    this.modBench.show(v);
+    this._modAt = v ? this.player.pos.clone() : null;
     this.input.reset();
     if (!isTouch) {
       if (v && document.pointerLockElement) { this._mapUnlock = true; document.exitPointerLock(); }
@@ -340,6 +359,7 @@ export class Game {
     this.building.reset();
     this.pings.reset();
     this.projectiles.reset();
+    this.fire.reset();
     this.events.reset();
     this.homes.reset();
     this.world.destructibles.reset();
@@ -403,6 +423,7 @@ export class Game {
     this.respawns = [];
     this.building.reset();
     this.projectiles.reset();
+    this.fire.reset();
     this.effects.clear();
     this.hud.reset();
     this.time = 0;
@@ -529,6 +550,10 @@ export class Game {
     if (this.input.pressed('inventory')) this.toggleInventory();
     else if (this.inv.open && (this.input.pressed('pause') || !p.alive)) this.toggleInventory(false);
     if (this.inv.open) this.inv.tick(dt);
+    if (this.modBench.open) {
+      if (this.input.pressed('pause') || this.input.pressed('interact') || !p.alive || p.pos.distanceTo(this._modAt) > 4) this.toggleModBench(false);
+      else this.modBench.tick(dt);
+    }
     if (this.spectating) this.updateSpectate(dt);
     if (this.warmup > 0) this.updateWarmup(dt);
     this.updateEmoteWheel(dt);
@@ -592,6 +617,7 @@ export class Game {
     this.world.destructibles.update(dt);
     this.traps.update(dt, this.actors);
     this.projectiles.update(dt);
+    this.fire.update(dt);
     this.combat.updateBursts(dt);
     this.world.traversal.update(dt, this.time, this.actors);
     if (this.warmup <= 0) this.events.update(dt, this.time);
@@ -606,7 +632,7 @@ export class Game {
         if (ev === 'reloaded') { a.finishReload(w); if (a.isPlayer) this.sound.play('reloaded'); }
         else if (ev === 'shell') {
           a.finishReload(w, 1);
-          if (w.ammo < w.def.mag && a.ammoFor(w.def.ammoType) > 0) { w.reloadT = w.reloadTime; if (a.isPlayer) this.sound.play('reload'); }
+          if (w.ammo < w.mag && a.ammoFor(w.def.ammoType) > 0) { w.reloadT = w.reloadTime; if (a.isPlayer) this.sound.play('reload'); }
           else { w.reloading = false; if (a.isPlayer) this.sound.play('reloaded'); }
         }
       }
@@ -620,6 +646,8 @@ export class Game {
     const inScope = scoped && this.rig.fov < 30;
     this.hud.scope?.(inScope);
     if (p.state === 'ground') p.root.visible = !inScope; // your own hero would block the scope view
+    this.rig.aimZoom = view.weapon?.zoom || 0;
+    this.rig.fastAds = view.weapon?.mods?.under === 'angled';
     this.rig.update(dt, view.state === 'bus' ? this.bus.mesh.position : view.pos, mode);
     if (this.cinematic) this._victoryCam(dt);
     // one frustum per frame for character culling
@@ -711,6 +739,8 @@ export class Game {
         else if (near.kind === 'llama') this.events.openLlama(near.llama, p);
         else if (near.kind === 'forage') { const msg = this.events.eat(near.forage, p); if (msg) this.hud.toast?.(msg); }
         else if (near.kind === 'hide') { const msg = this.events.hide(near.hide, p); if (msg) this.hud.toast?.(msg); }
+        else if (near.kind === 'modbench') this.toggleModBench(true);
+        else if (near.kind === 'dealer') { const msg = this.events.buyExotic(near.dealer, p); this.hud.toast?.(msg || `Bought ${WEAPONS[near.dealer.type].name}`); }
         else if (near.kind === 'bench') { const msg = this.events.upgrade(near.bench, p); this.hud.toast?.(msg || `Upgraded to ${p.held.name}`); }
         else if (near.kind === 'chest') this.loot.openChest(near.chest, p);
         else if (near.kind === 'ammobox') this.loot.openAmmoBox(near.box, p);
@@ -769,9 +799,21 @@ export class Game {
       }
       return;
     }
-    if (!input.down('fire')) return;
+    // Kinetic Blade: aim (right click) dashes forward
+    if (held.isGun && held.def.dash && input.pressed('aim') && p.state === 'ground') {
+      if (!this.combat.bladeDash(p, this.camera.getWorldDirection(_dir))) this.hud.toast?.('Dash recharging');
+    }
+    // bows: holding fire draws, letting go looses the arrow
+    const bowRelease = held.isGun && held.def.charge && !input.down('fire') && held.charge > 0 && this.time - (held.lastTry ?? -9) < 0.25;
+    if (!input.down('fire') && !bowRelease) return;
     const dir = this.camera.getWorldDirection(_dir);
     const origin = _origin.copy(this.camera.position).addScaledVector(dir, this.rig.curDist + 0.25);
+    if (bowRelease) {
+      p.character.root.updateMatrixWorld(true);
+      p.bodyYaw = p.aimYaw;
+      this.combat.fire(p, origin, dir, p.muzzleWorld(_muzzle), { release: true });
+      return;
+    }
     if (held.isPickaxe) {
       p.bodyYaw = p.aimYaw;
       this.combat.melee(p, origin, dir, 2.8);

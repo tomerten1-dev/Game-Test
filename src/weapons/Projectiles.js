@@ -34,14 +34,27 @@ export class Projectiles {
     return p;
   }
 
-  fireWeapon(owner, weapon, from, dir) {
+  // charge (bows): 0..1 draw; a weak draw flies slower, drops more and hits softer
+  fireWeapon(owner, weapon, from, dir, charge = 1) {
     const d = weapon.def, pr = d.projectile;
     const rocket = d.key === 'rocket';
-    const mesh = new THREE.Mesh(rocket ? this.rocketGeo : this.bulletGeo, rocket ? this.rocketMat : this.bulletMat);
+    let kind = rocket ? 'rocket' : 'bullet', mesh, speed = pr.speed, damage = weapon.damage, gravity = pr.gravity;
+    if (pr.arrow) {
+      kind = 'bullet';
+      const k = Math.max(0.15, charge);
+      speed = pr.speed * (0.35 + 0.65 * k); damage = weapon.damage * (0.3 + 0.7 * k); gravity = pr.gravity * (1.6 - 0.6 * k);
+      mesh = new THREE.Mesh(this.arrowGeo ||= new THREE.CylinderGeometry(0.015, 0.015, 0.9, 5).rotateX(Math.PI / 2), this.arrowMat ||= new THREE.MeshStandardMaterial({ color: '#c9b08a', roughness: 0.6 }));
+    } else if (pr.flare) {
+      kind = 'flare';
+      mesh = new THREE.Mesh(this.flareGeo ||= new THREE.SphereGeometry(0.12, 8, 6), this.flareMat ||= new THREE.MeshBasicMaterial({ color: '#ff5a2a' }));
+    } else if (pr.bounce) {
+      kind = 'glnade';
+      mesh = new THREE.Mesh(this.glGeo ||= new THREE.SphereGeometry(0.1, 10, 8), this.glMat ||= new THREE.MeshStandardMaterial({ color: '#46553a', roughness: 0.5, emissive: '#ff3a1a', emissiveIntensity: 0.3 }));
+    } else mesh = new THREE.Mesh(rocket ? this.rocketGeo : this.bulletGeo, rocket ? this.rocketMat : this.bulletMat);
     return this._add({
-      kind: rocket ? 'rocket' : 'bullet', owner, weapon, damage: weapon.damage,
-      pos: from.clone(), vel: dir.clone().multiplyScalar(pr.speed), gravity: pr.gravity,
-      life: d.range / pr.speed + 0.5, explode: pr.explode, headMult: d.headMult || 1.5,
+      kind, owner, weapon, damage, arrow: !!pr.arrow,
+      pos: from.clone(), vel: dir.clone().multiplyScalar(speed), gravity,
+      life: pr.fuse || d.range / speed + 0.5, explode: pr.explode, headMult: d.headMult || 1.5,
     }, mesh);
   }
 
@@ -65,6 +78,7 @@ export class Projectiles {
     const g = this.game, pos = p.pos.clone(), def = p.def;
     if (p.nade === 'grenade' || !p.nade) { this._explode(p, pos); return; }
     this._remove(p);
+    if (p.nade === 'gascan') { g.fire?.placeGasCan(pos, p.owner); return; }
     if (p.nade === 'crashpad') {
       g.events.addBouncePad(pos.x, g.world.groundAt(pos.x, pos.z, pos.y + 0.5, 0.5), pos.z, 'crash', p.owner);
       g.sound.play('bounce', pos, { range: 40 });
@@ -76,7 +90,7 @@ export class Projectiles {
       this.areas.push({ type: 'smoke', pos, smoke: s, r: def.radius, t: def.duration, dur: def.duration, emit: 0 });
       g.sound.play('bounce', pos, { range: 40 });
     } else if (p.nade === 'fire') {
-      this.areas.push({ type: 'fire', pos, owner: p.owner, r: def.radius, t: def.duration, dur: def.duration, emit: 0, dps: def.dps, tick: 0 });
+      g.fire ? g.fire.ignite(pos, p.owner, { r: def.radius, dur: def.duration, dps: def.dps, gen: 0 }) : this.areas.push({ type: 'fire', pos, owner: p.owner, r: def.radius, t: def.duration, dur: def.duration, emit: 0, dps: def.dps, tick: 0 });
       g.sound.play('explosion', pos, { range: 60, vol: 0.5 });
     } else if (p.nade === 'impulse') {
       impulse(g, pos, def.radius, def.push);
@@ -195,7 +209,7 @@ export class Projectiles {
     for (const p of [...this.list]) {
       p.life -= dt;
       if (p.kind === 'grenade' && p.life <= 0) { this._detonate(p); continue; }
-      if (p.life <= 0) { if (p.kind === 'rocket') this._explode(p, p.pos); else this._remove(p); continue; }
+      if (p.life <= 0) { if (p.kind === 'rocket' || p.kind === 'glnade') this._explode(p, p.pos); else if (p.kind === 'flare') this._flareLand(p, p.pos, null); else this._remove(p); continue; }
       if (!p.resting) this._step(p, dt);
       if (!p.alive) continue;
       // visuals
@@ -204,6 +218,10 @@ export class Projectiles {
       m.position.copy(p.pos);
       if (p.kind === 'grenade') { p.spin += dt * 9; m.rotation.set(p.spin, p.spin * 0.7, 0); }
       else if (p.vel.lengthSq() > 1) m.quaternion.setFromUnitVectors(_fwd, _dir.copy(p.vel).normalize());
+      if (p.kind === 'flare') {
+        _c.set('#ff7a3a');
+        g.effects.sparks.emit(p.pos.x, p.pos.y, p.pos.z, (Math.random() - 0.5), (Math.random() - 0.5), (Math.random() - 0.5), _c, 0.3, 0.35, 0);
+      }
       if (p.kind === 'rocket') {
         const back = _pt.copy(p.pos).addScaledVector(_dir, -0.45);
         _c.set('#ffb347');
@@ -227,12 +245,15 @@ export class Projectiles {
       const r = g.combat.trace(_prev, _dir, len, p.owner, p.kind === 'bullet' ? p.weapon?.def.projectile?.pad || 0 : 0);
       if (!r.hit) {
         p.pos.addScaledVector(_dir, len);
-        if (p.kind === 'bullet') g.effects.tracer(_prev, p.pos, '#fff2b0', 0.05);
+        if (p.kind === 'bullet' && !p.arrow) g.effects.tracer(_prev, p.pos, '#fff2b0', 0.05);
         continue;
       }
       _pt.copy(_prev).addScaledVector(_dir, r.t);
       if (p.kind === 'bullet') { g.effects.tracer(_prev, _pt, '#fff2b0', 0.05); this._bulletHit(p, r, _pt); return; }
       if (p.kind === 'rocket') { this._explode(p, _pt.addScaledVector(_dir, -0.3)); return; }
+      if (p.kind === 'flare') { this._flareLand(p, _pt.addScaledVector(_dir, -0.2), r); return; }
+      // launcher grenades go off when they hit a player, otherwise bounce until the fuse runs out
+      if (p.kind === 'glnade' && r.actor) { this._explode(p, _pt); return; }
       // shockwaves go off on impact; other throwables bounce
       if (p.def?.impact) { p.pos.copy(_pt).addScaledVector(_dir, -0.2); this._detonate(p); return; }
       this._normal(r, _pt, _n);
@@ -240,6 +261,7 @@ export class Projectiles {
       const vn = p.vel.dot(_n);
       p.vel.addScaledVector(_n, -1.6 * vn).multiplyScalar(0.5);
       if (p.vel.length() > 3) g.sound.play('bounce', p.pos, { range: 30 });
+      if (p.kind === 'glnade') { if (_n.y > 0.6 && p.vel.length() < 2) p.vel.set(0, 0, 0); return; }
       if (_n.y > 0.6 && p.vel.length() < 2) { p.resting = true; p.vel.set(0, 0, 0); }
       return;
     }
@@ -281,6 +303,20 @@ export class Projectiles {
       if (owner?.isPlayer) g.hud?.objHp?.(c, pt);
     }
     this._remove(p);
+  }
+
+  // Flare: a small hit, then the spot catches fire (and wooden builds, grass and trees nearby).
+  _flareLand(p, at, r) {
+    const g = this.game, pos = at.clone();
+    this._remove(p);
+    if (r?.actor) {
+      const t = r.actor, shieldBefore = t.shield;
+      const dealt = t.takeDamage(p.damage * (!p.owner?.isPlayer && !t.isPlayer ? 0.45 : 1), p.owner, false);
+      if (p.owner?.isPlayer) { g.effects.damageNumber(pos, dealt, false, shieldBefore > 0, t); g.hud?.hitMarker(false, !t.alive, shieldBefore > 0); }
+    }
+    if (r?.collider?.structure) g.fire?.igniteStructure(r.collider.structure, p.owner);
+    if (r?.collider?.obj) g.fire?.igniteTree(r.collider, p.owner);
+    g.fire?.ignite(pos, p.owner, { r: 2.6, dur: 7, gen: 0 });
   }
 
   _explode(p, at) {
@@ -334,7 +370,7 @@ export function explode(game, pos, owner, damage, radius, structureDamage) {
     }
   }
   for (const c of game.world.colliders.query(pos.x - radius, pos.x + radius, pos.z - radius, pos.z + radius, [])) {
-    if (c.breakable && !c.breakable.broken) game.world.towns.breakProp(c, game);
+    if (c.breakable && !c.breakable.broken) { c.breakable.lastHit ||= owner; game.world.towns.breakProp(c, game); }
     if (c.obj && !c.obj.dead && Math.hypot(c.x - pos.x, c.z - pos.z) < radius + c.r) game.world.destructibles.damage(c, (structureDamage || damage) * 0.6, owner);
   }
   game.homes?.explode(pos, radius, structureDamage || damage);

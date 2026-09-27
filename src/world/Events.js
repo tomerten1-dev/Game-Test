@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { TOWNS, WORLD_HALF } from './Terrain.js';
 import { Weapon } from '../weapons/Weapon.js';
-import { RARITIES, WEAPONS, rollWeaponType } from '../weapons/WeaponDefs.js';
+import { RARITIES, WEAPONS, rollWeaponType, EXOTIC, EXOTICS, MOD_COST } from '../weapons/WeaponDefs.js';
+import { Character } from '../player/Character.js';
 import { makeWeaponMesh, itemGeometry } from '../weapons/WeaponModels.js';
 import { mulberry32 } from '../core/noise.js';
 import { Loot } from './Loot.js';
@@ -26,10 +27,10 @@ function labelTexture(lines, colors) {
   ctx.textAlign = 'center';
   ctx.font = '800 30px "Barlow Condensed", sans-serif';
   ctx.fillStyle = colors[0];
-  ctx.fillText(lines[0], 128, 42);
+  ctx.fillText(lines[0], 128, 42, 236); // squeeze long names to fit
   ctx.font = '700 26px "Barlow Condensed", sans-serif';
   ctx.fillStyle = colors[1];
-  ctx.fillText(lines[1], 128, 78);
+  ctx.fillText(lines[1], 128, 78, 236);
   const t = new THREE.CanvasTexture(cv);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
@@ -52,6 +53,10 @@ export class Events {
     this._createJumpPads();
     this._createVending();
     this._createBenches();
+    this.modBenches = [];
+    this._createModBenches();
+    this.dealers = [];
+    this._createDealers();
     this._createHides();
     this._createForage();
     this.llamas = [];
@@ -293,6 +298,87 @@ export class Events {
     }
   }
 
+  // ---------- mod benches (next to the upgrade benches) ----------
+  _createModBenches() {
+    const top = new THREE.MeshStandardMaterial({ color: '#3a4250', roughness: 0.6, metalness: 0.4 });
+    const leg = new THREE.MeshStandardMaterial({ color: '#23272f', roughness: 0.6, metalness: 0.5 });
+    const glow = new THREE.MeshStandardMaterial({ color: '#4fc3ff', emissive: '#4fc3ff', emissiveIntensity: 1.3 });
+    for (const b of this.benches) {
+      let spot = null;
+      for (let i = 0; i < 120 && !spot; i++) {
+        const a = b.rot + Math.PI / 2 + (i % 2 ? Math.PI : 0) + Math.floor(i / 2) % 12 * 0.5, d = 5 + Math.floor(i / 24) * 1.4;
+        const x = b.x + Math.sin(a) * d, z = b.z + Math.cos(a) * d;
+        if (this._clearSpot(x, z, 1.2, 0.8)) spot = { x, z };
+      }
+      if (!spot) continue;
+      const y = this.world.heightAt(spot.x, spot.z);
+      const g = new THREE.Group();
+      const add = (geo, m, x, yy, z) => { const mesh = new THREE.Mesh(geo, m); mesh.position.set(x, yy, z); mesh.castShadow = mesh.receiveShadow = true; g.add(mesh); return mesh; };
+      add(new THREE.BoxGeometry(2.0, 0.12, 0.9), top, 0, 0.95, 0);
+      for (const [lx, lz] of [[-0.88, -0.35], [0.88, -0.35], [-0.88, 0.35], [0.88, 0.35]]) add(new THREE.BoxGeometry(0.1, 0.9, 0.1), leg, lx, 0.45, lz);
+      add(new THREE.BoxGeometry(2.0, 1.1, 0.08), leg, 0, 1.55, -0.42); // pegboard
+      for (let i = 0; i < 4; i++) add(new THREE.BoxGeometry(0.28, 0.14, 0.05), [glow, top, glow, top][i], -0.66 + i * 0.44, 1.6, -0.36);
+      const gun = makeWeaponMesh('ar', 2, { optic: 'holo', under: 'vertical', barrel: 'suppressor' });
+      gun.rotation.set(0, Math.PI / 2, 0); gun.scale.setScalar(1.3); gun.position.set(0, 1.05, 0.05); g.add(gun);
+      const rot = b.rot;
+      g.rotation.y = rot;
+      g.position.set(spot.x, y, spot.z);
+      const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture(['MOD BENCH', `${MOD_COST} gold per mod`], ['#4fc3ff', '#ffffff']), transparent: true, depthWrite: false }));
+      label.scale.set(2.6, 0.95, 1); label.position.set(0, 2.55, 0); g.add(label);
+      this.scene.add(g);
+      this.world.colliders.add({ kind: 'box', minX: spot.x - 1.0, maxX: spot.x + 1.0, minZ: spot.z - 1.0, maxZ: spot.z + 1.0, y0: y - 0.5, y1: y + 1.05, crate: true });
+      this.modBenches.push({ x: spot.x, z: spot.z, y, rot, group: g });
+    }
+  }
+
+  // ---------- exotic dealers: characters who sell one exotic weapon each for gold ----------
+  _createDealers() {
+    if (!this.game.assets) return;
+    const towns = [...TOWNS].sort((a, b) => a.name.localeCompare(b.name));
+    const chars = ['Female_Ranger', 'Male_Peasant', 'Female_Peasant', 'Male_Ranger'];
+    for (const t of towns) {
+      const k = this.dealers.length;
+      if (k >= EXOTICS.length) break;
+      let spot = null;
+      for (let i = 0; i < 240 && !spot; i++) {
+        const a = i * 2.39 + 0.4, d = t.r * (0.12 + (i % 12) * 0.07);
+        const x = t.x + Math.cos(a) * d, z = t.z + Math.sin(a) * d;
+        if (this._clearSpot(x, z, 1.0, 0.8) && !this.benches.some((b) => Math.hypot(b.x - x, b.z - z) < 6) && !this.vending.some((v) => Math.hypot(v.x - x, v.z - z) < 6)) spot = { x, z };
+      }
+      if (!spot) continue;
+      const type = EXOTICS[k];
+      const def = WEAPONS[type];
+      const y = this.world.heightAt(spot.x, spot.z);
+      const ch = new Character(this.game.assets, '#4ff4ff', chars[k % chars.length], 0.2);
+      ch.root.position.set(spot.x, y, spot.z);
+      ch.root.rotation.y = Math.atan2(t.x - spot.x, t.z - spot.z);
+      ch.setPose('Idle', null, 0);
+      const gun = makeWeaponMesh(type, EXOTIC);
+      ch.setWeapon(gun);
+      this.scene.add(ch.root);
+      const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture([def.name.toUpperCase(), `${def.price} gold · Exotic`], ['#4ff4ff', '#ffffff']), transparent: true, depthWrite: false }));
+      label.scale.set(2.8, 1.0, 1); label.position.set(spot.x, y + 2.9, spot.z);
+      this.scene.add(label);
+      this.world.colliders.add({ kind: 'circle', x: spot.x, z: spot.z, r: 0.45, y0: y, y1: y + 1.9, npc: true });
+      this.dealers.push({ x: spot.x, z: spot.z, y, type, price: def.price, ch, label, town: t.name, sold: 0 });
+    }
+  }
+
+  buyExotic(d, actor) {
+    if (this.game.warmup > 0) return 'Dealers open when the match starts';
+    if (actor.gold < d.price) return `Need ${d.price} gold (you have ${actor.gold})`;
+    actor.gold -= d.price;
+    const w = new Weapon(d.type, EXOTIC);
+    const at = _v.set(d.x + Math.sin(d.ch.root.rotation.y) * 1.2, d.y + 0.9, d.z + Math.cos(d.ch.root.rotation.y) * 1.2);
+    this.game.loot.spawnPickup({ type: 'weapon', weapon: w }, at, new THREE.Vector3(0, 3, 0));
+    this.game.loot.spawnPickup(Loot.ammoFor(w), at, new THREE.Vector3(1, 3.5, 0));
+    this.game.sound.play('buy');
+    d.ch.setPose('Interact', null, 0.1);
+    d.poseT = 1.2;
+    d.sold++;
+    return null;
+  }
+
   // ---------- hiding spots ----------
   _createHides() {
     const hay = new THREE.MeshStandardMaterial({ color: '#e3c16f', roughness: 0.95 });
@@ -503,12 +589,13 @@ export class Events {
     const w = actor.held;
     const cost = Events.upgradeCost(w);
     if (!w?.isGun) return 'Hold the weapon you want to upgrade';
-    if (!cost) return w.rarity >= 5 ? "Mythic weapons can't be upgraded" : 'Already Legendary';
+    if (!cost) return w.rarity >= 5 ? `${RARITIES[w.rarity].name} weapons can't be upgraded` : 'Already Legendary';
     const [, n] = cost;
     if (actor.gold < n) return `Need ${n} gold (you have ${actor.gold})`;
     actor.gold -= n;
     const nw = new Weapon(w.type, w.rarity + 1);
-    nw.ammo = Math.max(w.ammo, Math.min(nw.def.mag, w.ammo));
+    nw.mods = { ...w.mods };
+    nw.ammo = Math.max(w.ammo, Math.min(nw.mag, w.ammo));
     actor.items[actor.slot] = nw;
     actor._equip();
     const at = _v.set(bench.x, bench.y + 1.3, bench.z);
@@ -598,7 +685,7 @@ export class Events {
     s.opened = true;
     const loot = this.game.loot;
     const items = [];
-    const w = new Weapon(rollWeaponType('rare'), Math.random() < 0.4 ? 4 : 3);
+    const w = new Weapon(rollWeaponType('rare'), Math.random() < 0.4 ? 4 : 3).withRandomMods();
     items.push({ type: 'weapon', weapon: w }, Loot.ammoFor(w), Loot.ammoFor(w));
     items.push({ type: 'consumable', ctype: Math.random() < 0.5 ? 'bigshield' : 'medkit', count: 1 });
     const extra = ['grenade', 'grenade', 'smoke', 'impulse', 'fire', 'launchpad'][Math.floor(Math.random() * 6)];
@@ -672,6 +759,14 @@ export class Events {
       const d = Math.hypot(f.x - pos.x, f.z - pos.z);
       if (d < Math.min(bd, 1.7) && Math.abs(f.y - pos.y) < 2) { bd = d; best = { kind: 'forage', forage: f, text: f.kind === 'apple' ? 'Eat Apple · +5 health' : 'Eat Mushroom · +5 shield' }; }
     }
+    for (const b of this.modBenches || []) {
+      const d = Math.hypot(b.x - pos.x, b.z - pos.z);
+      if (d < bd + 0.8 && Math.abs(b.y - pos.y) < 2.5) { bd = d; best = { kind: 'modbench', bench: b, text: 'Use Mod Bench', rarity: 2 }; }
+    }
+    for (const dl of this.dealers || []) {
+      const d = Math.hypot(dl.x - pos.x, dl.z - pos.z);
+      if (d < bd + 1 && Math.abs(dl.y - pos.y) < 2.5) { bd = d; best = { kind: 'dealer', dealer: dl, text: `Buy ${WEAPONS[dl.type].name} · ${dl.price} gold`, rarity: EXOTIC }; }
+    }
     for (const b of this.benches) {
       const d = Math.hypot(b.x - pos.x, b.z - pos.z);
       if (d < bd + 0.8 && Math.abs(b.y - pos.y) < 2.5) {
@@ -703,6 +798,11 @@ export class Events {
     for (const s of this.supplies) if (!s.opened) out.push({ x: s.x, z: s.z, color: '#58a6ff', shape: 'square', label: 'Supply drop' });
     for (const v of this.vending) out.push({ x: v.x, z: v.z, color: '#4fd1ff', shape: 'vending', label: 'Vending machine' });
     for (const b of this.benches) out.push({ x: b.x, z: b.z, color: '#ffb52b', shape: 'vending', label: 'Upgrade bench' });
+    for (const b of this.modBenches || []) out.push({ x: b.x, z: b.z, color: '#4fc3ff', shape: 'vending', label: 'Mod bench' });
+    for (const d of this.dealers || []) out.push({ x: d.x, z: d.z, color: '#4ff4ff', shape: 'dot', label: `Exotic: ${WEAPONS[d.type].name}` });
+    // Shadow Tracker hits: the target shows up for a few seconds
+    const now = this.game.time;
+    for (const a of this.game.actors) if (a.alive && !a.isPlayer && a.markedUntil > now && a.markedBy === this.game.player) out.push({ x: a.pos.x, z: a.pos.z, color: '#ff3b6b', shape: 'medal', label: 'Tracked' });
     for (const p of this.pads) if (p.kind === 'jump') out.push({ x: p.x, z: p.z, color: '#39e0ff', shape: 'dot', label: 'Jump pad' });
     const boss = this.game.boss;
     for (const b of boss?.bosses || []) if (b.alive) out.push({ x: b.pos.x, z: b.pos.z, color: b.bossCfg.color, shape: 'square', label: 'Boss' });
@@ -735,6 +835,12 @@ export class Events {
     this._updateSupplies(dt);
     this._updatePads(dt);
     this._updateZones(dt);
+    const cam = this.game.camera.position;
+    for (const d of this.dealers || []) {
+      if (Math.abs(d.x - cam.x) + Math.abs(d.z - cam.z) > 90) continue; // only animate nearby dealers
+      if (d.poseT > 0 && (d.poseT -= dt) <= 0) d.ch.setPose('Idle', null, 0.3);
+      d.ch.update(dt, 0, false, 0);
+    }
     for (const v of this.vending) {
       v.t += dt;
       v.show.rotation.y += dt * 1.2;

@@ -110,14 +110,15 @@ export class Actor {
   get wood() { return this.mats.wood; }
   set wood(v) { this.mats.wood = Math.max(0, Math.min(MAT_CAP, v)); }
 
-  ammoFor(type) { return this.infiniteAmmo ? Infinity : this.ammo[type] || 0; }
+  ammoFor(type) { return this.infiniteAmmo || type === 'none' ? Infinity : this.ammo[type] || 0; }
 
   // Move rounds from the reserve into the magazine when a reload completes.
   finishReload(w, max = Infinity) {
-    const need = Math.min(max, w.def.mag - w.ammo);
-    const take = this.infiniteAmmo ? need : Math.min(need, this.ammo[w.def.ammoType] || 0);
+    const need = Math.min(max, w.mag - w.ammo);
+    const free = this.infiniteAmmo || w.def.ammoType === 'none'; // bows never run out of arrows
+    const take = free ? need : Math.min(need, this.ammo[w.def.ammoType] || 0);
     w.ammo += take;
-    if (!this.infiniteAmmo) this.ammo[w.def.ammoType] -= take;
+    if (!free) this.ammo[w.def.ammoType] -= take;
   }
 
   addAmmo(type, n) { this.ammo[type] = Math.min(999, (this.ammo[type] || 0) + n); }
@@ -926,7 +927,7 @@ export class Actor {
     if (w) {
       const shotgun = (x) => x && (x.def.key === 'pump' || x.def.key === 'shotgun');
       const penalty = shotgun(w) && shotgun(prev) && this.game.time - prev.lastShot < 1 ? 0.6 : 0;
-      w.drawT = Math.max(w.drawT, (w.def.draw || 0.3) + penalty);
+      w.drawT = Math.max(w.drawT, (w.def.draw || 0.3) * (w.mods?.under === 'angled' ? 0.6 : 1) + penalty);
     }
     this._equip();
     return true;
@@ -944,7 +945,7 @@ export class Actor {
   _equip() {
     const h = this.held;
     if (this.buildMode) this.character.setWeapon(null);
-    else if (h && h.isGun) this.character.setWeapon(applyWrap(makeWeaponMesh(h.type, h.rarity), this.wrap));
+    else if (h && h.isGun) this.character.setWeapon(applyWrap(makeWeaponMesh(h.type, h.rarity, h.mods), this.wrap));
     else if (h && h.isPickaxe) this.character.setWeapon(makeHarvestTool(this.pickaxeSkin), true);
     else if (h?.def?.throw) this.character.setWeapon(makeThrowableMesh(h.type, 1.2));
     else if (h?.isConsumable && !h.def.key) {

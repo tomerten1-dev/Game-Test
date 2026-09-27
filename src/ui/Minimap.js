@@ -71,6 +71,12 @@ export class Minimap {
       ctx.beginPath();
       ctx.arc(nx, ny, Math.max(0, storm.nextRadius * s), 0, Math.PI * 2);
       ctx.stroke();
+      const fut = game.player?.alive && game.player.held?.def?.exotic === 'scout' ? storm.peekFuture() : null;
+      if (fut) {
+        const [fx, fy] = this.toMap(fut.center.x, fut.center.y);
+        ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = '#4ff4ff';
+        ctx.beginPath(); ctx.arc(fx, fy, Math.max(1.5, fut.radius * s), 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+      }
       // outside the next circle: dashed line to the nearest safe point
       const me = game.player;
       if (me?.alive && me.state !== 'bus' && storm.distOutsideNext(me.pos) > 0) {

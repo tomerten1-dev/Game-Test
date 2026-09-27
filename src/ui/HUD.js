@@ -270,7 +270,7 @@ export class HUD {
         name = m ? m[1] : label;
         if (m) count = `×${m[2]}`;
         if (pk.type === 'medallion') rar = RARITIES[4];
-        if (pk.type === 'crown') rar = RARITIES[RARITIES.length - 1];
+        if (pk.type === 'crown') rar = RARITIES[5];
       }
       el.style.setProperty('--rar', rar ? rar.color : '#9fb3c8');
       el.querySelector('.lt-key').textContent = keyTxt;
@@ -685,7 +685,7 @@ export class HUD {
       else ic.textContent = !it ? '' : it.isGun ? it.def.icon : it.isConsumable ? it.def.icon : '⛏';
       s.classList.toggle('has-img', !!url);
       s.querySelector('.count').textContent = it?.isConsumable ? String(it.count) : it?.isGun ? String(it.ammo) : '';
-      s.classList.toggle('low', !!it?.isGun && it.ammo <= Math.ceil(it.def.mag * 0.25));
+      s.classList.toggle('low', !!it?.isGun && it.ammo <= Math.ceil(it.mag * 0.25));
     });
     for (const k of ['wood', 'stone', 'metal']) this.set('mat' + k, this.el.mats[k], String(p.mats[k]));
     // ammo by type next to the materials, and special items (keycard) beside the quick bar
@@ -716,14 +716,24 @@ export class HUD {
     }
     const rl = w?.reloading, using = p.useT > 0 && p.useItem;
     // low-ammo hint: mag at a quarter or less and spare ammo to load
-    const lowAmmo = !!w?.isGun && !rl && !using && w.def.mag > 1 && w.ammo <= Math.floor(w.def.mag / 4) && p.ammoFor(w.def.ammoType) > 0;
+    const lowAmmo = !!w?.isGun && !rl && !using && w.mag > 1 && w.ammo <= Math.floor(w.mag / 4) && p.ammoFor(w.def.ammoType) > 0;
     if (this.cache.lowAmmo !== lowAmmo) {
       this.cache.lowAmmo = lowAmmo;
       const h = document.getElementById('reload-hint');
       h.classList.toggle('hidden', !lowAmmo);
       if (lowAmmo) h.querySelector('kbd').textContent = keyLabel(this.game.input?.keyFor?.('reload') || 'KeyR').replace('Mouse ', 'M');
     }
-    this.el.reload.classList.toggle('hidden', !rl && !using);
+    // bow draw / minigun spin-up / blade dash cooldown share the dial
+    const drawing = !rl && !using && !!w?.def.charge && w.charge > 0 && g.time - (w.lastTry ?? -9) < 0.25;
+    const spinning = !rl && !using && !!w?.def.spinUp && g.time - (w.lastTry ?? -9) < 0.3 && g.time - w.spinStart < w.def.spinUp;
+    const dashCd = !rl && !using && !!w?.def.dash && (w.dashReady || 0) > g.time;
+    this.el.reload.classList.toggle('hidden', !rl && !using && !drawing && !spinning && !dashCd);
+    if (drawing || spinning || dashCd) {
+      const k = drawing ? w.charge : spinning ? (g.time - w.spinStart) / w.def.spinUp : 1 - (w.dashReady - g.time) / 6;
+      this.set('ring', this.el.ringLabel, drawing ? (w.charge >= 1 ? 'FULL DRAW' : 'DRAWING') : spinning ? 'SPINNING UP' : 'DASH');
+      this.el.reloadCircle.style.strokeDashoffset = String(100.5 * (1 - Math.max(0, Math.min(1, k))));
+      this.set('ringNum', this.el.ringNum, dashCd ? String(Math.ceil(w.dashReady - g.time)) : '');
+    }
     // countdown dial: seconds left in the middle, the ring fills as it goes
     if (rl || using) {
       const left = rl ? w.reloadT : p.useT, total = rl ? w.reloadTime : p.useItem.def.time;

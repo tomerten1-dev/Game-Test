@@ -49,14 +49,18 @@ export class CameraRig {
     const base = this.baseFov || 70;
     // the character sits left of the crosshair (big hooded heads must never block the aim point)
     let dist = 3.5, side = 1.15, up = 0.5, fov = base, pivotH = 1.6;
-    if (mode === 'aim') { dist = 2.2; side = 1.0; up = 0.42; fov = base - 15; }
+    if (mode === 'aim') {
+      dist = 2.2; side = 1.0; up = 0.42; fov = base - 15;
+      // optics (mod bench / DMR) zoom further: fov for that magnification
+      if (this.aimZoom > 1) { fov = Math.min(fov, (2 * Math.atan(Math.tan((base * Math.PI) / 360) / this.aimZoom) * 180) / Math.PI); if (this.aimZoom >= 2) { dist = 1.8; side = 0.8; } }
+    }
     else if (mode === 'scope') { dist = 1.6; side = 0.55; fov = 20; }
     else if (mode === 'skydive' || mode === 'glide') { dist = 7.5; side = 0; up = 1.2; fov = base + 8; pivotH = 1.0; }
     else if (mode === 'bus') { dist = 18; side = 0; up = 4; fov = base; pivotH = 0; }
     else if (mode === 'dead') { dist = 6; side = 0; up = 1.5; }
     this.side = damp(this.side, side * this.shoulder, 8, dt);
     this.up = damp(this.up, up, 8, dt);
-    this.fov = damp(this.fov, fov, 10, dt);
+    this.fov = damp(this.fov, fov, this.fastAds && mode === 'aim' ? 17 : 10, dt);
     if (Math.abs(this.camera.fov - this.fov) > 0.01) { this.camera.fov = this.fov; this.camera.updateProjectionMatrix(); }
 
     _pivot.set(target.x, target.y + pivotH, target.z);

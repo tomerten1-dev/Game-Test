@@ -84,16 +84,31 @@ export class Storm {
     this.nextRadius = ph.radius;
     // the last two circles can drift out of the current one ("moving zones")
     this.moving = this.phase >= STORM_PHASES.length - 2;
-    const maxOff = this.moving
-      ? this.radius * 0.9 + ph.radius + 6
-      : Math.max(0, this.radius - ph.radius) * (this.phase === 0 ? 0.35 : 0.9);
+    // a circle already revealed early (Storm Scout) is the one that comes
+    if (this._future?.phase === this.phase) this.nextCenter.copy(this._future.center);
+    else this._pickCenter(this.center, this.radius, this.phase, this.nextCenter);
+    this._future = null;
+  }
+
+  _pickCenter(center, radius, phase, out) {
+    const ph = STORM_PHASES[phase];
+    const moving = phase >= STORM_PHASES.length - 2;
+    const maxOff = moving ? radius * 0.9 + ph.radius + 6 : Math.max(0, radius - ph.radius) * (phase === 0 ? 0.35 : 0.9);
     for (let i = 0; i < 40; i++) {
       const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * maxOff;
-      const x = this.center.x + Math.cos(a) * r, z = this.center.y + Math.sin(a) * r;
-      const nearCenter = this.moving && Math.hypot(x - this.center.x, z - this.center.y) < this.radius * 0.6;
-      if (this.terrain.heightAt(x, z) > 2.2 && Math.hypot(x, z) < 250 && !nearCenter) { this.nextCenter.set(x, z); return; }
+      const x = center.x + Math.cos(a) * r, z = center.y + Math.sin(a) * r;
+      const nearCenter = moving && Math.hypot(x - center.x, z - center.y) < radius * 0.6;
+      if (this.terrain.heightAt(x, z) > 2.2 && Math.hypot(x, z) < 250 && !nearCenter) return out.set(x, z);
     }
-    this.nextCenter.copy(this.center);
+    return out.copy(center);
+  }
+
+  // The circle after the next one, decided now so it can be shown early (Storm Scout). null in the last phase.
+  peekFuture() {
+    const ph = this.phase + 1;
+    if (ph >= STORM_PHASES.length) return null;
+    if (this._future?.phase !== ph) this._future = { phase: ph, center: this._pickCenter(this.nextCenter, this.nextRadius, ph, new THREE.Vector2()), radius: STORM_PHASES[ph].radius };
+    return this._future;
   }
 
   // returns an event name when the phase changes

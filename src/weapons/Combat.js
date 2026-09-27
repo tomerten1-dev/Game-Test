@@ -9,6 +9,7 @@ const _b = new THREE.Vector3();
 const _n = new THREE.Vector3();
 const _hit = {};
 const _p = new THREE.Vector3();
+const _up = new THREE.Vector3(0, 1, 0);
 
 // Random direction within a cone of half-angle `spread` around `dir`.
 export function coneDir(dir, spread, out) {
@@ -59,13 +60,27 @@ export class Combat {
   }
 
   // origin/aimDir: the aiming ray (camera ray for the player); muzzle: where the tracer starts.
-  fire(shooter, origin, aimDir, muzzle) {
+  fire(shooter, origin, aimDir, muzzle, opts = {}) {
     const g = this.game;
     const w = shooter.weapon;
     if (!w || shooter.splatT > 0) return false; // no shooting while getting up from a splat
+    if (w.def.melee) return this.bladeSwing(shooter, origin, aimDir);
     if (!w.canFire()) {
       if (w.ammo <= 0 && !w.reloading) this.reload(shooter);
       return false;
+    }
+    // charge weapons (bows): hold to draw, release to loose; bots loose at full draw
+    if (w.def.charge) {
+      if (g.time - (w.lastTry ?? -9) > 0.25) w.chargeStart = g.time;
+      w.lastTry = g.time;
+      w.charge = Math.min(1, (g.time - w.chargeStart) / w.def.charge);
+      if (shooter.isPlayer ? !opts.release : w.charge < 1) return false;
+    }
+    // minigun: the barrels spin up while the trigger is held
+    if (w.def.spinUp) {
+      if (g.time - (w.lastTry ?? -9) > 0.3) { w.spinStart = g.time; g.sound.play('reload', shooter.isPlayer ? null : shooter.pos, { range: 30 }); }
+      w.lastTry = g.time;
+      if (g.time - w.spinStart < w.def.spinUp) return false;
     }
     const hs = Math.hypot(shooter.vel.x, shooter.vel.z);
     const moving = hs > 1.5;
@@ -84,11 +99,12 @@ export class Combat {
       coneDir(aimDir, spread, _dir);
       const t0 = Math.max(0, _a.copy(muzzle).sub(origin).dot(_dir));
       const start = _end.copy(origin).addScaledVector(_dir, t0);
-      g.projectiles.fireWeapon(shooter, w, start, _dir);
-      g.effects.muzzle(muzzle, aimDir, def.key === 'rocket' ? 1.6 : 1.3, shooter.isPlayer || shooter.distToCam < 40);
-      g.sound.play(def.key, shooter.isPlayer ? null : shooter.pos, { range: 220 });
+      g.projectiles.fireWeapon(shooter, w, start, _dir, def.charge ? w.charge : 1);
+      w.charge = 0; w.lastTry = -9;
+      if (!def.charge) g.effects.muzzle(muzzle, aimDir, def.key === 'rocket' ? 1.6 : 1.3, shooter.isPlayer || shooter.distToCam < 40);
+      this._gunSound(shooter, w, 220);
       if (shooter.isPlayer) {
-        g.rig.recoil += def.recoil;
+        g.rig.recoil += w.recoil;
         g.rig.shake = Math.min(0.6, g.rig.shake + def.shake);
       }
       if (w.ammo <= 0) this.reload(shooter);
@@ -112,7 +128,7 @@ export class Combat {
         const fall = def.pellets > 1 ? w.shotgunFalloff(r.t) : 1 - 0.4 * Math.min(1, Math.max(0, (r.t - def.falloffStart) / (def.range - def.falloffStart)));
         // bots trade damage a bit slower with each other so matches last longer
         const botVsBot = !shooter.isPlayer && !r.actor.isPlayer ? 0.45 : 1;
-        const dmg = w.damage * fall * (r.head ? def.headMult || 1.5 : 1) * botVsBot;
+        const dmg = w.damage * fall * (r.head ? def.headMult || 1.5 : 1) * botVsBot * (def.exotic === 'sixshooter' && shooter.aiming ? 1.5 : 1);
         let e = perTarget.get(r.actor);
         if (!e) { e = { dmg: 0, head: false, heads: 0, bodyDmg: 0, point: _end.clone() }; perTarget.set(r.actor, e); }
         e.dmg += dmg;
@@ -127,7 +143,7 @@ export class Combat {
           if (shooter.isPlayer && r.collider.structure.owner !== shooter) g.meta?.track('buildDamage', w.damage * 0.9);
           if (shooter.isPlayer) (buildHits ||= { pos: _end.clone(), dmg: 0 }).dmg += w.damage * 0.9;
         }
-        else if (r.collider?.breakable) this.damageProp(r.collider, w.damage);
+        else if (r.collider?.breakable) this.damageProp(r.collider, w.damage, shooter);
         else if (r.collider?.part) r.collider.part.damage(w.damage, shooter); // house walls, doors, windows
         else if (r.collider?.obj) g.world.destructibles.damage(r.collider, w.damage, shooter); // trees, rocks
         if (shooter.isPlayer && i < 1) g.hud?.objHp?.(r.collider, _end);
@@ -143,6 +159,7 @@ export class Combat {
       }
       const shieldBefore = target.shield;
       const dealt = target.takeDamage(e.dmg, shooter, e.head);
+      if (def.exotic === 'mark' && target.alive) this.markTarget(target, shooter);
       g.effects.hitSparks(e.point, e.head ? '#ffd23f' : shieldBefore > 0 ? '#6cc4ff' : '#ffffff');
       if (shooter.isPlayer) {
         g.effects.damageNumber(e.point, dealt, e.head, shieldBefore > 0, target);
@@ -150,13 +167,88 @@ export class Combat {
         g.sound.play(e.head ? (setting(g, 'legacyHitSound', false) ? 'headshotLegacy' : 'headshot') : shieldBefore > 0 ? 'shieldHit' : 'hit');
       }
     }
-    g.effects.muzzle(muzzle, aimDir, def.pellets > 1 ? 1.5 : 1, shooter.isPlayer || shooter.distToCam < 30);
-    g.sound.play(def.key, shooter.isPlayer ? null : shooter.pos, { range: 140 });
+    g.effects.muzzle(muzzle, aimDir, (def.pellets > 1 ? 1.5 : 1) * (w.suppressed ? 0.4 : 1), shooter.isPlayer || shooter.distToCam < 30);
+    this._gunSound(shooter, w, 140);
+    // Six Shooter: aimed shots are slow and heavy
+    if (def.exotic === 'sixshooter' && shooter.aiming) w.cooldown = 1 / 1.6;
+    // The Dub: every blast throws you backwards
+    if (def.push) {
+      shooter.vel.x -= aimDir.x * def.push; shooter.vel.z -= aimDir.z * def.push;
+      shooter.vel.y = Math.max(shooter.vel.y, 4 - aimDir.y * def.push * 0.7);
+      shooter.onGround = false; shooter.noFallT = Math.max(shooter.noFallT || 0, 2); shooter.flungT = 0.6;
+    }
     if (shooter.isPlayer) {
-      g.rig.recoil += def.recoil;
+      g.rig.recoil += w.recoil;
       g.rig.shake = Math.min(0.6, g.rig.shake + def.shake);
     }
     if (w.ammo <= 0) this.reload(shooter);
+    return true;
+  }
+
+  // Gunshot: suppressed guns are quiet and only heard (and shown on sound markers) up close.
+  _gunSound(shooter, w, range) {
+    const at = shooter.isPlayer ? null : shooter.pos;
+    if (w.suppressed) this.game.sound.play('suppressed', at, { range: 22, vol: 0.6 });
+    else this.game.sound.play(w.def.key, at, { range });
+  }
+
+  // Shadow Tracker: the target shows on your map (and through walls) for a few seconds.
+  markTarget(target, by) {
+    target.markedUntil = this.game.time + 8;
+    target.markedBy = by;
+  }
+
+  // Kinetic Blade: a wide slash (every third one in a row hits harder); structures take big damage.
+  bladeSwing(actor, origin, dir) {
+    const g = this.game, w = actor.weapon;
+    if (w.cooldown > 0 || w.drawT > 0) return false;
+    w.cooldown = 1 / w.def.rate;
+    w.combo = g.time - (w.lastShot || -9) < 1.2 ? ((w.combo || 0) + 1) % 3 : 0;
+    w.lastShot = g.time;
+    actor.swingT = 0.5;
+    actor.lastFireTime = g.time;
+    if (actor.character) actor.character.kick = 0.8;
+    g.sound.play('swing', actor.isPlayer ? null : actor.pos);
+    const dmg = w.combo === 2 ? 75 : w.def.damage;
+    let hitSomething = false;
+    // three rays in a fan so the slash is forgiving
+    for (const off of [0, -0.25, 0.25]) {
+      _p.copy(dir).applyAxisAngle(_up, off);
+      const r = this.trace(origin, _p, w.def.range + (actor.isPlayer ? g.rig.curDist * 0.2 : 0), actor, 0.25);
+      if (!r.hit) continue;
+      _end.copy(origin).addScaledVector(_p, r.t);
+      if (r.actor) {
+        const t = r.actor;
+        if (t._bladeT === g.time) continue;
+        t._bladeT = g.time;
+        const shieldBefore = t.shield;
+        const dealt = t.takeDamage(dmg * (!actor.isPlayer && !t.isPlayer ? 0.45 : 1), actor, false);
+        g.effects.hitSparks(_end, '#9ff4ff');
+        if (actor.isPlayer) { g.effects.damageNumber(_end, dealt, false, shieldBefore > 0, t); g.hud?.hitMarker(false, !t.alive, shieldBefore > 0); g.sound.play('hit'); }
+        hitSomething = true;
+      } else if (off === 0) {
+        const c = r.collider;
+        if (c?.structure) c.structure.damage(120, actor);
+        else if (c?.breakable) this.damageProp(c, 120, actor);
+        else if (c?.part) c.part.damage(80, actor);
+        g.effects.impact(_end, c?.structure?.mat === 'wood' ? 'wood' : 'stone', _n.copy(_p).negate());
+        hitSomething = true;
+      }
+    }
+    return hitSomething || true;
+  }
+
+  // Kinetic Blade alt fire: a quick forward dash (6 s cooldown).
+  bladeDash(actor, dir) {
+    const g = this.game, w = actor.weapon;
+    if (!w?.def.dash || g.time < (w.dashReady || 0)) return false;
+    w.dashReady = g.time + 6;
+    const h = Math.hypot(dir.x, dir.z) || 1;
+    actor.vel.x = (dir.x / h) * 24; actor.vel.z = (dir.z / h) * 24;
+    actor.vel.y = Math.max(actor.vel.y, 4);
+    actor.onGround = false; actor.flungT = 0.35; actor.noFallT = Math.max(actor.noFallT || 0, 1.5);
+    g.sound.play('jumppad', actor.isPlayer ? null : actor.pos, { range: 40 });
+    g.effects.dust?.(actor.pos, 10, 1.2);
     return true;
   }
 
@@ -195,7 +287,7 @@ export class Combat {
     if (!w) return;
     const reserve = actor.ammoFor(w.def.ammoType);
     if (w.startReload(reserve)) { if (actor.isPlayer) this.game.sound.play('reload'); }
-    else if (actor.isPlayer && reserve <= 0 && w.ammo < w.def.mag && !this._noAmmoT) {
+    else if (actor.isPlayer && reserve <= 0 && w.ammo < w.mag && !this._noAmmoT) {
       this.game.hud.toast(`No ${w.def.ammoType} ammo`);
       this._noAmmoT = setTimeout(() => (this._noAmmoT = null), 1500);
     }
@@ -223,7 +315,7 @@ export class Combat {
     const c = r.collider;
     if (actor.isPlayer && c) g.hud?.objHp?.(c, _end);
     if (c?.structure) { const m = c.structure.mat || 'wood'; c.structure.damage(c.structure.owner && c.structure.owner !== actor ? 75 : 50, actor); g.effects.impact(_end, m === 'wood' ? 'wood' : 'stone'); g.sound.play(`harvest_${m}`, actor.isPlayer ? null : _end); return true; }
-    if (c?.breakable) this.damageProp(c, 35);
+    if (c?.breakable) this.damageProp(c, 35, actor);
     if (c?.part) c.part.damage(c.mat === 'glass' ? 1 : 55, actor); // house walls break after a few swings
     const mat = r.terrain ? null : c?.mat === 'glass' ? null : c?.mat || (c?.tree || c?.crate ? 'wood' : c?.rock || c?.stone ? 'stone' : c?.house ? 'wood' : null);
     g.effects.impact(_end, mat === 'wood' ? 'wood' : 'stone', _n.copy(dir).negate());
@@ -277,10 +369,11 @@ export class Combat {
     this.weakMesh.scale.setScalar(s);
   }
 
-  damageProp(c, amount) {
+  damageProp(c, amount, by = null) {
     const b = c.breakable;
     if (!b || b.broken) return;
     b.hp -= amount;
+    if (by) b.lastHit = by;
     if (b.hp <= 0) this.game.world.towns.breakProp(c, this.game);
   }
 }

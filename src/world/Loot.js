@@ -297,7 +297,7 @@ export class Loot {
     const table = [
       ['bandage', 20], ['smallshield', 15], ['bigshield', 13], ['medkit', 9], ['medmist', 6], ['slurp', 5], ['chug', 2], ['keg', 2], ['campfire', 3],
       ['grenade', 8], ['smoke', 3], ['impulse', 3], ['fire', 3], ['launchpad', 2], ['shockwave', 3], ['grappler', 2], ['rift', 1.5], ['trap', 4],
-      ['bouncer', 2], ['crashpad', 2.5], ['wingsuit', 1.5], ['sliders', 1.5],
+      ['bouncer', 2], ['crashpad', 2.5], ['wingsuit', 1.5], ['sliders', 1.5], ['gascan', 2.5],
     ];
     let k = r * table.reduce((a, t) => a + t[1], 0), type = table[0][0];
     for (const [t, w] of table) { if ((k -= w) <= 0) { type = t; break; } }
@@ -305,7 +305,7 @@ export class Loot {
   }
 
   static ammoFor(weapon) {
-    const t = weapon.def.ammoType;
+    const t = weapon.def.ammoType === 'none' ? 'medium' : weapon.def.ammoType;
     return { type: 'ammo', ammoType: t, amount: AMMO[t].box };
   }
 
@@ -315,7 +315,7 @@ export class Loot {
       if (Math.random() > 0.55) continue;
       const roll = Math.random();
       if (roll < 0.4) {
-        const w = new Weapon(rollWeaponType('floor'), rollRarity(Math.random, 0));
+        const w = new Weapon(rollWeaponType('floor'), rollRarity(Math.random, 0)).withRandomMods();
         this.spawnPickup({ type: 'weapon', weapon: w }, _v.set(s.x, s.y + 0.2, s.z));
         this.spawnPickup(Loot.ammoFor(w), _v.set(s.x + 0.5, s.y + 0.2, s.z + 0.4));
       } else if (roll < 0.8) this.spawnPickup(Loot.randomConsumable(), _v.set(s.x, s.y + 0.2, s.z));
@@ -329,7 +329,7 @@ export class Loot {
         const y = this.world.groundAt(x, z, 200) + 0.2;
         const roll = Math.random();
         if (roll < 0.38) {
-          const w = new Weapon(rollWeaponType('floor'), rollRarity(Math.random, 0));
+          const w = new Weapon(rollWeaponType('floor'), rollRarity(Math.random, 0)).withRandomMods();
           this.spawnPickup({ type: 'weapon', weapon: w }, _v.set(x, y, z));
           this.spawnPickup(Loot.ammoFor(w), _v.set(x + 0.9, y, z + 0.4));
         } else if (roll < 0.8) this.spawnPickup(Loot.randomConsumable(), _v.set(x, y, z));
@@ -343,7 +343,7 @@ export class Loot {
     const g = new THREE.Group();
     let mesh, color;
     if (item.type === 'weapon') {
-      mesh = makeWeaponMesh(item.weapon.type, item.weapon.rarity);
+      mesh = makeWeaponMesh(item.weapon.type, item.weapon.rarity, item.weapon.mods);
       mesh.scale.setScalar(1.5);
       mesh.position.y = 0.55;
       color = RARITIES[item.weapon.rarity].color;
@@ -436,11 +436,11 @@ export class Loot {
     this.game.sound.play('chest', actor.isPlayer ? null : _v.set(c.x, c.y, c.z));
     const out = [];
     // chests never give grey weapons
-    const w = new Weapon(rollWeaponType(c.rare ? 'rare' : 'chest'), Math.max(1, rollRarity(Math.random, c.rare ? 2.2 : 1)));
+    const w = new Weapon(rollWeaponType(c.rare ? 'rare' : 'chest'), Math.max(1, rollRarity(Math.random, c.rare ? 2.2 : 1))).withRandomMods();
     out.push({ type: 'weapon', weapon: w });
     out.push(Loot.ammoFor(w));
     if (c.rare) {
-      const w2 = new Weapon(rollWeaponType('chest'), rollRarity(Math.random, 1.5));
+      const w2 = new Weapon(rollWeaponType('chest'), rollRarity(Math.random, 1.5)).withRandomMods();
       out.push({ type: 'weapon', weapon: w2 }, Loot.ammoFor(w2));
       if (Math.random() < 0.5) out.push({ type: 'consumable', ctype: 'grenade', count: 2 });
     }
@@ -577,7 +577,7 @@ export class Loot {
     const items = [];
     actor.items.forEach((it, i) => {
       if (i === 0 || !it) return;
-      if (it.isGun) { it.ammo = Math.max(it.ammo, Math.ceil(it.def.mag / 2)); items.push({ type: 'weapon', weapon: it }); if (actor.infiniteAmmo) items.push(Loot.ammoFor(it)); }
+      if (it.isGun) { it.ammo = Math.max(it.ammo, Math.ceil(it.mag / 2)); items.push({ type: 'weapon', weapon: it }); if (actor.infiniteAmmo) items.push(Loot.ammoFor(it)); }
       else if (it.isConsumable) items.push({ type: 'consumable', ctype: it.type, count: it.count });
     });
     if (!actor.infiniteAmmo) for (const [t, n] of Object.entries(actor.ammo)) if (n > 0) items.push({ type: 'ammo', ammoType: t, amount: n });

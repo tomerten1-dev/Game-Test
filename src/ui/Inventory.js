@@ -88,7 +88,7 @@ export class Inventory {
       const col = !it ? 'rgba(255,255,255,0.15)' : it.isGun ? RARITIES[it.rarity].color : it.isConsumable ? it.def.color : '#e8d7b0';
       const url = itemIcon(it);
       const icon = url ? `<img src="${url}" alt="">` : !it ? '' : it.isGun ? it.def.icon : it.isConsumable ? it.def.icon : '⛏';
-      const sub = !it ? 'Empty' : it.isGun ? `${it.ammo}/${it.def.mag}` : it.isConsumable ? `×${it.count}` : '';
+      const sub = !it ? 'Empty' : it.isGun ? `${it.ammo}/${it.mag}` : it.isConsumable ? `×${it.count}` : '';
       const drag = i > 0 && it ? 'draggable="true"' : '';
       return `<div class="inv-slot${i === this.sel ? ' sel' : ''}${i === 0 ? ' fixed' : ''}" data-slot="${i}" data-act="sel" data-arg="${i}" ${drag} style="--rar:${col}">
         <span class="k">${keyName(this.game.input.keyFor('slot' + (i + 1)))}</span><span class="ic">${icon}</span><span class="nm">${it ? it.name : ''}</span><span class="sb">${sub}</span></div>`;
@@ -97,7 +97,7 @@ export class Inventory {
     if (!it) this.detailEl.innerHTML = `<div class="inv-hint">${this.sel === 0 ? 'The harvesting axe can’t be dropped.' : 'Select an item to drop or split it.'}</div>`;
     else {
       const rar = it.isGun ? `<span class="rar" style="color:${RARITIES[it.rarity].color}">${RARITIES[it.rarity].name}</span> ` : '';
-      const stats = it.isGun ? `${Math.round(it.damage)} damage · ${it.def.mag} mag · ${AMMO[it.def.ammoType].name}` : it.def.heal ? `+${it.def.heal} health` : it.def.shield ? `+${it.def.shield} shield` : it.def.desc || '';
+      const stats = it.isGun ? `${Math.round(it.damage)} damage · ${it.mag} mag · ${AMMO[it.def.ammoType]?.name || 'No ammo needed'}` : it.def.heal ? `+${it.def.heal} health` : it.def.shield ? `+${it.def.shield} shield` : it.def.desc || '';
       const free = p.items.some((x, i) => i > 0 && !x);
       this.detailEl.innerHTML = `<div class="inv-name">${rar}${it.name}</div><div class="inv-stats">${stats}</div>
         <div class="inv-btns"><button class="btn" data-act="drop">Drop${it.isConsumable && it.count > 1 ? ' all' : ''}</button>

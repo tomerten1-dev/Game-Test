@@ -73,6 +73,52 @@ function build(type, rarity) {
     p.push(part(BOX(0.05, 0.14, 0.06), DARK, mat(0, -0.09, 0.36, 0.2, 0, 0)));
     p.push(part(BOX(0.05, 0.08, 0.18), '#1d2027', mat(0.12, 0.12, 0.2)));
     muzzle = 0.66; foregrip = 0.36;
+  } else if (type === 'minigun') {
+    p.push(part(BOX(0.16, 0.16, 0.42), '#3a3f4a', mat(0, 0.02, -0.05)));
+    p.push(part(BOX(0.165, 0.05, 0.3), acc, mat(0, 0.12, -0.05)));
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      p.push(part(CYL(0.018, 0.7, 6), DARK, mat(Math.cos(a) * 0.055, 0.02 + Math.sin(a) * 0.055, 0.5, Math.PI / 2, 0, 0)));
+    }
+    p.push(part(CYL(0.085, 0.04, 12), MID, mat(0, 0.02, 0.5, Math.PI / 2, 0, 0)));
+    p.push(part(CYL(0.085, 0.04, 12), MID, mat(0, 0.02, 0.8, Math.PI / 2, 0, 0)));
+    p.push(part(BOX(0.05, 0.16, 0.06), DARK, mat(0, -0.12, -0.02, -0.2, 0, 0)));
+    p.push(part(BOX(0.04, 0.1, 0.22), '#1d2027', mat(0, 0.16, 0.12)));
+    muzzle = 0.86; foregrip = 0.3;
+  } else if (type === 'launcher') {
+    p.push(part(CYL(0.1, 0.18, 12), '#4f5a3a', mat(0, 0.0, 0.12, Math.PI / 2, 0, 0)));
+    for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; p.push(part(CYL(0.03, 0.19, 8), '#2b2f38', mat(Math.cos(a) * 0.06, Math.sin(a) * 0.06, 0.12, Math.PI / 2, 0, 0))); }
+    p.push(part(CYL(0.045, 0.42, 10), DARK, mat(0, 0.03, 0.42, Math.PI / 2, 0, 0)));
+    p.push(part(BOX(0.09, 0.05, 0.3), acc, mat(0, 0.1, 0.25)));
+    p.push(part(BOX(0.06, 0.16, 0.08), DARK, mat(0, -0.12, 0.02, -0.25, 0, 0)));
+    p.push(part(BOX(0.07, 0.1, 0.24), '#4f5a3a', mat(0, -0.02, -0.2)));
+    muzzle = 0.66; foregrip = 0.36;
+  } else if (type === 'flare') {
+    p.push(part(BOX(0.08, 0.1, 0.24), '#d9642a', mat(0, 0.03, 0.06)));
+    p.push(part(CYL(0.035, 0.26, 10), '#e8742f', mat(0, 0.05, 0.2, Math.PI / 2, 0, 0)));
+    p.push(part(BOX(0.085, 0.03, 0.2), acc, mat(0, 0.1, 0.06)));
+    p.push(part(BOX(0.06, 0.16, 0.08), '#2b2f38', mat(0, -0.07, -0.02, -0.25, 0, 0)));
+    muzzle = 0.34; foregrip = 0.05;
+  } else if (type === 'sixshooter') {
+    p.push(part(CYL(0.02, 0.36, 8), '#8a8f99', mat(0, 0.05, 0.24, Math.PI / 2, 0, 0)));
+    p.push(part(CYL(0.05, 0.09, 6), '#6b7079', mat(0, 0.03, 0.03, Math.PI / 2, 0, 0)));
+    p.push(part(BOX(0.05, 0.03, 0.34), acc, mat(0, 0.09, 0.14)));
+    p.push(part(BOX(0.055, 0.17, 0.08), '#6b4a2e', mat(0, -0.08, -0.06, -0.35, 0, 0)));
+    muzzle = 0.42; foregrip = 0.05;
+  } else if (type === 'bow') {
+    const arc = new THREE.TorusGeometry(0.42, 0.022, 6, 20, Math.PI * 0.9);
+    p.push(part(arc, '#5b3b22', mat(0, 0, 0.05, 0, Math.PI / 2, Math.PI / 2 - Math.PI * 0.45)));
+    p.push(part(BOX(0.05, 0.2, 0.05), acc, mat(0, 0, 0.47)));
+    p.push(part(BOX(0.006, 0.8, 0.006), '#f0ead8', mat(0, 0, 0.23)));
+    p.push(part(CYL(0.012, 0.75, 5), '#c9b08a', mat(0, 0.02, 0.3, Math.PI / 2, 0, 0)));
+    p.push(part(new THREE.ConeGeometry(0.025, 0.07, 4), '#9fa7b3', mat(0, 0.02, 0.7, Math.PI / 2, 0, 0)));
+    muzzle = 0.72; foregrip = 0.47;
+  } else if (type === 'blade') {
+    p.push(part(BOX(0.035, 0.07, 0.24), '#1d2027', mat(0, 0, -0.08)));
+    p.push(part(BOX(0.16, 0.05, 0.05), acc, mat(0, 0, 0.05)));
+    p.push(part(BOX(0.018, 0.09, 0.95), '#bfefff', mat(0, 0.0, 0.55)));
+    p.push(part(BOX(0.02, 0.025, 0.9), '#4ff4ff', mat(0, 0.045, 0.53)));
+    muzzle = 1.0; foregrip = 0.0;
   } else {
     p.push(part(BOX(0.08, 0.12, 0.36), DARK, mat(0, 0.02, 0.1)));
     p.push(part(BOX(0.085, 0.04, 0.3), acc, mat(0, 0.1, 0.1)));
@@ -87,6 +133,31 @@ function build(type, rarity) {
   return { geo, muzzle, foregrip };
 }
 
+// Mod bench attachments drawn on the gun.
+const ATT_MAT = new THREE.MeshStandardMaterial({ color: '#23272f', roughness: 0.5, metalness: 0.4 });
+const LENS_MAT = new THREE.MeshStandardMaterial({ color: '#ff3b3b', emissive: '#ff2020', emissiveIntensity: 0.8 });
+const DRUM_GEO = new THREE.CylinderGeometry(0.085, 0.085, 0.07, 14).rotateZ(Math.PI / 2);
+function addMods(group, mods) {
+  if (!mods) return group;
+  const mz = group.userData.muzzle, len = mz.z;
+  const top = (group.userData.top ?? 0.1);
+  const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; group.add(o); return o; };
+  if (mods.optic === 'reddot' || mods.optic === 'holo') {
+    add(new THREE.BoxGeometry(0.05, 0.05, mods.optic === 'holo' ? 0.12 : 0.07), ATT_MAT, 0, top + 0.035, len * 0.3);
+    add(new THREE.BoxGeometry(0.03, 0.03, 0.005), LENS_MAT, 0, top + 0.04, len * 0.3 + 0.03);
+  } else if (mods.optic) {
+    const L = mods.optic === 'x4' ? 0.3 : 0.2;
+    add(new THREE.CylinderGeometry(0.035, 0.035, L, 10).rotateX(Math.PI / 2), ATT_MAT, 0, top + 0.05, len * 0.3);
+  }
+  if (mods.mag === 'drum') add(DRUM_GEO, ATT_MAT, 0, -0.1, len * 0.4);
+  else if (mods.mag === 'speed') add(new THREE.BoxGeometry(0.05, 0.13, 0.07), new THREE.MeshStandardMaterial({ color: '#d9a13a', roughness: 0.5 }), 0, -0.1, len * 0.4);
+  if (mods.under === 'laser') add(new THREE.BoxGeometry(0.04, 0.04, 0.12), LENS_MAT, 0, -0.04, len * 0.72);
+  else if (mods.under) add(new THREE.BoxGeometry(0.04, mods.under === 'vertical' ? 0.12 : 0.07, 0.06), ATT_MAT, 0, -0.08, len * 0.68);
+  if (mods.barrel === 'suppressor') { add(new THREE.CylinderGeometry(0.035, 0.035, 0.24, 10).rotateX(Math.PI / 2), ATT_MAT, 0, mz.y, len + 0.1); mz.z += 0.2; }
+  else if (mods.barrel === 'brake') { add(new THREE.CylinderGeometry(0.03, 0.03, 0.08, 8).rotateX(Math.PI / 2), ATT_MAT, 0, mz.y, len + 0.03); mz.z += 0.06; }
+  return group;
+}
+
 // Styloo gun models for every gun (procedural fallback if they fail to load).
 let models = null;
 export function setWeaponModels(m) { models = m; }
@@ -99,6 +170,13 @@ const KENNEY = {
   pump: { name: 'guns/shotgun', length: 0.95, rotY: -Math.PI / 2, textured: true },
   shotgun: { name: 'guns/shotgun', length: 0.88, rotY: -Math.PI / 2, textured: true },
   rocket: { name: 'guns/rocket', length: 1.15, rotY: -Math.PI / 2, textured: true },
+  drum: { name: 'guns/mac10', length: 0.62, rotY: -Math.PI / 2, textured: true, drum: true },
+  dmr: { name: 'guns/awp', length: 1.05, rotY: -Math.PI / 2, textured: true },
+  handcannon: { name: 'guns/pew', length: 0.52, rotY: -Math.PI / 2, textured: true },
+  dualpistol: { name: 'guns/pew', length: 0.4, rotY: -Math.PI / 2, textured: true, dual: true },
+  tracker: { name: 'guns/pew', length: 0.44, rotY: -Math.PI / 2, textured: true },
+  dub: { name: 'guns/shotgun', length: 0.78, rotY: -Math.PI / 2, textured: true },
+  stormscout: { name: 'guns/awp', length: 1.2, rotY: -Math.PI / 2, textured: true },
 };
 // Higher-rarity launchers get the fancier models.
 const RARITY_MODEL = { rocket: { 4: { name: 'guns/rocketvariant' }, 5: { name: 'guns/quadrocket', rotY: -Math.PI / 2, length: 1.05 } } };
@@ -131,6 +209,8 @@ function buildKenney(type, rarity) {
     inner.add(mesh);
   }
   group.add(inner);
+  if (cfg.dual) { const twin = inner.clone(); twin.position.x -= 0.24; group.add(twin); }
+  if (cfg.drum) { const d = new THREE.Mesh(DRUM_GEO, ATT_MAT); d.position.set(0, -0.07, cfg.length * 0.42); group.add(d); }
   // glowing rarity stripe on top
   const key = type + rarity;
   if (!stripeCache.has(key)) stripeCache.set(key, [new THREE.BoxGeometry(0.035, 0.03, cfg.length * 0.55), new THREE.MeshStandardMaterial({ color: RARITIES[rarity].color, emissive: RARITIES[rarity].color, emissiveIntensity: 0.9, roughness: 0.4 })]);
@@ -139,6 +219,7 @@ function buildKenney(type, rarity) {
   group.add(stripe);
   group.userData.muzzle = new THREE.Vector3(0, 0.02, cfg.length * 0.85);
   group.userData.foregrip = cfg.length * 0.45;
+  group.userData.top = info.size.y * s * 0.45;
   return group;
 }
 
@@ -248,9 +329,9 @@ export function makePickaxeMesh() {
   return m;
 }
 
-export function makeWeaponMesh(type, rarity) {
+export function makeWeaponMesh(type, rarity, mods = null) {
   const k = models && KENNEY[type] ? buildKenney(type, rarity) : null;
-  if (k) return k;
+  if (k) return addMods(k, mods);
   const key = `${type}:${rarity}`;
   let g = cache.get(key);
   if (!g) { g = build(type, rarity); cache.set(key, g); }
@@ -258,5 +339,5 @@ export function makeWeaponMesh(type, rarity) {
   mesh.castShadow = true;
   mesh.userData.muzzle = new THREE.Vector3(0, 0.04, g.muzzle);
   mesh.userData.foregrip = g.foregrip;
-  return mesh;
+  return addMods(mesh, mods);
 }

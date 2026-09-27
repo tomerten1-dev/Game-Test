@@ -81,6 +81,8 @@ export class Towns {
     const col = new THREE.Color(c.mat === 'metal' ? '#9fb3c8' : '#b07a45');
     for (let i = 0; i < 22; i++) game.effects.debris.emit(x + (Math.random() - 0.5), y + Math.random(), z + (Math.random() - 0.5), (Math.random() - 0.5) * 5, Math.random() * 5, (Math.random() - 0.5) * 5, col, 0.9, 0.2, 14);
     game.sound.play('break', new THREE.Vector3(x, y, z));
+    // fuel barrels and gas cans blow up
+    if (b.explosive || /Fuel_/.test(b.type)) { b.explosive = true; game.fire?.blast(new THREE.Vector3(x, c.y0 + 0.6, z), b.lastHit || null, b.blastDmg || 80, 5.5); if (b.mesh) b.mesh.parent?.remove(b.mesh); return; }
     if (game.warmup <= 0 && Math.random() < b.loot) {
       const r = Math.random();
       const item = r < 0.2 ? { type: 'gold', amount: 15 } : r < 0.5 ? game.loot.constructor.randomConsumable() : r < 0.8 ? { type: 'ammo', ammoType: ['light', 'medium', 'shells', 'heavy'][Math.floor(Math.random() * 4)], amount: 12 } : { type: 'mat', matType: 'wood', amount: 20 };
@@ -99,7 +101,7 @@ export class Towns {
     const idx = this._place(type, x, y - 0.02, z, rot, s);
     if (colR) {
       const c = { kind: 'circle', x, z, r: colR, y0: y - 1, y1: y + height, crate: true, mat: mat || (type.includes('city_') ? 'metal' : undefined) };
-      if (BREAKABLE.test(type)) c.breakable = { type, idx: [idx], hp: 90, loot: 0.35 };
+      if (BREAKABLE.test(type)) c.breakable = { type, idx: [idx], hp: /Fuel_/.test(type) ? 60 : 90, loot: 0.35, explosive: /Fuel_/.test(type) };
       this.colliders.add(c);
     }
   }
@@ -112,7 +114,7 @@ export class Towns {
     const idx = this._place(type, x, y, z, rot, s);
     if (colR) {
       const c = { kind: 'circle', x, z, r: colR, y0: y - 0.2, y1: y + height, crate: true };
-      if (BREAKABLE.test(type)) c.breakable = { type, idx: [idx], hp: 90, loot: 0.35 };
+      if (BREAKABLE.test(type)) c.breakable = { type, idx: [idx], hp: /Fuel_/.test(type) ? 60 : 90, loot: 0.35, explosive: /Fuel_/.test(type) };
       this.colliders.add(c);
     }
     return idx;
@@ -722,7 +724,7 @@ export class Towns {
     const cx = x + c.x * cos + c.z * sin, cz = z - c.x * sin + c.z * cos;
     const long = Math.max(sx, sz), short = Math.min(sx, sz), n = Math.max(1, Math.round(long / short));
     const ax = sx >= sz ? [cos, -sin] : [sin, cos];
-    const breakable = BREAKABLE.test(type) ? { type, idx: [idx], hp: 90, loot: 0.3 } : undefined;
+    const breakable = BREAKABLE.test(type) ? { type, idx: [idx], hp: /Fuel_/.test(type) ? 60 : 90, loot: 0.3, explosive: /Fuel_/.test(type) } : undefined;
     for (let i = 0; i < n; i++) {
       const t = n === 1 ? 0 : (i / (n - 1) - 0.5) * (long - short);
       const col = { kind: 'circle', x: cx + ax[0] * t, z: cz + ax[1] * t, r: short * 0.48, y0: y - 1, y1: y + sy, crate: true, mat: opts.mat ?? KIT_MAT(type) };

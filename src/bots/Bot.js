@@ -313,7 +313,7 @@ export class Bot extends Actor {
       if (this.target) this._chooseWeapon(this.pos.distanceTo(this.target.pos));
       else if (this.mode !== 'harvest') this._chooseWeapon(30);
     }
-    if (this.weapon && this.weapon.ammo < this.weapon.def.mag * 0.4 && !this.targetVisible) g.combat.reload(this);
+    if (this.weapon && this.weapon.ammo < this.weapon.mag * 0.4 && !this.targetVisible) g.combat.reload(this);
 
     // refresh aim error
     const d = this.target ? this.pos.distanceTo(this.target.pos) : 10;
@@ -716,7 +716,7 @@ export class Bot extends Actor {
       if (this.target && g.time - this.lastSeenT > 5) this.target = null;
     }
     this._chooseWeapon(this.target ? this.pos.distanceTo(this.target.pos) : 30);
-    if (this.weapon && this.weapon.ammo < this.weapon.def.mag * 0.4 && !this.targetVisible) g.combat.reload(this);
+    if (this.weapon && this.weapon.ammo < this.weapon.mag * 0.4 && !this.targetVisible) g.combat.reload(this);
     const d = this.target ? this.pos.distanceTo(this.target.pos) : 10;
     const err = (0.25 + d * 0.022) * (1.45 - this.skill * 0.65);
     this.aimErr.set(Math.random() - 0.5, (Math.random() - 0.5) * 0.8, Math.random() - 0.5).multiplyScalar(err * 2);
@@ -752,7 +752,11 @@ export class Bot extends Actor {
       else if (k === 'smg') s *= d < 22 ? 1.4 : 0.6;
       else if (k === 'ar') s *= d > 15 ? 1.5 : 0.9;
       else if (k === 'sniper') s *= d > 45 ? 2.2 : d > 25 ? 1 : 0.15;
-      else if (k === 'rocket') s *= d > 9 && d < 70 ? (this.shootWall || this.target?.boxed ? 2.4 : 1.1) : 0.05;
+      else if (k === 'rocket' || k === 'launcher') s *= d > 9 && d < 70 ? (this.shootWall || this.target?.boxed ? 2.4 : 1.1) : 0.05;
+      else if (w.def.melee) s *= d < 5 ? 2 : 0.2;
+      else if (k === 'bow' || k === 'dmr' || k === 'stormscout') s *= d > 25 ? 1.7 : 0.6;
+      else if (w.def.pellets > 1) s *= d < 10 ? 2.5 : d < 18 ? 0.8 : 0.1;
+      else if (k === 'flare') s *= 0.5;
       if (w.ammo === 0) s *= 0.25; // swap to a loaded gun instead of reloading mid-fight
       if (s > bestS) { bestS = s; bestI = i; }
     }
@@ -1004,10 +1008,11 @@ export class Bot extends Actor {
       this.reactionT -= dt;
       const d = _dir.length();
       const w = this.weapon;
-      const single = key === 'sniper' || key === 'pump' || key === 'shotgun' || key === 'rocket';
+      const wd = w0?.def;
+      const single = key === 'sniper' || key === 'pump' || key === 'shotgun' || key === 'rocket' || !!(wd && (wd.charge || wd.spinUp || wd.melee || wd.projectile || wd.rate < 2.5));
       // snipers wait until the aim has settled; shotguns only fire in their range
       const ready = key === 'sniper' ? this.settle > 0.55 && Math.abs(dy) < 0.035 : Math.abs(dy) < 0.12;
-      if (this.reactionT <= 0 && w && ready && d < w.def.range * 0.8 && !(w.def.pellets > 1 && d > 15)) {
+      if (this.reactionT <= 0 && w && ready && d < (w.def.melee ? w.def.range : w.def.range * 0.8) && !(w.def.pellets > 1 && d > 15)) {
         // burst pacing on automatic guns so bots aren't lasers
         if (this.pauseT > 0 && !single) this.pauseT -= dt;
         else {
