@@ -26,6 +26,10 @@ export class StormFX {
     this.t = 0;
   }
 
+  setBaseFog(fog) {
+    if (fog) this.baseFog = { color: fog.color.clone(), near: this.baseFog?.near ?? fog.near, far: this.baseFog?.far ?? fog.far };
+  }
+
   // inside = 0..1 (1 = camera is in the storm)
   update(dt, camera, inside) {
     this.k += (inside - this.k) * Math.min(1, dt * 2.5);

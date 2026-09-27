@@ -166,10 +166,10 @@ Each phase ends with a playable build, a screenshot check and a git commit (same
 4. Spectate your killer after elimination.
 5. Visualized sound effects (accessibility option).
 
-### Phase D — Loot & world events · ~2 days
+### Phase D — Loot & world events · ✅ done
 1. Supply drops with balloon + smoke, rare chests.
 2. Sniper rifle (projectile + drop + scope overlay), rocket launcher, grenades.
-3. Launch pads (redeploy glider), jump pads, a couple of vending machines.
+3. Launch pads (redeploy glider), jump pads, vending machines (4 towns, paid in materials).
 4. Day/evening lighting variation per match.
 
 ### Phase E — Lobby & progression · ~3 days

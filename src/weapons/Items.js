@@ -5,6 +5,7 @@ export const AMMO = {
   medium: { name: 'Medium Ammo', color: '#7be06a', box: 20, icon: 'M' },
   shells: { name: 'Shells', color: '#ff9f6b', box: 6, icon: 'S' },
   heavy: { name: 'Heavy Ammo', color: '#d9b3ff', box: 6, icon: 'H' },
+  rockets: { name: 'Rockets', color: '#ff7a59', box: 3, icon: 'R' },
 };
 
 export const MATS = {
@@ -19,8 +20,12 @@ export const CONSUMABLES = {
   medkit: { name: 'Medkit', heal: 100, cap: 100, time: 6, max: 3, stack: 1, icon: '✚', color: '#ff5a5f' },
   smallshield: { name: 'Small Shield', shield: 25, cap: 50, time: 2, max: 6, stack: 3, icon: '◆', color: '#6fd0ff' },
   bigshield: { name: 'Shield Potion', shield: 50, cap: 100, time: 4.5, max: 3, stack: 1, icon: '⛊', color: '#3d8dff' },
+  // thrown / placed items share the consumable stack logic
+  grenade: { name: 'Grenade', throw: 'grenade', max: 6, stack: 3, icon: '●', color: '#8fd16a', damage: 70, radius: 5, fuse: 2.2 },
+  launchpad: { name: 'Launch Pad', place: 'launchpad', max: 1, stack: 1, icon: '⇑', color: '#ffcf3f' },
 };
 export const CONSUMABLE_TYPES = Object.keys(CONSUMABLES);
+export const HEAL_TYPES = CONSUMABLE_TYPES.filter((k) => CONSUMABLES[k].heal || CONSUMABLES[k].shield);
 
 export class Pickaxe {
   constructor() {
@@ -47,6 +52,7 @@ export class Consumable {
   // Can this actor benefit right now?
   usableBy(a) {
     const d = this.def;
+    if (d.throw || d.place) return true;
     if (d.heal) return a.health < d.cap;
     return a.shield < d.cap;
   }

@@ -26,6 +26,9 @@ import { TouchControls } from '../ui/TouchControls.js';
 import { MapScreen } from '../ui/MapScreen.js';
 import { Pings } from '../ui/Pings.js';
 import { StormFX } from '../effects/StormFX.js';
+import { Projectiles } from '../weapons/Projectiles.js';
+import { Events } from '../world/Events.js';
+import { applyMood, pickMood } from '../world/TimeOfDay.js';
 import { isTouch } from './device.js';
 
 export class Game {
@@ -76,6 +79,8 @@ export class Game {
     this.bus = new Bus(this.scene);
     this.loot = new Loot(this);
     this.building = new Building(this);
+    this.projectiles = new Projectiles(this);
+    this.events = new Events(this);
     this.ambient = new Ambient(this);
     this._firstMatch = true;
     this.post = new Post(this.renderer, this.scene, this.camera);
@@ -171,6 +176,9 @@ export class Game {
     this.storm.reset();
     this.building.reset();
     this.pings.reset();
+    this.projectiles.reset();
+    this.events.reset();
+    this.mood = applyMood(this, pickMood());
     this.spectating = null;
     this.deathInfo = null;
     this.hud.showSpectate(null);
@@ -278,6 +286,8 @@ export class Game {
     this.updateStorm(dt);
     this.loot.update(dt, this.time);
     this.building.update(dt);
+    this.projectiles.update(dt);
+    this.events.update(dt, this.time);
     this.ambient.update(dt, this.time);
     for (const a of this.actors) {
       a.updateMovement(dt);
@@ -289,7 +299,11 @@ export class Game {
     this.sound.updateListener?.(this.camera);
     this.sound.chestHum?.(p.alive && p.state === 'ground' ? this.loot.nearestChest(p.pos, 18) : null, p.pos);
     const view = this.spectating || p;
-    const mode = this.spectating ? (view.state === 'ground' ? 'ground' : view.state) : !p.alive || p.victory ? 'dead' : p.state === 'ground' ? (p.aiming ? 'aim' : 'ground') : p.state;
+    const scoped = p.alive && p.aiming && p.state === 'ground' && !!p.weapon?.def.scope;
+    const mode = this.spectating ? (view.state === 'ground' ? 'ground' : view.state) : !p.alive || p.victory ? 'dead' : p.state === 'ground' ? (scoped ? 'scope' : p.aiming ? 'aim' : 'ground') : p.state;
+    const inScope = scoped && this.rig.fov < 30;
+    this.hud.scope?.(inScope);
+    if (p.state === 'ground') p.root.visible = !inScope; // your own hero would block the scope view
     this.rig.update(dt, view.state === 'bus' ? this.bus.mesh.position : view.pos, mode);
     for (const a of this.actors) a.updateVisual(dt, this.camera.position);
     this.focus.copy(view.pos);
@@ -330,11 +344,13 @@ export class Game {
     }
     if (this.updateBuild(dt)) return;
     if (p.state === 'ground') {
-      const near = this.loot.nearestInteractable(p.pos);
-      const text = !near ? null : near.kind === 'chest' ? 'Open Chest' : near.kind === 'ammobox' ? 'Open Ammo Box' : `Pick up ${this.loot.label(near.pickup)}`;
-      this.hud.prompt?.(text, near?.pickup?.weapon?.rarity);
+      const near = this.events.nearestInteractable(p.pos) || this.loot.nearestInteractable(p.pos);
+      const text = !near ? null : near.text || (near.kind === 'chest' ? (near.chest.rare ? 'Open Rare Chest' : 'Open Chest') : near.kind === 'ammobox' ? 'Open Ammo Box' : `Pick up ${this.loot.label(near.pickup)}`);
+      this.hud.prompt?.(text, near?.pickup?.weapon?.rarity ?? near?.rarity);
       if (near && input.pressed('interact')) {
-        if (near.kind === 'chest') this.loot.openChest(near.chest, p);
+        if (near.kind === 'supply') this.events.openSupply(near.supply, p);
+        else if (near.kind === 'vending') { const msg = this.events.buy(near.vending, p); if (msg) this.hud.toast?.(msg); }
+        else if (near.kind === 'chest') this.loot.openChest(near.chest, p);
         else if (near.kind === 'ammobox') this.loot.openAmmoBox(near.box, p);
         else { const msg = this.loot.collect(near.pickup, p); if (msg) this.hud.toast?.(msg); }
       }
@@ -342,6 +358,21 @@ export class Game {
     this.updateConsumable(dt);
     const held = p.held;
     if (!held || p.state !== 'ground') return;
+    if (held.isConsumable && held.def.throw) {
+      if (input.down('fire')) {
+        const dir = this.camera.getWorldDirection(_dir);
+        p.bodyYaw = p.aimYaw;
+        p.throwHeld(dir);
+      }
+      return;
+    }
+    if (held.isConsumable && held.def.place) {
+      if (input.pressed('fire')) {
+        if (this.events.placeLaunchPad(p)) p.consumeHeld();
+        else this.hud.toast?.('Needs flat ground');
+      }
+      return;
+    }
     if (held.isConsumable) {
       if (input.pressed('fire') && p.useT <= 0) {
         if (!p.startUse()) this.hud.toast?.(held.def.heal ? 'Health is already full' : 'Shield is already full');

@@ -277,3 +277,10 @@ body.touch .kbd { display: none; }
 @media (max-width: 900px) { #bigmap { flex-direction: column; gap: 8px; } .bm-side { width: auto; align-items: center; } .bm-legend, .bm-help { display: none; } }
 #bm-close { font-size: 18px; padding: 8px 18px; align-self: flex-start; }
 @media (max-width: 900px) { #bm-close { align-self: center; } }
+
+/* sniper scope */
+#scope { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 50%, transparent 0, transparent min(34vh, 34vw), rgba(0,0,0,0.92) calc(min(34vh, 34vw) + 2px)); }
+#scope .sc-h, #scope .sc-v { position: absolute; background: rgba(0,0,0,0.85); }
+#scope .sc-h { left: calc(50% - min(34vh, 34vw)); right: calc(50% - min(34vh, 34vw)); top: 50%; height: 2px; transform: translateY(-1px); }
+#scope .sc-v { top: calc(50% - min(34vh, 34vw)); bottom: calc(50% - min(34vh, 34vw)); left: 50%; width: 2px; transform: translateX(-1px); }
+#crosshair.scoped { opacity: 0; }

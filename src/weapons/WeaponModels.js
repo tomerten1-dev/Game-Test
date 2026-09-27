@@ -37,6 +37,25 @@ function build(type, rarity) {
     p.push(part(BOX(0.1, 0.07, 0.16), acc, mat(0, -0.03, 0.4)));
     p.push(part(BOX(0.07, 0.14, 0.24), '#6b4a2e', mat(0, -0.04, -0.2, 0.18, 0, 0)));
     muzzle = 0.76; foregrip = 0.4;
+  } else if (type === 'sniper') {
+    p.push(part(BOX(0.07, 0.11, 0.62), '#3d4a3a', mat(0, 0.0, 0.18)));
+    p.push(part(BOX(0.075, 0.035, 0.5), acc, mat(0, 0.07, 0.2)));
+    p.push(part(CYL(0.02, 0.62), DARK, mat(0, 0.02, 0.8, Math.PI / 2, 0, 0)));
+    p.push(part(CYL(0.035, 0.34), '#1d2027', mat(0, 0.14, 0.14, Math.PI / 2, 0, 0)));
+    p.push(part(CYL(0.045, 0.05), '#1d2027', mat(0, 0.14, 0.33, Math.PI / 2, 0, 0)));
+    p.push(part(BOX(0.06, 0.16, 0.26), '#5a4630', mat(0, -0.05, -0.28, 0.12, 0, 0)));
+    p.push(part(BOX(0.05, 0.14, 0.06), DARK, mat(0, -0.1, 0.02, -0.25, 0, 0)));
+    p.push(part(BOX(0.02, 0.16, 0.02), MID, mat(0.04, -0.1, 0.62, 0.4, 0, 0)));
+    p.push(part(BOX(0.02, 0.16, 0.02), MID, mat(-0.04, -0.1, 0.62, 0.4, 0, 0)));
+    muzzle = 1.1; foregrip = 0.42;
+  } else if (type === 'rocket') {
+    p.push(part(CYL(0.1, 1.05, 12), '#4f6b3a', mat(0, 0.06, 0.12, Math.PI / 2, 0, 0)));
+    p.push(part(CYL(0.115, 0.12, 12), acc, mat(0, 0.06, 0.6, Math.PI / 2, 0, 0)));
+    p.push(part(CYL(0.115, 0.1, 12), DARK, mat(0, 0.06, -0.38, Math.PI / 2, 0, 0)));
+    p.push(part(BOX(0.06, 0.16, 0.08), DARK, mat(0, -0.1, 0.12, -0.2, 0, 0)));
+    p.push(part(BOX(0.05, 0.14, 0.06), DARK, mat(0, -0.09, 0.36, 0.2, 0, 0)));
+    p.push(part(BOX(0.05, 0.08, 0.18), '#1d2027', mat(0.12, 0.12, 0.2)));
+    muzzle = 0.66; foregrip = 0.36;
   } else {
     p.push(part(BOX(0.08, 0.12, 0.36), DARK, mat(0, 0.02, 0.1)));
     p.push(part(BOX(0.085, 0.04, 0.3), acc, mat(0, 0.1, 0.1)));
@@ -89,6 +108,35 @@ function buildKenney(type, rarity) {
   group.userData.muzzle = new THREE.Vector3(0, 0.02, cfg.length * 0.85);
   group.userData.foregrip = cfg.length * 0.45;
   return group;
+}
+
+// Throwables / placeables (grenade, launch pad): small procedural meshes.
+const itemGeoCache = {};
+export function itemGeometry(kind) {
+  if (itemGeoCache[kind]) return itemGeoCache[kind];
+  let g;
+  if (kind === 'grenade') {
+    g = merge([
+      part(new THREE.SphereGeometry(0.11, 12, 10), '#5f8f3e', mat(0, 0.11, 0)),
+      part(new THREE.CylinderGeometry(0.045, 0.05, 0.06, 8), '#3a3f47', mat(0, 0.23, 0)),
+      part(new THREE.TorusGeometry(0.035, 0.01, 6, 10), '#d8dde4', mat(0.05, 0.27, 0, 0, Math.PI / 2, 0)),
+      part(new THREE.BoxGeometry(0.03, 0.12, 0.02), '#3a3f47', mat(-0.06, 0.18, 0, 0, 0, 0.35)),
+    ]);
+  } else {
+    g = merge([
+      part(new THREE.CylinderGeometry(0.62, 0.7, 0.14, 20), '#2c3140', mat(0, 0.07, 0)),
+      part(new THREE.CylinderGeometry(0.5, 0.5, 0.05, 20), '#ffcf3f', mat(0, 0.16, 0)),
+      part(new THREE.ConeGeometry(0.22, 0.18, 3), '#2c3140', mat(0, 0.24, 0.12, Math.PI / 2, 0, 0)),
+      part(new THREE.ConeGeometry(0.22, 0.18, 3), '#2c3140', mat(0, 0.24, -0.12, Math.PI / 2, 0, 0)),
+    ]);
+  }
+  g.computeBoundingSphere();
+  return (itemGeoCache[kind] = g);
+}
+export function makeItemMesh(kind) {
+  const m = new THREE.Mesh(itemGeometry(kind), material);
+  m.castShadow = true;
+  return m;
 }
 
 // KayKit axe used as the harvesting tool; keeps its original units so it fits the hand slot.

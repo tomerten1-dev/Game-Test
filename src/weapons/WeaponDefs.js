@@ -1,4 +1,4 @@
-// Weapon + rarity tables. All guns are hitscan.
+// Weapon + rarity tables. Most guns are hitscan; the sniper and rocket launcher fire projectiles.
 
 export const RARITIES = [
   { key: 'common', name: 'Common', color: '#b9bec7', mult: 1.0 },
@@ -33,13 +33,38 @@ export const WEAPONS = {
     spread: 0.02, bloom: 0.007, maxSpread: 0.08, recover: 0.25,
     range: 110, falloffStart: 22, recoil: 0.008, idealRange: 13, shake: 0.08,
   },
+  sniper: {
+    key: 'sniper', name: 'Sniper Rifle', icon: 'SNP', ammoType: 'heavy',
+    damage: 100, pellets: 1, rate: 0.4, mag: 1, reload: 2.4,
+    spread: 0.035, bloom: 0, maxSpread: 0.035, recover: 1, scopedSpread: 0,
+    range: 420, falloffStart: 400, recoil: 0.09, idealRange: 70, shake: 0.35, headMult: 2.5,
+    projectile: { speed: 280, gravity: 9 }, scope: true,
+  },
+  rocket: {
+    key: 'rocket', name: 'Rocket Launcher', icon: 'RKT', ammoType: 'rockets',
+    damage: 85, pellets: 1, rate: 0.75, mag: 1, reload: 2.8,
+    spread: 0.004, bloom: 0, maxSpread: 0.004, recover: 1,
+    range: 300, falloffStart: 300, recoil: 0.08, idealRange: 30, shake: 0.4,
+    projectile: { speed: 55, gravity: 0, explode: { radius: 5.5, structure: 450 } },
+  },
 };
 
-export const LOOT_WEAPONS = ['ar', 'shotgun', 'smg', 'pistol'];
+// Weighted loot tables: sniper and rocket are rare on the floor, likelier in rare chests / supply drops.
+const WEAPON_WEIGHTS = {
+  floor: { ar: 30, shotgun: 25, smg: 22, pistol: 20, sniper: 3, rocket: 0 },
+  chest: { ar: 30, shotgun: 26, smg: 20, pistol: 10, sniper: 9, rocket: 5 },
+  rare: { ar: 24, shotgun: 22, smg: 12, pistol: 0, sniper: 22, rocket: 20 },
+};
+export function rollWeaponType(table = 'floor', rand = Math.random) {
+  const w = WEAPON_WEIGHTS[table];
+  let r = rand() * Object.values(w).reduce((a, b) => a + b, 0);
+  for (const [k, v] of Object.entries(w)) if ((r -= v) <= 0) return k;
+  return 'ar';
+}
 
 // Weighted rarity roll; `luck` shifts toward rarer drops (chests > floor loot).
 export function rollRarity(rand = Math.random, luck = 0) {
-  const w = [40 - luck * 20, 30, 18 + luck * 6, 9 + luck * 8, 3 + luck * 6];
+  const w = [Math.max(0, 40 - luck * 20), Math.max(4, 30 - Math.max(0, luck - 1.5) * 20), 18 + luck * 6, 9 + luck * 8, 3 + luck * 6];
   const total = w.reduce((a, b) => a + b, 0);
   let r = rand() * total;
   for (let i = 0; i < w.length; i++) {

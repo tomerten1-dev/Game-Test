@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { part, merge, mat } from './geomUtils.js';
 import { TOWNS } from './Terrain.js';
 import { Weapon } from '../weapons/Weapon.js';
-import { LOOT_WEAPONS, RARITIES, rollRarity } from '../weapons/WeaponDefs.js';
+import { RARITIES, rollRarity, rollWeaponType } from '../weapons/WeaponDefs.js';
+import { itemGeometry } from '../weapons/WeaponModels.js';
 import { makeWeaponMesh } from '../weapons/WeaponModels.js';
 import { mulberry32 } from '../core/noise.js';
 import { AMMO, MATS, CONSUMABLES } from '../weapons/Items.js';
@@ -117,6 +118,7 @@ export class Loot {
       const y = this.world.groundAt(s.x, s.z, 200, 0.6);
       if (y < 1) continue;
       const group = new THREE.Group();
+      const rare = r() < 0.12; // rare chests: purple, better loot
       let lidPivot;
       const kk = this.game.models?.get('kk/chest_gold');
       if (kk) {
@@ -125,7 +127,7 @@ export class Loot {
         const sc = 1.25 / kk.size.x;
         model.scale.setScalar(sc);
         model.traverse((o) => {
-          if (o.isMesh) { o.material = this.kkChestMat(o.material); o.castShadow = true; }
+          if (o.isMesh) { o.material = rare ? this.kkRareMat(o.material) : this.kkChestMat(o.material); o.castShadow = true; }
           if (o.name.includes('lid')) lidPivot = o;
         });
         group.add(model);
@@ -141,7 +143,7 @@ export class Loot {
         group.add(base, lidPivot);
         lidPivot.userData.baseRot = 0;
       }
-      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTex, color: '#ffd76a', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.7 }));
+      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTex, color: rare ? '#c77dff' : '#ffd76a', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.7 }));
       glow.material.color.multiplyScalar(1.6);
       glow.scale.set(2.6, 2.6, 1);
       glow.position.y = 0.5;
@@ -149,7 +151,7 @@ export class Loot {
       group.position.set(s.x, y, s.z);
       group.rotation.y = s.rot;
       this.scene.add(group);
-      this.chests.push({ x: s.x, z: s.z, y, group, lidPivot, glow, opened: false, openT: 0 });
+      this.chests.push({ x: s.x, z: s.z, y, group, lidPivot, glow, rare, opened: false, openT: 0 });
     }
     this._createAmmoBoxes(spots, r);
     this.spawnFloorLoot();
@@ -198,6 +200,19 @@ export class Loot {
     });
   }
 
+  kkRareMat(src) {
+    if (!this._kkRare) {
+      const m = src.clone();
+      m.color.set('#b784ff');
+      m.emissive = new THREE.Color('#5a1fa8');
+      m.emissiveIntensity = 0.55;
+      m.roughness = 0.3;
+      m.metalness = 0.4;
+      this._kkRare = m;
+    }
+    return this._kkRare;
+  }
+
   kkChestMat(src) {
     if (!this._kkMat) {
       const m = src.clone();
@@ -226,7 +241,7 @@ export class Loot {
 
   static randomConsumable() {
     const r = Math.random();
-    const type = r < 0.35 ? 'bandage' : r < 0.55 ? 'smallshield' : r < 0.8 ? 'bigshield' : 'medkit';
+    const type = r < 0.3 ? 'bandage' : r < 0.48 ? 'smallshield' : r < 0.68 ? 'bigshield' : r < 0.82 ? 'medkit' : r < 0.96 ? 'grenade' : 'launchpad';
     return { type: 'consumable', ctype: type, count: CONSUMABLES[type].stack };
   }
 
@@ -244,7 +259,7 @@ export class Loot {
         const y = this.world.groundAt(x, z, 200) + 0.2;
         const roll = Math.random();
         if (roll < 0.55) {
-          const w = new Weapon(LOOT_WEAPONS[Math.floor(Math.random() * LOOT_WEAPONS.length)], rollRarity(Math.random, 0));
+          const w = new Weapon(rollWeaponType('floor'), rollRarity(Math.random, 0));
           this.spawnPickup({ type: 'weapon', weapon: w }, _v.set(x, y, z));
           this.spawnPickup(Loot.ammoFor(w), _v.set(x + 0.9, y, z + 0.4));
         } else if (roll < 0.8) this.spawnPickup(Loot.randomConsumable(), _v.set(x, y, z));
@@ -277,10 +292,11 @@ export class Loot {
       mesh.position.y = 0.3;
       color = AMMO[item.ammoType].color;
     } else {
-      const geo = { bandage: this.itemGeo.bandage, medkit: this.itemGeo.med, smallshield: this.itemGeo.small, bigshield: this.itemGeo.shield }[item.ctype];
+      const geo = { bandage: this.itemGeo.bandage, medkit: this.itemGeo.med, smallshield: this.itemGeo.small, bigshield: this.itemGeo.shield, grenade: itemGeometry('grenade'), launchpad: itemGeometry('launchpad') }[item.ctype];
       mesh = new THREE.Mesh(geo, this.itemMat);
       mesh.position.y = 0.3;
       color = CONSUMABLES[item.ctype].color;
+      if (item.ctype === 'launchpad') mesh.scale.setScalar(0.55);
     }
     mesh.castShadow = true;
     g.add(mesh);
@@ -323,9 +339,14 @@ export class Loot {
     c.glow.visible = false;
     this.game.sound.play('chest', actor.isPlayer ? null : _v.set(c.x, c.y, c.z));
     const out = [];
-    const w = new Weapon(LOOT_WEAPONS[Math.floor(Math.random() * 3)], rollRarity(Math.random, 1));
+    const w = new Weapon(rollWeaponType(c.rare ? 'rare' : 'chest'), rollRarity(Math.random, c.rare ? 2.2 : 1));
     out.push({ type: 'weapon', weapon: w });
     out.push(Loot.ammoFor(w));
+    if (c.rare) {
+      const w2 = new Weapon(rollWeaponType('chest'), rollRarity(Math.random, 1.5));
+      out.push({ type: 'weapon', weapon: w2 }, Loot.ammoFor(w2));
+      out.push({ type: 'consumable', ctype: 'grenade', count: 3 });
+    }
     out.push(Loot.randomConsumable());
     out.push({ type: 'mat', matType: ['wood', 'wood', 'stone', 'metal'][Math.floor(Math.random() * 4)], amount: 30 });
     const fwd = c.group.rotation.y;
@@ -446,7 +467,7 @@ export class Loot {
         const d2 = CONSUMABLES[p.ctype];
         const room = hasFree || actor.items.some((it) => it?.isConsumable && it.type === p.ctype && it.count < d2.max);
         const carried = actor.items.reduce((n, it) => n + (it?.isConsumable ? 1 : 0), 0);
-        s = !room ? 0 : (d2.heal ? (actor.health < 70 ? 1.8 : 0.9) : 1.2) - carried * 0.25;
+        s = !room ? 0 : (d2.heal ? (actor.health < 70 ? 1.8 : 0.9) : d2.shield ? 1.2 : d2.throw ? 0.8 : 0) - carried * 0.25;
         if (guns.length === 0) s *= 0.5; // a gun first
       } else if (p.type === 'mat') s = actor.wood < 60 && p.matType === 'wood' ? 0.6 : 0;
       if (p.type === 'weapon' && guns.length === 0) s = 3;

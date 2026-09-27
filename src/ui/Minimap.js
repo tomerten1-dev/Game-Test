@@ -67,6 +67,19 @@ export class Minimap {
       ctx.stroke();
     }
 
+
+    // world events: supply drops, vending machines, jump pads
+    for (const ic of game.events?.mapIcons() || []) {
+      const [ix, iy] = this.toMap(ic.x, ic.z);
+      const r = W * 0.022;
+      ctx.fillStyle = ic.color; ctx.strokeStyle = '#0b1a33'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      if (ic.shape === 'square') ctx.rect(ix - r, iy - r, r * 2, r * 2);
+      else if (ic.shape === 'vending') ctx.roundRect(ix - r * 0.7, iy - r, r * 1.4, r * 2, r * 0.3);
+      else ctx.arc(ix, iy, r * 0.6, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+    }
+
     // bus path
     const bus = game.bus;
     const p = game.player;

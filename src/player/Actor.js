@@ -46,7 +46,7 @@ export class Actor {
     // slot 0 = pickaxe, slots 1-5 = guns or stackable consumables
     this.items = [new Pickaxe(), null, null, null, null, null];
     this.slot = 0;
-    this.ammo = { light: 0, medium: 0, shells: 0, heavy: 0 };
+    this.ammo = { light: 0, medium: 0, shells: 0, heavy: 0, rockets: 0 };
     this.mats = { wood: 0, stone: 0, metal: 0 };
     this.infiniteAmmo = !isPlayer; // bots don't track reserve ammo
     this.crouched = false;
@@ -120,12 +120,32 @@ export class Actor {
     if (this.useT > 0) return null;
     this.useT = 0;
     it.apply(this);
+    this.consumeHeld();
+    return it;
+  }
+
+  // Use up one of the held stack; switch away when it runs out.
+  consumeHeld() {
+    const it = this.held;
+    if (!it || !it.isConsumable) return;
     if (--it.count <= 0) {
       this.items[this.slot] = null;
       const next = this.items.findIndex((x, i) => i > 0 && x);
       if (!this.switchSlot(next > 0 ? next : 0)) this._equip();
     }
-    return it;
+  }
+
+  // Throw a grenade from the held stack toward dir.
+  throwHeld(dir) {
+    const it = this.held;
+    if (!it?.def?.throw || (this.throwCd || 0) > this.game.time) return false;
+    this.throwCd = this.game.time + 0.7;
+    const from = this.chest(new THREE.Vector3()).addScaledVector(dir, 0.6);
+    from.y += 0.4;
+    this.game.projectiles.throwGrenade(this, from, dir);
+    this.swingT = 0.4;
+    this.consumeHeld();
+    return true;
   }
 
   // Slot of a consumable of the given kind ('heal' / 'shield') that helps right now, best first.
@@ -140,6 +160,20 @@ export class Actor {
       if (v > bestV) { bestV = v; best = i; }
     });
     return best;
+  }
+
+  // Launch pad: fly up and redeploy the glider.
+  launch(vy = 40) {
+    if (this.state !== 'ground') return;
+    this.setBuildMode?.(null);
+    this.useT = 0;
+    this.crouched = false;
+    this.vel.y = vy;
+    this.onGround = false;
+    this.launching = true;
+    this.dropTarget?.set(this.pos.x + Math.sin(this.aimYaw) * 45, 0, this.pos.z + Math.cos(this.aimYaw) * 45);
+    this.setState('skydive');
+    this.pos.y += 0.3;
   }
 
   startSlide() {
@@ -184,6 +218,7 @@ export class Actor {
   updateMovement(dt) {
     const world = this.game.world;
     const it = this.intent;
+    if (this.noFallT > 0) this.noFallT -= dt;
     if (this.state === 'bus' || this.state === 'dead') {
       if (this.state === 'dead') {
         this.vel.x = this.vel.z = 0;
@@ -224,7 +259,7 @@ export class Actor {
       world.moveBody(this, dt);
       if (this.onGround && !wasGround && this.landSpeed > 7) {
         this.onHardLanding?.(this.landSpeed);
-        if (this.landSpeed > FALL_SAFE) this.fallDamage(Math.round((this.landSpeed - FALL_SAFE) * 5.5));
+        if (this.landSpeed > FALL_SAFE && !(this.noFallT > 0)) this.fallDamage(Math.round((this.landSpeed - FALL_SAFE) * 5.5));
       }
       // footsteps
       const hs = Math.hypot(this.vel.x, this.vel.z);
@@ -242,6 +277,13 @@ export class Actor {
         this._dustT = (this._dustT || 0) - dt;
         if (this._dustT <= 0) { this._dustT = 0.22; this.game.effects.dust(this.pos, 1, 0.6); }
       }
+    } else if (this.state === 'skydive' && this.launching) {
+      // launch pad arc: real gravity until the top, then the glider opens
+      this.vel.x = damp(this.vel.x, it.mx * 10, 2, dt);
+      this.vel.z = damp(this.vel.z, it.mz * 10, 2, dt);
+      world.moveBody(this, dt, 1);
+      if (this.vel.y < 2) { this.launching = false; this.setState('glide'); }
+      if (this.onGround) { this.launching = false; this.land(); }
     } else if (this.state === 'skydive') {
       const hs = 17;
       this.vel.x = damp(this.vel.x, it.mx * hs, 2.2, dt);

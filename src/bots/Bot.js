@@ -235,6 +235,24 @@ export class Bot extends Actor {
       }
     }
 
+    // lob a grenade at enemies hiding behind builds
+    this.nadeCd = (this.nadeCd || 0) - THINK;
+    if (this.target && this.nadeCd <= 0 && this.useT <= 0 && !this.boxed) {
+      const dd = this.pos.distanceTo(this.target.pos);
+      const gi = this.items.findIndex((it) => it?.def?.throw);
+      if (gi > 0 && dd > 6 && dd < 30 && (this.shootWall || this.target.boxed || Math.random() < 0.08)) {
+        this.nadeCd = 4 + Math.random() * 3;
+        this.switchSlot(gi);
+        const t = this.target.pos;
+        _dir.set(t.x - this.pos.x, 0, t.z - this.pos.z).normalize();
+        _dir.y = 0.08 + dd * 0.012 + (t.y - this.pos.y) / Math.max(8, dd);
+        _dir.normalize();
+        this.aimYaw = this.bodyYaw = Math.atan2(_dir.x, _dir.z);
+        this.throwHeld(_dir);
+        this._chooseWeapon(dd);
+      }
+    }
+
     // in a box: heal up, peek through windows, leave when it's time
     if (this.boxed) {
       this.boxT += THINK;
@@ -283,6 +301,14 @@ export class Bot extends Actor {
     // loot (search further when unarmed)
     const loot = g.loot;
     if (loot) {
+      // supply drops are worth a detour
+      const sup = armed && g.events?.nearestSupply(this.pos, 110);
+      if (sup && (!storm || storm.isSafe(sup.x, sup.z, 5))) {
+        this.mode = 'loot';
+        this.setGoal(sup.x, sup.z);
+        if (sup.landed && Math.hypot(sup.x - this.pos.x, sup.z - this.pos.z) < 2.4) g.events.openSupply(sup, this);
+        return;
+      }
       if (this.lootChest && this.lootChest.opened) this.lootChest = null;
       if (!this.lootChest) this.lootChest = loot.nearestChest(this.pos, armed ? 45 : 90, storm);
       if (this.lootChest) {
@@ -400,6 +426,8 @@ export class Bot extends Actor {
       if (k === 'shotgun') s *= d < 10 ? 2.5 : d < 18 ? 0.8 : 0.1;
       else if (k === 'smg') s *= d < 22 ? 1.4 : 0.6;
       else if (k === 'ar') s *= d > 15 ? 1.5 : 0.9;
+      else if (k === 'sniper') s *= d > 45 ? 2.2 : d > 25 ? 1 : 0.15;
+      else if (k === 'rocket') s *= d > 9 && d < 70 ? (this.shootWall || this.target?.boxed ? 2.4 : 1.1) : 0.05;
       if (w.ammo === 0 && w.reloading) s *= 0.3;
       if (s > bestS) { bestS = s; bestI = i; }
     }

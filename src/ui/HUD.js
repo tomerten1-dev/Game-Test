@@ -26,6 +26,7 @@ export class HUD {
           <i class="ch t"></i><i class="ch b"></i><i class="ch l"></i><i class="ch r"></i><i class="dot"></i>
           <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
         </div>
+        <div id="scope" class="hidden"><i class="sc-h"></i><i class="sc-v"></i></div>
         <canvas id="compass"></canvas>
         <div id="soundviz"></div>
         <div id="spectate" class="hidden">
@@ -174,6 +175,13 @@ export class HUD {
     t.classList.remove('show');
     void t.offsetWidth;
     t.classList.add('show');
+  }
+
+  scope(on) {
+    if (this.cache.scope === on) return;
+    this.cache.scope = on;
+    this.root.querySelector('#scope').classList.toggle('hidden', !on);
+    this.el.crosshair.classList.toggle('scoped', on);
   }
 
   setSoundViz(on) {

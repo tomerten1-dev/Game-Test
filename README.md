@@ -53,6 +53,17 @@ Production build: `npm run build` (output in `dist/`), preview it with `npm run 
 - Guns use **light / medium / shells** ammo; reserve shows after the slash. Green **ammo boxes** near houses and anything dropped on the ground are picked up by walking over it.
 - Sprinting is fast but inaccurate; standing still gives a perfectly accurate first shot. Falls from high up hurt.
 
+## Loot & world events
+
+- **Weapons:** assault rifle, shotgun, SMG and pistol (hitscan), plus a **sniper rifle** (heavy ammo, bullets travel and drop, right-click for a scope, 2.5× headshots) and a **rocket launcher** (splash damage that wrecks builds). Sniper and rockets are rare on the floor and common in rare chests and supply drops.
+- **Grenades** (click to throw, they bounce and go off after ~2 s) and **launch pads** (click to place, step on it to fly up and glide).
+- **Rare chests** (purple, ~1 in 8) drop two weapons and grenades.
+- **Supply drops** float down under a blue balloon three times a match inside the next safe zone. They leave blue smoke and hold an epic or legendary weapon, heals, grenades or a launch pad, and 60 metal.
+- **Jump pads** (cyan discs around the island) bounce you high with no fall damage.
+- **Vending machines** in four towns rotate rare / epic / legendary weapons for 100 wood / 200 stone / 300 metal.
+- Each match rolls a lighting mood: **Sunny Day**, **Golden Hour** or **Dusk**.
+- Bots switch to the sniper at long range and the rocket launcher against builds, lob grenades at enemies hiding in boxes, and race for supply drops.
+
 ## Map, storm & spectating
 
 - The compass at the top shows your heading plus your marker, pings and (when you're outside) the direction of the safe zone.

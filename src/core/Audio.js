@@ -261,6 +261,40 @@ export class Sound {
       case 'use':
         this._noise(t, 0.3, { type: 'bandpass', freq: 1500, q: 2, gain: 0.15, attack: 0.05 });
         break;
+      case 'sniper':
+        this._noise(t, 0.5, { freq: 3800, freqEnd: 300, gain: 0.95 * v });
+        this._tone(t, 0.3, { type: 'sawtooth', freq: 140, freqEnd: 40, gain: 0.35 * v });
+        this._noise(t + 0.12, 0.6, { type: 'bandpass', freq: 600, freqEnd: 200, q: 0.8, gain: 0.25 * v, attack: 0.05 });
+        break;
+      case 'rocket':
+        this._noise(t, 0.7, { type: 'bandpass', freq: 900, freqEnd: 2600, q: 0.7, gain: 0.6 * v, attack: 0.03 });
+        this._tone(t, 0.25, { type: 'sine', freq: 90, freqEnd: 50, gain: 0.5 * v });
+        break;
+      case 'explosion':
+        this._noise(t, 1.2, { freq: 1400, freqEnd: 80, gain: 1.2 * v });
+        this._tone(t, 0.7, { type: 'sine', freq: 70, freqEnd: 28, gain: 0.9 * v });
+        this._noise(t + 0.05, 0.4, { type: 'highpass', freq: 2500, gain: 0.3 * v });
+        break;
+      case 'throw':
+        this._noise(t, 0.2, { type: 'bandpass', freq: 800, freqEnd: 2200, q: 1.2, gain: 0.25 * v, attack: 0.03 });
+        break;
+      case 'bounce':
+        this._tone(t, 0.07, { type: 'triangle', freq: 520, freqEnd: 300, gain: 0.25 * v });
+        break;
+      case 'launch':
+        this._tone(t, 0.6, { type: 'sine', freq: 180, freqEnd: 900, gain: 0.3 * v, attack: 0.02 });
+        this._noise(t, 0.8, { type: 'bandpass', freq: 500, freqEnd: 2000, q: 0.6, gain: 0.35 * v, attack: 0.05 });
+        break;
+      case 'jumppad':
+        this._tone(t, 0.3, { type: 'square', freq: 220, freqEnd: 660, gain: 0.12 * v });
+        this._tone(t + 0.05, 0.3, { type: 'sine', freq: 440, freqEnd: 1320, gain: 0.15 * v });
+        break;
+      case 'buy':
+        [784, 988, 1319].forEach((f, i) => this._tone(t + i * 0.06, 0.2, { type: 'square', freq: f, gain: 0.08 }));
+        break;
+      case 'supply':
+        [392, 523, 659, 784].forEach((f, i) => this._tone(t + i * 0.12, 0.5, { type: 'triangle', freq: f, gain: 0.16 }));
+        break;
       case 'ping':
         this._tone(t, 0.12, { type: 'sine', freq: 1320, gain: 0.14 });
         this._tone(t + 0.1, 0.2, { type: 'sine', freq: 1760, gain: 0.12 });

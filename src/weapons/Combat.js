@@ -67,11 +67,28 @@ export class Combat {
     }
     const hs = Math.hypot(shooter.vel.x, shooter.vel.z);
     const moving = hs > 1.5;
-    const spread = w.spread(moving, !shooter.onGround, { crouched: shooter.crouched, still: hs < 0.4, now: g.time }) * (shooter.accuracyMult ?? 1);
+    const spread = w.spread(moving, !shooter.onGround, { crouched: shooter.crouched, still: hs < 0.4, now: g.time, scoped: shooter.aiming && w.def.scope }) * (shooter.accuracyMult ?? 1);
     w.onFire(g.time);
     shooter.lastFireTime = g.time;
     shooter.sprinting = false;
     const def = w.def;
+    if (def.projectile) {
+      // aim the projectile from the muzzle at whatever the aiming ray points at
+      coneDir(aimDir, spread, _dir);
+      const r = this.trace(origin, _dir, def.range, shooter);
+      _end.copy(origin).addScaledVector(_dir, r.t);
+      const pd = _a.copy(_end).sub(muzzle);
+      if (r.t > 3 && pd.lengthSq() > 1) _dir.copy(pd.normalize());
+      g.projectiles.fireWeapon(shooter, w, muzzle, _dir);
+      g.effects.muzzle(muzzle, aimDir, def.key === 'rocket' ? 1.6 : 1.3, shooter.isPlayer || shooter.distToCam < 40);
+      g.sound.play(def.key, shooter.isPlayer ? null : shooter.pos, { range: 220 });
+      if (shooter.isPlayer) {
+        g.rig.recoil += def.recoil;
+        g.rig.shake = Math.min(0.6, g.rig.shake + def.shake);
+      }
+      if (w.ammo <= 0) this.reload(shooter);
+      return true;
+    }
     const perTarget = new Map();
     for (let i = 0; i < def.pellets; i++) {
       coneDir(aimDir, spread, _dir);

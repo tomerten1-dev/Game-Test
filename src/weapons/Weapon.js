@@ -22,7 +22,8 @@ export class Weapon {
   // Rough power score for bots comparing loot.
   get score() {
     const d = this.def;
-    return d.damage * d.pellets * Math.min(d.rate, 6) * RARITIES[this.rarity].mult * (d.key === 'pistol' ? 0.6 : 1);
+    const base = d.key === 'sniper' ? 150 : d.key === 'rocket' ? 140 : d.damage * d.pellets * Math.min(d.rate, 6);
+    return base * RARITIES[this.rarity].mult * (d.key === 'pistol' ? 0.6 : 1);
   }
 
   update(dt) {
@@ -41,6 +42,7 @@ export class Weapon {
   // opts: { crouched, still, now } -> first shot is perfectly accurate when standing still
   spread(moving, airborne, opts = {}) {
     const d = this.def;
+    if (opts.scoped && d.scopedSpread !== undefined) return d.scopedSpread + (moving ? 0.01 : 0) + (airborne ? 0.03 : 0);
     const crouch = opts.crouched ? 0.7 : 1;
     if (d.pellets > 1) return d.spread * (airborne ? 1.3 : 1) * (opts.crouched ? 0.85 : 1);
     if (opts.still && !airborne && opts.now !== undefined && opts.now - this.lastShot > 0.5 && this.bloom < 0.004) return 0;

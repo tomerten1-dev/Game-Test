@@ -36,7 +36,8 @@ export class Player extends Actor {
 
   readInput(dt, input, rig) {
     const look = input.consumeLook();
-    rig.addLook(look.x, look.y);
+    const zoom = rig.fov < 40 ? rig.fov / 70 : 1; // slower look while scoped
+    rig.addLook(look.x * zoom, look.y * zoom);
     this.aimYaw = rig.yaw + Math.PI;
     this.aimPitch = rig.pitch + rig.recoil;
     this.aiming = input.down('aim') && !this.buildMode;
