@@ -40,23 +40,34 @@ Production build: `npm run build` (output in `dist/`), preview it with `npm run 
 | G | Edit your wall/floor: click or drag tiles on the 3×3 grid, G again to confirm, right-click to reset (ramps flip) |
 | 1 – 6 / mouse wheel | Switch slot (1 = harvesting axe) · leaves build mode |
 | M | Full-screen map (click: marker, right-click: clear, wheel: zoom, drag: pan) |
-| Middle click | Ping what you're looking at |
+| Middle click (or P) | Ping what you're looking at |
+| Tab | Inventory screen: drag slots to swap, drop / drop one / split stacks, drop materials and ammo |
+| J | Drop the held item |
+| Y | Swap camera shoulder |
 | T | Emote — tap for your equipped emote, hold for the emote wheel |
 | N | Mute |
 | Esc | Pause |
+
+Every key above can be changed in **Settings → Key bindings** (movement, jump, sprint, crouch, reload, interact, the build pieces, edit, quick 90s, map, emote, mute, weapon slots 1–6, inventory, drop, ping and shoulder swap).
 
 **Touch devices** get a floating joystick on the left, drag-to-look on the right, and buttons for Fire (hold), Jump, Crouch, Reload, Use and quick-build (Wall, Floor, Ramp, Cone, MAT to switch material). Push the stick all the way to sprint. Tap the inventory slots to switch, and tap the minimap for the full map.
 
 ## Inventory & survival
 
 - **Slot 1** is the harvesting axe: hit trees, crates and wooden houses for wood, rocks and walls for stone, cars, lamps and city props for metal.
-- **Slots 2–6** hold guns or stacks of heals: Bandages (+15 up to 75), Medkit (full health), Small Shield (+25 up to 50), Shield Potion (+50). Hold still-ish while the ring fills.
+- **Slots 2–6** hold guns or stacks of heals: Bandages (+15 up to 75), Medkit (full health), Small Shield (+25 up to 50), Shield Potion (+50), **Med-Mist** (+30, use it on the move), **Slurp Juice** (+75 over time: health, then shield), **Chug Jug** (full health and shield, 15 s). Placeables: **Shield Keg** (shields everyone nearby up to 100) and **Campfire** (heals everyone nearby over time). Hold still-ish while the ring fills.
+- **Mobility:** **Shockwave Grenade** (goes off on impact and launches everyone nearby, you too, ~40 m with no fall damage), **Grappler** (10 charges: pulls you to where you aim, up to 60 m), **Rift-to-Go** (warps you into the sky to glide).
+- **Upgrade benches** in six towns (orange on the map): hold a gun and interact to raise its rarity for 100 wood / 150 stone / 200 metal / 300 metal.
+- **Hiding spots:** jump into haystacks and dumpsters (interact); bots can't see you inside. Jump or interact to pop out.
+- Crates, barrels, furniture and street clutter **break** from the axe, bullets and explosions and sometimes drop loot.
+- **Swimming:** deep water is swimmable (slower, and no shooting or building while swimming).
+- **Movement:** sprint into a low fence or crate to **hurdle** it; land from a big drop while running to **roll**; crouch-walking is almost silent.
 - Guns use **light / medium / shells** ammo; reserve shows after the slash. Green **ammo boxes** near houses and anything dropped on the ground are picked up by walking over it.
 - Sprinting is fast but inaccurate; standing still gives a perfectly accurate first shot. Falls from high up hurt.
 
 ## Lobby & progression
 
-- **Lobby:** your hero stands on a floating stage off the island's coast. Tabs: **Play**, **Locker**, **Item Shop**, **Quests**, **Career**, **Settings**. Drag to spin your hero; the Emote button (or **T** in a match) plays your equipped emote.
+- **Lobby:** your hero stands on a floating stage off the island's coast next to three party pads, with a nameplate showing your level and wins; leave it alone for a bit and your hero dances your equipped emote. Tabs: **Play**, **Locker**, **Item Shop**, **Quests**, **Career**, **Settings**. Drag to spin your hero; the Emote button (or **T** in a match) plays your equipped emote.
 - **Modes:** *Solo* (you vs 19 bots) or *Quick Match* (you vs 9 bots, faster storm). After a short matchmaking screen there's a **20-second warm-up**: everyone spawns with an AR, a shotgun and 100 wood, respawns on death, and nothing counts. Then inventories are wiped and the Storm Bus leaves.
 - **XP & levels:** earned for time survived, eliminations, chests, supply drops, damage, placement and quests; the results screen itemises it. Every level gives Storm Coins, and the **Season 1 reward track** (levels 2–30) unlocks outfits colours, gliders, contrails, emotes, weapon wraps and heroes.
 - **Daily quests:** three per day (e.g. "Open 3 chests", "Land at Candy Corners"), +500 XP and 100 Storm Coins each.
@@ -89,7 +100,8 @@ Production build: `npm run build` (output in `dist/`), preview it with `npm run 
 
 - The compass at the top shows your heading plus your marker, pings and (when you're outside) the direction of the safe zone.
 - The last two storm circles move instead of just shrinking. Inside the storm the world goes purple, foggy and rainy.
-- When you're eliminated you spectate whoever got you (then whoever gets them). Press Space or click **See results** to continue.
+- **Storm surge:** from the third circle, while more players are alive than the circle allows, the ones who dealt the least damage take 20 damage every 10 s. The storm line shows your damage against the safe threshold.
+- When you're eliminated you spectate whoever got you (then whoever gets them). Click / right-click to switch to the next / previous player; press Space or click **See results** to continue.
 - **Visualize sound** (menu/pause) shows icons around the crosshair for gunshots, footsteps, building and nearby chests. It also works with sound muted.
 
 ## Building
@@ -158,5 +170,5 @@ public/models/        models: chars/ (KayKit heroes), kk/ (KayKit world), env/ (
   - **Elijah Cobden Stylized Trees Pack** (provided by the project owner; see its itch.io page for the license): detailed oaks, columnar trees and pines near the camera, willows, swiggly trees and dead trees. See `public/models/trees/CREDITS.md`.
   - **Quaternius Stylized Nature:** painted leafy trees (shown near the camera; cheaper trees stand in far away), flowering bushes and clover. See `public/models/nature/CREDITS.md`.
   - **Procedural:** far-away round/autumn trees, bushes, grass, the bus, fences, fountains and lamps are built from low-poly shapes.
-  - **Audio:** all sounds are synthesized with Web Audio.
+  - **Audio:** CC0 Kenney sound samples plus synthesized effects (see `public/audio/CREDITS.md`), and CC0 music for the lobby, the Storm Bus, the final circles and the victory / defeat jingles (see `public/audio/music/CREDITS.md`).
 
