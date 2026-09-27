@@ -197,7 +197,7 @@ export class Bot extends Actor {
     cands.sort((a, b) => a[0] - b[0]);
     const fx = Math.sin(this.aimYaw), fz = Math.cos(this.aimYaw);
     let bestS = Infinity, checks = 0;
-    for (let i = 0; i < cands.length && checks < 4; i++) {
+    for (let i = 0; i < cands.length && checks < 3; i++) {
       const [d, a] = cands[i];
       if (a !== this.target) {
         // must notice them: in front (or close / loud) and a per-think chance
@@ -401,8 +401,8 @@ export class Bot extends Actor {
         if (box) loot.openAmmoBox(box, this);
       }
     }
-    // third-party: go where the shooting is
-    if (armed) {
+    // third-party: go where the shooting is (only when healthy enough to take another fight)
+    if (armed && this.health + this.shield >= 80) {
       if (this.huntT > 0 && Math.hypot(this.huntPos.x - this.pos.x, this.huntPos.z - this.pos.z) > 6) {
         this.huntT -= THINK;
         this.mode = 'hunt';

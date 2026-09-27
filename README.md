@@ -78,6 +78,7 @@ Production build: `npm run build` (output in `dist/`), preview it with `npm run 
 - **Vending machines** in four towns rotate rare / epic / legendary weapons for 100 wood / 200 stone / 300 metal.
 - Each match rolls a lighting mood: **Sunny Day**, **Golden Hour** or **Dusk**.
 - Bots switch to the sniper at long range and the rocket launcher against builds, lob grenades at enemies hiding in boxes, and race for supply drops.
+- **Bot brain:** bots pick targets by threat (whoever is shooting them, weak, reloading or healing enemies first), turn toward gunfire they hear and toward whoever hit them, and pre-aim where you were last seen. They push weak enemies and back off from fights they're losing (box up, or retreat behind smoke). Their aim settles the longer they track you (moving, jumping, getting hit or a fast target throws it off), leads by bullet travel time and holds over for sniper drop; rockets go at your feet and snipers stand still and go for the head. With an empty mag they swap guns, or wall off and reload. They step out of fire, box up before long heals when enemies are near, and build loadouts with one gun per role (close, rifle, long range, explosive).
 
 ## Seasons
 
