@@ -14,7 +14,8 @@ const DEEP_WATER = -1.3;
 const _list = [];
 
 export class World {
-  constructor(scene, renderer) {
+  constructor(scene, renderer, models) {
+    this.models = models;
     this.scene = scene;
     this.colliders = new Colliders();
     this.terrain = new Terrain();
@@ -37,8 +38,8 @@ export class World {
     this.lighting = new Lighting(scene);
     this.water = new Water(scene);
     this.clouds = new Clouds(scene);
-    this.towns = new Towns(scene, this.terrain, this.colliders);
-    this.foliage = new Foliage(scene, this.terrain, this.colliders);
+    this.towns = new Towns(scene, this.terrain, this.colliders, models);
+    this.foliage = new Foliage(scene, this.terrain, this.colliders, models);
   }
 
   update(dt, t, focus, camera) {

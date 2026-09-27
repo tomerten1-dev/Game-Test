@@ -51,7 +51,48 @@ function build(type, rarity) {
   return { geo, muzzle, foregrip };
 }
 
+// Kenney CC0 blasters for pistol / SMG / AR; the shotgun stays procedural.
+let models = null;
+export function setWeaponModels(m) { models = m; }
+const KENNEY = {
+  pistol: { name: 'blaster', length: 0.42, rotY: Math.PI },
+  smg: { name: 'blaster-repeater', length: 0.52, rotY: Math.PI },
+  ar: { name: 'blaster-a', length: 0.9, rotY: -Math.PI / 2 },
+};
+const kenneyMats = new Map();
+const stripeCache = new Map();
+
+function buildKenney(type, rarity) {
+  const cfg = KENNEY[type];
+  const info = models.get(cfg.name);
+  const along = cfg.rotY % Math.PI === 0 ? info.size.z : info.size.x;
+  const s = cfg.length / along;
+  const group = new THREE.Group();
+  const inner = new THREE.Group();
+  inner.rotation.y = cfg.rotY;
+  inner.scale.setScalar(s);
+  inner.position.set(0, -info.size.y * s * 0.45, cfg.length * 0.3);
+  for (const p of info.parts) {
+    let m = kenneyMats.get(p.material);
+    if (!m) { m = p.material.clone(); m.roughness = 0.45; m.metalness = Math.min(0.3, m.metalness ?? 0); kenneyMats.set(p.material, m); }
+    const mesh = new THREE.Mesh(p.geometry, m);
+    mesh.castShadow = true;
+    inner.add(mesh);
+  }
+  group.add(inner);
+  // glowing rarity stripe on top
+  const key = type + rarity;
+  if (!stripeCache.has(key)) stripeCache.set(key, [new THREE.BoxGeometry(0.035, 0.03, cfg.length * 0.55), new THREE.MeshStandardMaterial({ color: RARITIES[rarity].color, emissive: RARITIES[rarity].color, emissiveIntensity: 0.9, roughness: 0.4 })]);
+  const stripe = new THREE.Mesh(...stripeCache.get(key));
+  stripe.position.set(0, info.size.y * s * 0.55 + 0.01, cfg.length * 0.3);
+  group.add(stripe);
+  group.userData.muzzle = new THREE.Vector3(0, 0.02, cfg.length * 0.85);
+  group.userData.foregrip = cfg.length * 0.45;
+  return group;
+}
+
 export function makeWeaponMesh(type, rarity) {
+  if (models && KENNEY[type]) return buildKenney(type, rarity);
   const key = `${type}:${rarity}`;
   let g = cache.get(key);
   if (!g) { g = build(type, rarity); cache.set(key, g); }

@@ -3,22 +3,9 @@ import { mulberry32 } from '../core/noise.js';
 import { part, merge, mat } from './geomUtils.js';
 import { TOWNS } from './Terrain.js';
 
-const WALLS = ['#ffd6e0', '#bde0fe', '#caffbf', '#fdffb6', '#ffc8dd', '#ffd8a8', '#c8b6ff', '#b9fbc0', '#fff1c1'];
-const ROOFS = ['#e76f51', '#5c6bc0', '#d1495b', '#2a9d8f', '#8d6e63', '#ef8354', '#6d597a'];
-
-function prismGeo(w, h, d) {
-  // triangular prism: ridge along X, triangle in YZ
-  const hw = w / 2, hd = d / 2;
-  const v = [
-    // front gable (z+) -> actually gables at x ends
-    -hw, 0, -hd, -hw, 0, hd, -hw, h, 0,
-    hw, 0, hd, hw, 0, -hd, hw, h, 0,
-  ];
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
-  g.computeVertexNormals();
-  return g;
-}
+const WALLS = ['#ffd6e0', '#bde0fe', '#caffbf', '#fdffb6', '#ffc8dd', '#ffd8a8', '#d7c8ff', '#b9fbc0', '#fff1c1', '#ffe0cc'];
+const ROOFS = ['#e76f51', '#4f6bd8', '#d1495b', '#2a9d8f', '#8d6e63', '#ef8354', '#7b5ea7', '#3c9d5d'];
+const HOUSE_TYPES = ['house1', 'house-3', 'house-4', 'house-5', 'house-7'];
 
 export function makeCrateTexture() {
   const cv = document.createElement('canvas');
@@ -45,25 +32,33 @@ export function makeCrateTexture() {
 }
 
 export class Towns {
-  constructor(scene, terrain, colliders) {
+  constructor(scene, terrain, colliders, models) {
     this.scene = scene;
     this.terrain = terrain;
     this.colliders = colliders;
+    this.models = models;
     this.rand = mulberry32(2024);
     this.houses = [];
     this.chestSpots = [];
+    this.housePlacements = new Map(HOUSE_TYPES.map((t) => [t, []]));
+    this.barrels = [];
     const parts = [];
     const crates = [];
     for (const town of TOWNS) this._town(town, parts, crates);
     this._scatterCrates(crates);
+    this._landmark(parts);
 
+    // stone foundations (hide gaps on slopes)
     const geo = merge(parts);
-    const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, flatShading: true });
+    const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, flatShading: true });
     const mesh = new THREE.Mesh(geo, m);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    mesh.name = 'houses';
+    mesh.name = 'foundations';
     scene.add(mesh);
+
+    for (const [type, pl] of this.housePlacements) if (pl.length) scene.add(models.instanced(type, pl));
+    if (this.barrels.length) scene.add(models.instanced('barrel', this.barrels));
 
     const crateGeo = new THREE.BoxGeometry(1.2, 1.2, 1.2);
     crateGeo.translate(0, 0.6, 0);
@@ -72,6 +67,30 @@ export class Towns {
     crateMesh.castShadow = crateMesh.receiveShadow = true;
     crateMesh.computeBoundingSphere();
     scene.add(crateMesh);
+  }
+
+  // A castle tower on a hill as a landmark.
+  _landmark(parts) {
+    const r = this.rand;
+    let best = null;
+    for (let i = 0; i < 400; i++) {
+      const a = r() * Math.PI * 2, d = 40 + r() * 100;
+      const x = Math.cos(a) * d, z = Math.sin(a) * d;
+      const h = this.terrain.heightAt(x, z);
+      if (h < 6 || h > 22 || this.terrain.normalAt(x, z).y < 0.93) continue;
+      if (TOWNS.some((t) => Math.hypot(x - t.x, z - t.z) < t.r + 25)) continue;
+      if (Math.hypot(x + 62, z - 88) < 70) continue;
+      if (!best || h > best.h) best = { x, z, h };
+    }
+    if (!best) return;
+    const info = this.models.get('tower');
+    const s = 12 / info.size.y;
+    const y = Math.min(this.terrain.heightAt(best.x - 4, best.z - 4), this.terrain.heightAt(best.x + 4, best.z + 4), best.h) - 0.3;
+    this.scene.add(this.models.instanced('tower', [{ x: best.x, y, z: best.z, rot: r() * 6, scale: s }]));
+    const hw = info.size.x * s * 0.28;
+    this.colliders.add({ kind: 'box', minX: best.x - hw, maxX: best.x + hw, minZ: best.z - hw, maxZ: best.z + hw, y0: y - 2, y1: y + info.size.y * s, house: true });
+    this.chestSpots.push({ x: best.x + hw + 2, z: best.z, rot: Math.PI / 2 });
+    this.landmark = { x: best.x, z: best.z, name: 'Old Tower' };
   }
 
   _overlaps(box, pad) {
@@ -93,13 +112,16 @@ export class Towns {
       const face = Math.atan2(town.x - x, town.z - z);
       const rotIdx = ((Math.round(face / (Math.PI / 2)) % 4) + 4) % 4;
       const rot = rotIdx * (Math.PI / 2);
-      const w = 7 + r() * 3, d = 6 + r() * 2.5, h = 3.6 + r() * 1.0;
+      const type = HOUSE_TYPES[Math.floor(r() * HOUSE_TYPES.length)];
+      const info = this.models.get(type);
+      const scale = (8.5 + r() * 2.5) / info.size.x;
+      const w = info.size.x * scale, d = info.size.z * scale, h = info.size.y * scale;
       const sw = rotIdx % 2 ? d : w, sd = rotIdx % 2 ? w : d;
       const box = { minX: x - sw / 2, maxX: x + sw / 2, minZ: z - sd / 2, maxZ: z + sd / 2 };
       if (this._overlaps(box, 3)) continue;
       const y = this.terrain.heightAt(x, z);
-      this._house(parts, x, y, z, rot, w, d, h);
-      const col = { kind: 'box', ...box, y0: y - 3, y1: y + h + 2.6, house: true };
+      this._house(parts, type, scale, x, y, z, rot, w, d);
+      const col = { kind: 'box', ...box, y0: y - 3, y1: y + h, house: true };
       this.colliders.add(col);
       this.houses.push({ ...box, x, z, y, h, rot });
       placed++;
@@ -110,7 +132,10 @@ export class Towns {
       if (r() < 0.8) {
         const cx = x - fx * 0 + sideX * (w / 2 + 1.1), cz = z + sideZ * (w / 2 + 1.1);
         this._crateStack(crates, cx, cz, r() < 0.4 ? 2 : 1);
+      } else {
+        this._barrel(x - sideX * (w / 2 + 1), z - sideZ * (w / 2 + 1) + fz * 1.5);
       }
+      if (r() < 0.6) this._barrel(x + sideX * (w / 2 + 1.2) + fx * 2.2, z + sideZ * (w / 2 + 1.2) + fz * 2.2);
     }
     // plaza crates as cover
     for (let i = 0; i < 4; i++) {
@@ -142,47 +167,24 @@ export class Towns {
     }
   }
 
-  _house(parts, x, y, z, rot, w, d, h) {
+  _barrel(x, z) {
+    const y = this.terrain.heightAt(x, z);
+    for (const h of this.houses) if (x > h.minX - 0.6 && x < h.maxX + 0.6 && z > h.minZ - 0.6 && z < h.maxZ + 0.6) return;
+    const s = 1.35;
+    this.barrels.push({ x, y: y + 0.38 * s - 0.02, z, rot: this.rand() * 6, rz: Math.PI / 2, scale: s });
+    this.colliders.add({ kind: 'circle', x, z, r: 0.5, y0: y - 1, y1: y + 0.76 * s, crate: true });
+  }
+
+  _house(parts, type, scale, x, y, z, rot, w, d) {
     const r = this.rand;
     const wall = new THREE.Color(WALLS[Math.floor(r() * WALLS.length)]);
     const roof = new THREE.Color(ROOFS[Math.floor(r() * ROOFS.length)]);
-    const trim = new THREE.Color('#fffaf0');
+    this.housePlacements.get(type).push({
+      x, y: y - 0.05, z, rot, scale,
+      colors: { main: wall, _defaultMat: wall, roof, border: new THREE.Color('#f4efe6') },
+    });
     const base = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rot), new THREE.Vector3(1, 1, 1));
-    const add = (geo, color, local) => parts.push(part(geo, color, base.clone().multiply(local)));
-
-    add(new THREE.BoxGeometry(w + 0.4, 2.6, d + 0.4), '#b9ab98', mat(0, -1.1, 0));
-    add(new THREE.BoxGeometry(w, h, d), wall, mat(0, h / 2, 0));
-    // corner trims
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) add(new THREE.BoxGeometry(0.3, h, 0.3), trim, mat(sx * w / 2, h / 2, sz * d / 2));
-    add(new THREE.BoxGeometry(w + 0.1, 0.25, d + 0.1), trim, mat(0, h - 0.12, 0));
-    // roof: gables + two slabs, ridge along X
-    const rh = 2.2 + r() * 0.6;
-    add(prismGeo(w, rh, d), wall, mat(0, h, 0));
-    const halfD = d / 2 + 0.55;
-    const slope = Math.atan2(rh, d / 2);
-    const slabLen = Math.hypot(halfD, rh * (halfD / (d / 2)));
-    for (const s of [-1, 1]) {
-      add(new THREE.BoxGeometry(w + 0.9, 0.28, slabLen), roof, mat(0, h + rh - (rh * halfD) / d + 0.14, s * (halfD / 2), s * slope, 0, 0));
-    }
-    // chimney
-    const cx = (r() - 0.5) * w * 0.5;
-    add(new THREE.BoxGeometry(0.8, 2.4, 0.8), '#c96f53', mat(cx, h + rh * 0.55 + 0.7, -d / 4));
-    add(new THREE.BoxGeometry(1.0, 0.25, 1.0), '#8c4a37', mat(cx, h + rh * 0.55 + 1.95, -d / 4));
-    // door on +z face
-    add(new THREE.BoxGeometry(1.3, 2.3, 0.14), '#7a4a2b', mat(0, 1.15, d / 2 + 0.05));
-    add(new THREE.BoxGeometry(1.6, 0.2, 0.2), trim, mat(0, 2.35, d / 2 + 0.06));
-    add(new THREE.BoxGeometry(2.2, 0.18, 1.2), '#d6c7ad', mat(0, 0.02, d / 2 + 0.6));
-    // windows
-    const glass = new THREE.Color('#9fd8f5');
-    const win = (lx, lz, ry) => {
-      add(new THREE.BoxGeometry(1.25, 1.15, 0.12), trim, mat(lx, h * 0.55, lz, 0, ry, 0));
-      add(new THREE.BoxGeometry(1.0, 0.9, 0.16), glass, mat(lx, h * 0.55, lz, 0, ry, 0));
-    };
-    win(-w / 2 + 1.5, d / 2 + 0.02, 0);
-    win(w / 2 - 1.5, d / 2 + 0.02, 0);
-    win(-w / 4, -d / 2 - 0.02, 0);
-    win(w / 4, -d / 2 - 0.02, 0);
-    win(w / 2 + 0.02, 0, Math.PI / 2);
-    win(-w / 2 - 0.02, 0, Math.PI / 2);
+    parts.push(part(new THREE.BoxGeometry(w + 0.5, 3, d + 0.5), '#b9ab98', base.clone().multiply(mat(0, -1.45, 0))));
+    parts.push(part(new THREE.BoxGeometry(2.4, 0.2, 1.4), '#d6c7ad', base.clone().multiply(mat(0, 0.02, d / 2 + 0.7))));
   }
 }

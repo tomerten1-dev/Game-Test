@@ -5,6 +5,8 @@ import { CharacterAssets } from '../player/Character.js';
 import { Player } from '../player/Player.js';
 import { CameraRig } from '../player/CameraRig.js';
 import { Input } from './Input.js';
+import { Models } from './Models.js';
+import { setWeaponModels } from '../weapons/WeaponModels.js';
 import { quality } from './device.js';
 import { Sound } from './Audio.js';
 import { Effects } from '../effects/Effects.js';
@@ -49,9 +51,13 @@ export class Game {
   async init(progress = () => {}) {
     progress(0.1, 'Loading robots…');
     this.assets = await CharacterAssets.load();
-    progress(0.35, 'Shaping the island…');
+    progress(0.2, 'Loading the island…');
+    this.models = new Models();
+    await this.models.load(undefined, (k) => progress(0.2 + k * 0.2));
+    setWeaponModels(this.models);
+    progress(0.45, 'Shaping the island…');
     await nextFrame();
-    this.world = new World(this.scene, this.renderer);
+    this.world = new World(this.scene, this.renderer, this.models);
     progress(0.8, 'Growing trees…');
     await nextFrame();
     this.input = new Input(this.renderer.domElement);

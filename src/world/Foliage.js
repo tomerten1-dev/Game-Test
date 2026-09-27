@@ -38,7 +38,8 @@ function pineCanopyGeo() {
 }
 
 export class Foliage {
-  constructor(scene, terrain, colliders) {
+  constructor(scene, terrain, colliders, models) {
+    this.models = models;
     this.scene = scene;
     this.terrain = terrain;
     this.colliders = colliders;
@@ -46,6 +47,7 @@ export class Foliage {
     this.occupied = new Set();
     this._trees();
     this._rocks();
+    if (models) { this._palms(); this._spires(); }
     this._bushes();
     this._grass();
   }
@@ -170,6 +172,48 @@ export class Foliage {
     im.receiveShadow = true;
     im.computeBoundingSphere();
     this.scene.add(im);
+  }
+
+  // Kenney palms along the beaches.
+  _palms() {
+    const r = this.rand;
+    const pl = { 'palm-long': [], 'palm-short': [] };
+    for (let i = 0; i < 900 && pl['palm-long'].length + pl['palm-short'].length < 46; i++) {
+      const a = r() * Math.PI * 2, d = 130 + r() * 60;
+      const x = Math.cos(a) * d, z = Math.sin(a) * d;
+      const h = this.terrain.heightAt(x, z);
+      if (h < 0.9 || h > 3.2 || this._inTown(x, z, 2)) continue;
+      if (!this._free(x, z, 5)) continue;
+      const type = r() < 0.5 ? 'palm-long' : 'palm-short';
+      const s = (7 + r() * 4) / this.models.get(type).size.y;
+      pl[type].push({ x, y: h - 0.2, z, rot: r() * Math.PI * 2, scale: s });
+      this.colliders.add({ kind: 'circle', x, z, r: 0.35, y0: h - 2, y1: h + 8, tree: true });
+    }
+    for (const [type, list] of Object.entries(pl)) if (list.length) this.scene.add(this.models.instanced(type, list));
+  }
+
+  // Tall Kenney rock spires on the mountain and a few on the coast.
+  _spires() {
+    const r = this.rand;
+    const pl = { 'formation-large-stone': [], 'formation-stone': [] };
+    const grey = ['#b8bcc2', '#a7aab0', '#c9ccd1', '#9ea3aa'];
+    let n = 0;
+    for (let i = 0; i < 1500 && n < 34; i++) {
+      const onMountain = r() < 0.6;
+      const c = onMountain ? this._candidate(10, 44, 0.5) : this._candidate(0.8, 14, 0.55);
+      if (!c) continue;
+      if (!onMountain && Math.hypot(c.x, c.z) < 125) continue;
+      if (!this._free(c.x, c.z, 8)) continue;
+      const type = r() < 0.5 ? 'formation-large-stone' : 'formation-stone';
+      const info = this.models.get(type);
+      const s = (4 + r() * 6) / info.size.x;
+      pl[type].push({ x: c.x, y: c.h - 0.8, z: c.z, rot: r() * Math.PI * 2, scale: s, colors: { stone: new THREE.Color(grey[Math.floor(r() * grey.length)]) } });
+      this.colliders.add({ kind: 'circle', x: c.x, z: c.z, r: info.size.x * s * 0.36, y0: c.h - 3, y1: c.h + info.size.y * s * 0.9, stone: true });
+      n++;
+    }
+    for (const [type, list] of Object.entries(pl)) {
+      if (list.length) this.scene.add(this.models.instanced(type, list, { material: (p) => new THREE.MeshStandardMaterial({ color: p.material.color, roughness: 0.92, flatShading: true }) }));
+    }
   }
 
   _bushes() {
