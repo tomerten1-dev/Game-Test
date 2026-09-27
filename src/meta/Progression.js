@@ -2,7 +2,7 @@ import { COSMETIC_LIST, COSMETICS } from './Cosmetics.js';
 import { mulberry32 } from '../core/noise.js';
 import { TOWNS } from '../world/Terrain.js';
 
-export const SEASON = { name: 'Season 1: Eye of the Storm', levels: 30 };
+export const SEASON = { name: 'Season 1: Eye of the Storm', levels: 50 };
 
 export const xpForLevel = (level) => 600 + 150 * (level - 1);
 

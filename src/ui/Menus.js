@@ -50,21 +50,24 @@ export class Menus {
           </nav>
           <div class="lb-wallet">
             <div class="lb-level"><b id="lb-lvl">1</b><div><div class="xpbar"><i id="lb-xpfill"></i></div><small id="lb-xptext"></small></div></div>
+            <div class="lb-crown" title="You won your last match: you start the next one wearing the Victory Crown">♛</div>
+            <div class="lb-arena" id="lb-arena" title="Arena division"></div>
             <div class="lb-coins" title="Storm Coins — earned by playing, never sold">${coin}<b id="lb-coins">0</b></div>
           </div>
         </div>
         <div class="lb-body">
           <section class="lb-panel" data-panel="play">
             <div class="play-left">
+              <div class="lb-card pass-mini" id="pass-mini"></div>
               <div class="lb-card quests-mini"><div class="card-h">Daily quests</div><div id="qmini"></div></div>
               <button class="lb-btn" id="emote-btn">Emote</button>
             </div>
             <div class="play-right">
               <div class="modes">
-                <button class="mode" data-mode="solo"><b>Solo</b><span>You vs 99 bots</span></button>
-                <button class="mode" data-mode="quick"><b>Quick Match</b><span>You vs 29 bots · faster storm</span></button>
-                <button class="mode" data-mode="zb"><b>Zero Build</b><span>No building · 50 overshield</span></button>
-                <button class="mode arena" data-mode="arena"><b>Arena</b><span id="arena-div">Ranked · Open I</span></button>
+                <button class="mode m-solo" data-mode="solo"><i class="mi">⚔</i><b>Solo</b><span>You vs 99 bots</span></button>
+                <button class="mode m-quick" data-mode="quick"><i class="mi">⚡</i><b>Quick Match</b><span>29 bots · faster storm</span></button>
+                <button class="mode m-zb" data-mode="zb"><i class="mi">◈</i><b>Zero Build</b><span>No building · overshield</span></button>
+                <button class="mode arena" data-mode="arena"><i class="mi">🏆</i><b>Arena</b><span id="arena-div">Ranked · Open I</span></button>
               </div>
               <button id="play-btn" class="btn big">PLAY</button>
               <div class="sub">Straight onto the Storm Bus</div>
@@ -90,7 +93,7 @@ export class Menus {
         </div>
       </div>
       <div id="end" class="screen hidden">
-        <div class="menu-inner">
+        <div class="menu-inner end-panel">
           <div id="end-rank" class="rank">#1</div>
           <div id="end-title" class="logo">VICTORY</div>
           <div id="end-sub" class="tagline"></div>
@@ -152,8 +155,14 @@ export class Menus {
     $('#lb-coins').textContent = d.coins.toLocaleString();
     const ad = arenaDivision(d.arena?.points || 0);
     $('#arena-div').innerHTML = `<i style="color:${ad.color}">${ad.name}</i> · ${d.arena?.points || 0} Hype`;
+    $('#lb-arena').innerHTML = `<span style="background:${ad.color}"></span>${ad.name}`;
     const quests = this.meta.quests();
-    $('#qmini').innerHTML = quests.map((q) => `<div class="qrow ${q.done ? 'done' : ''}"><span>${q.def.text}</span><b>${q.done ? '✓' : `${Math.floor(q.progress)}/${q.def.target}`}</b></div>`).join('');
+    $('#qmini').innerHTML = quests.map((q) => `<div class="qrow ${q.done ? 'done' : ''}"><div class="qline"><span>${q.def.text}</span><b>${q.done ? '✓' : `${Math.floor(q.progress)}/${q.def.target}`}</b></div><div class="qbar"><i style="width:${Math.min(100, (q.progress / q.def.target) * 100)}%"></i></div></div>`).join('');
+    // season pass: the next reward on the track
+    const nextLvl = Object.keys(TRACK).map(Number).filter((l) => l > d.level && TRACK[l].item).sort((a, b) => a - b)[0];
+    const nextItem = nextLvl && COSMETICS[TRACK[nextLvl].item];
+    $('#pass-mini').innerHTML = nextItem ? `<div class="card-h">${SEASON.name.split(':')[0]} pass</div><div class="pm-row" style="--rar:${RARITIES[nextItem.rarity].color}">${itemIcon(nextItem)}<div><b>${nextItem.name}</b><small>Unlocks at level ${nextLvl}</small><div class="qbar"><i style="width:${Math.min(100, ((d.level - 1 + d.xp / xpForLevel(d.level)) / (nextLvl - 1)) * 100)}%"></i></div></div></div>` : '<div class="card-h">Season pass</div><small>Every reward unlocked!</small>';
+    this.el.lobby.classList.toggle('crowned', !!d.crowned);
     if (this.tab === 'locker') this.renderLocker();
     if (this.tab === 'shop') this.renderShop();
     if (this.tab === 'quests') this.renderQuests();
