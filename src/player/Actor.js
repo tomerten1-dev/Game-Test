@@ -284,7 +284,22 @@ export class Actor {
 
   heightAboveGround() { return this.pos.y - this.game.world.groundAt(this.pos.x, this.pos.z, this.pos.y); }
 
+  // Slurp-style regeneration: health first, then shield.
+  _tickRegen(dt) {
+    const r = this.regen;
+    if (!r || !this.alive) return;
+    r.acc += r.rate * dt;
+    while (r.acc >= 1 && r.left > 0) {
+      r.acc -= 1; r.left--;
+      if (this.health < 100) this.health++;
+      else if (this.shield < 100) this.shield++;
+      else r.left = 0;
+    }
+    if (r.left <= 0) this.regen = null;
+  }
+
   updateMovement(dt) {
+    this._tickRegen(dt);
     const world = this.game.world;
     const it = this.intent;
     if (this.noFallT > 0) this.noFallT -= dt;
@@ -307,7 +322,7 @@ export class Actor {
       if (this.tacSprint) { this.stamina = Math.max(0, this.stamina - STAMINA_DRAIN * dt); this.staminaIdle = 0; }
       else if ((this.staminaIdle += dt) > 0.8) this.stamina = Math.min(100, this.stamina + STAMINA_REGEN * dt);
       let speed = this.sprinting ? (this.tacSprint ? TAC_SPRINT_SPEED : SPRINT_SPEED) : this.crouched ? CROUCH_SPEED : RUN_SPEED;
-      if (this.useT > 0) speed = Math.min(speed, 3.2);
+      if (this.useT > 0 && !this.useItem?.def.mobile) speed = Math.min(speed, 3.2);
       if (this.inWater) speed *= this.groundY < -1.2 ? 0.5 : 0.65;
       const k = this.onGround ? 14 : 3;
       if (this.slideT > 0) {

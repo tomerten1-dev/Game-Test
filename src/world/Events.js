@@ -9,6 +9,7 @@ import { CONSUMABLES } from '../weapons/Items.js';
 
 const _v = new THREE.Vector3();
 const _c = new THREE.Color();
+const _fc = new THREE.Color();
 const DROP_TIMES = [90, 220, 350, 460]; // seconds after the bus leaves
 const FALL_SPEED = 5.5;
 const VEND_PRICES = [0, 0, 100, 200, 300]; // by rarity (rare+)
@@ -40,6 +41,7 @@ export class Events {
     this.world = game.world;
     this.supplies = [];
     this.pads = [];      // jump pads (world) + launch pads (placed)
+    this.zones = [];     // placed shield kegs / campfires
     this.vending = [];
     this.dropIdx = 0;
     this.padMat = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.5 });
@@ -94,6 +96,59 @@ export class Events {
     this.pads.push({ kind: 'launch', x, z, y, group: m, cd: 0.25, owner: actor });
     this.game.sound.play('build', actor.isPlayer ? null : actor.pos);
     return true;
+  }
+
+  // Placeable items: launch pad, shield keg, campfire.
+  placeItem(actor, kind) {
+    if (kind === 'launchpad') return this.placeLaunchPad(actor);
+    const f = [Math.sin(actor.aimYaw), Math.cos(actor.aimYaw)];
+    const x = actor.pos.x + f[0] * 1.8, z = actor.pos.z + f[1] * 1.8;
+    const y = this.world.groundAt(x, z, actor.pos.y + 1, 0.4);
+    if (Math.abs(y - actor.pos.y) > 1.5) return false;
+    const group = new THREE.Group();
+    const M = (geo, color, extra = {}) => { const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.6, ...extra })); m.castShadow = true; group.add(m); return m; };
+    if (kind === 'keg') {
+      M(new THREE.CylinderGeometry(0.42, 0.42, 0.9, 16), '#2f6fd6', { metalness: 0.4 }).position.y = 0.45;
+      for (const h of [0.15, 0.75]) M(new THREE.TorusGeometry(0.43, 0.04, 6, 20), '#c9d6e8', { metalness: 0.6 }).position.y = h;
+      group.children.at(-1).rotation.x = group.children.at(-2).rotation.x = Math.PI / 2;
+      M(new THREE.CylinderGeometry(0.2, 0.2, 0.12, 12), '#6fd0ff', { emissive: '#3d8dff', emissiveIntensity: 1.5 }).position.y = 0.96;
+    } else {
+      for (let i = 0; i < 4; i++) {
+        const log = M(new THREE.CylinderGeometry(0.08, 0.1, 0.9, 7), '#6b4226');
+        log.rotation.set(Math.PI / 2 - 0.35, (i * Math.PI) / 2, 0, 'YXZ');
+        log.position.set(Math.sin((i * Math.PI) / 2) * 0.18, 0.2, Math.cos((i * Math.PI) / 2) * 0.18);
+      }
+      M(new THREE.CylinderGeometry(0.55, 0.6, 0.08, 14), '#7d7d7d').position.y = 0.04;
+    }
+    group.position.set(x, y, z);
+    this.scene.add(group);
+    const def = kind === 'keg' ? { t: 20, r: 5.5, rate: 6, stat: 'shield' } : { t: 25, r: 5, rate: 2, stat: 'health' };
+    this.zones.push({ kind, x, y, z, group, owner: actor, ...def, acc: 0 });
+    this.game.sound.play('build', actor.isPlayer ? null : actor.pos);
+    return true;
+  }
+
+  // Keg / campfire: top up everyone standing close, then fade away.
+  _updateZones(dt) {
+    const g = this.game, fx = g.effects;
+    for (const z of [...this.zones]) {
+      z.t -= dt;
+      if (z.t <= 0) { this.scene.remove(z.group); this.zones.splice(this.zones.indexOf(z), 1); continue; }
+      z.acc += z.rate * dt;
+      const n = Math.floor(z.acc);
+      z.acc -= n;
+      for (const a of g.actors) {
+        if (!a.alive || a.state !== 'ground' || !n) continue;
+        if ((a.pos.x - z.x) ** 2 + (a.pos.z - z.z) ** 2 > z.r * z.r || Math.abs(a.pos.y - z.y) > 3) continue;
+        if (z.stat === 'health') a.health = Math.min(100, a.health + n);
+        else a.shield = Math.min(100, a.shield + n);
+      }
+      if (Math.random() < dt * (z.kind === 'campfire' ? 30 : 10)) {
+        const c = z.kind === 'campfire' ? _fc.setHSL(0.05 + Math.random() * 0.05, 1, 0.25) : _fc.set('#5fb8ff');
+        fx.sparks.emit(z.x + (Math.random() - 0.5) * 0.5, z.y + (z.kind === 'campfire' ? 0.25 : 1.0), z.z + (Math.random() - 0.5) * 0.5,
+          (Math.random() - 0.5) * 0.4, 1.6 + Math.random(), (Math.random() - 0.5) * 0.4, c, 0.6, z.kind === 'campfire' ? 0.5 : 0.25, -1);
+      }
+    }
   }
 
   // Launch pads throw you high and open your glider; jump pads just bounce.
@@ -323,6 +378,8 @@ export class Events {
     this.pads = this.pads.filter((q) => q.kind === 'jump');
     for (const v of this.vending) { this._rollOffers(v); v.i = 0; this._showOffer(v); }
     this.dropIdx = 0;
+    for (const z of this.zones) this.scene.remove(z.group);
+    this.zones = [];
   }
 
   update(dt, matchTime) {
@@ -332,6 +389,7 @@ export class Events {
     }
     this._updateSupplies(dt);
     this._updatePads(dt);
+    this._updateZones(dt);
     for (const v of this.vending) {
       v.t += dt;
       v.show.rotation.y += dt * 1.2;

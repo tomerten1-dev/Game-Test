@@ -73,7 +73,34 @@ function itemGeometries() {
     part(new THREE.BoxGeometry(0.6, 0.12, 0.18), '#8aa0b7', mat(0, 0.06, 0.1)),
     part(new THREE.BoxGeometry(0.6, 0.12, 0.18), '#b4c6d8', mat(0, 0.18, 0)),
   ]);
-  return { shield, med, wood, small, bandage, ammo, stone, metal };
+  const medmist = merge([
+    part(new THREE.CylinderGeometry(0.09, 0.09, 0.34, 12), '#7dffb2', mat(0, 0.17, 0)),
+    part(new THREE.CylinderGeometry(0.1, 0.1, 0.05, 12), '#2b7a55', mat(0, 0.1, 0)),
+    part(new THREE.BoxGeometry(0.08, 0.1, 0.12), '#e9f7ff', mat(0, 0.39, 0.03)),
+  ]);
+  const slurp = merge([
+    part(new THREE.CylinderGeometry(0.15, 0.17, 0.3, 12), '#b86bff', mat(0, 0.15, 0)),
+    part(new THREE.CylinderGeometry(0.16, 0.16, 0.06, 12), '#6fd0ff', mat(0, 0.18, 0)),
+    part(new THREE.CylinderGeometry(0.03, 0.03, 0.22, 6), '#ffffff', mat(0.06, 0.38, 0, 0, 0, -0.3)),
+  ]);
+  const chug = merge([
+    part(new THREE.CylinderGeometry(0.2, 0.26, 0.5, 14), '#39d0ff', mat(0, 0.25, 0)),
+    part(new THREE.SphereGeometry(0.21, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), '#39d0ff', mat(0, 0.5, 0)),
+    part(new THREE.CylinderGeometry(0.07, 0.08, 0.14, 10), '#e7eef7', mat(0, 0.74, 0)),
+    part(new THREE.TorusGeometry(0.12, 0.035, 6, 12), '#e7eef7', mat(0.26, 0.4, 0, 0, 0, Math.PI / 2)),
+  ]);
+  const keg = merge([
+    part(new THREE.CylinderGeometry(0.24, 0.24, 0.5, 14), '#2f6fd6', mat(0, 0.25, 0)),
+    part(new THREE.CylinderGeometry(0.25, 0.25, 0.04, 14), '#c9d6e8', mat(0, 0.08, 0)),
+    part(new THREE.CylinderGeometry(0.25, 0.25, 0.04, 14), '#c9d6e8', mat(0, 0.42, 0)),
+    part(new THREE.CylinderGeometry(0.1, 0.1, 0.06, 10), '#6fd0ff', mat(0, 0.53, 0)),
+  ]);
+  const campfire = merge([
+    part(new THREE.CylinderGeometry(0.06, 0.07, 0.6, 7), '#6b4226', mat(0, 0.08, 0, Math.PI / 2, 0, 0.5)),
+    part(new THREE.CylinderGeometry(0.06, 0.07, 0.6, 7), '#7a4c2c', mat(0, 0.14, 0, Math.PI / 2, 0, -0.5)),
+    part(new THREE.ConeGeometry(0.12, 0.26, 7), '#ff9a3c', mat(0, 0.3, 0)),
+  ]);
+  return { shield, med, wood, small, bandage, ammo, stone, metal, medmist, slurp, chug, keg, campfire };
 }
 
 let _beamTex;
@@ -256,8 +283,12 @@ export class Loot {
 
   static randomConsumable() {
     const r = Math.random();
-    const type = r < 0.28 ? 'bandage' : r < 0.45 ? 'smallshield' : r < 0.63 ? 'bigshield' : r < 0.76 ? 'medkit'
-      : r < 0.85 ? 'grenade' : r < 0.89 ? 'smoke' : r < 0.93 ? 'impulse' : r < 0.97 ? 'fire' : 'launchpad';
+    const table = [
+      ['bandage', 20], ['smallshield', 15], ['bigshield', 13], ['medkit', 9], ['medmist', 6], ['slurp', 5], ['chug', 2], ['keg', 2], ['campfire', 3],
+      ['grenade', 8], ['smoke', 3], ['impulse', 3], ['fire', 3], ['launchpad', 2],
+    ];
+    let k = r * table.reduce((a, t) => a + t[1], 0), type = table[0][0];
+    for (const [t, w] of table) { if ((k -= w) <= 0) { type = t; break; } }
     return { type: 'consumable', ctype: type, count: CONSUMABLES[type].stack };
   }
 
@@ -312,7 +343,7 @@ export class Loot {
       mesh.position.y = 0.4;
       color = CONSUMABLES[item.ctype].color;
     } else {
-      const geo = { bandage: this.itemGeo.bandage, medkit: this.itemGeo.med, smallshield: this.itemGeo.small, bigshield: this.itemGeo.shield, grenade: itemGeometry('grenade'), launchpad: itemGeometry('launchpad') }[item.ctype];
+      const geo = { bandage: this.itemGeo.bandage, medkit: this.itemGeo.med, smallshield: this.itemGeo.small, bigshield: this.itemGeo.shield, grenade: itemGeometry('grenade'), launchpad: itemGeometry('launchpad') }[item.ctype] || this.itemGeo[item.ctype] || this.itemGeo.small;
       mesh = new THREE.Mesh(geo, this.itemMat);
       mesh.position.y = 0.3;
       color = CONSUMABLES[item.ctype].color;

@@ -636,7 +636,7 @@ export class Game {
     }
     if (held.isConsumable && held.def.place) {
       if (input.pressed('fire')) {
-        if (this.events.placeLaunchPad(p)) p.consumeHeld();
+        if (this.events.placeItem(p, held.def.place)) p.consumeHeld();
         else this.hud.toast?.('Needs flat ground');
       }
       return;
