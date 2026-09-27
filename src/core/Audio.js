@@ -1,6 +1,8 @@
 // Web Audio: CC0 Kenney samples for the main sounds (public/audio), a small synth for the
 // rest and as a fallback if a sample can't be decoded.
 
+// CC0 music (public/audio/music, see CREDITS.md). Loops fade in and out; jingles play once.
+const MUSIC_TRACKS = { lobby: { loop: true, gain: 0.8 }, bus: { loop: true, gain: 0.7 }, endgame: { loop: true, gain: 0.7 }, victory: { loop: false, gain: 1 }, defeat: { loop: false, gain: 1 } };
 const SAMPLE_FILES = ['blaster', 'blaster_repeater', 'enemy_destroy', 'enemy_hurt', 'jump_a', 'jump_b', 'jump_c', 'land', 'walking', 'weapon_change', 'coin', 'break', 'fall', 'impact', 'engine', 'ui-tap', 'build'];
 // sound name -> [sample, playbackRate, gain, (optional) synth layer too]
 const SAMPLE_MAP = {
@@ -64,6 +66,8 @@ export class Sound {
     }
     if (this.ctx.state === 'suspended') this.ctx.resume();
     this.loadSamples();
+    // music asked for before audio was unlocked: start it now
+    if (this.musicName && !this._track) { const n = this.musicName; this.musicName = null; this.music(n); }
     return this.ctx;
   }
 
@@ -165,13 +169,60 @@ export class Sound {
     if (this.musicGain) this.musicGain.gain.value = this.musicVolume;
   }
 
-  // ---- procedural music: a relaxed lobby loop and short stings ----
+  _loadTrack(name) {
+    this._trackBufs ||= {};
+    if (!this._trackBufs[name]) {
+      this._trackBufs[name] = fetch(`/audio/music/${name}.ogg`)
+        .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status))))
+        .then((b) => this.ctx.decodeAudioData(b))
+        .catch(() => null);
+    }
+    return this._trackBufs[name];
+  }
+
+  _stopTrack(fade = 1.2) {
+    const tr = this._track;
+    this._track = null;
+    if (!tr || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    tr.g.gain.cancelScheduledValues(t);
+    tr.g.gain.setValueAtTime(tr.g.gain.value, t);
+    tr.g.gain.linearRampToValueAtTime(0.0001, t + fade);
+    tr.src.stop(t + fade + 0.05);
+  }
+
+  // Music: a CC0 track when there is one (falls back to the procedural lobby loop / synth stings).
   music(name) {
     if (name === this.musicName) return;
     this.musicName = name;
     clearInterval(this._musicTimer);
     this._musicTimer = null;
+    this._stopTrack(name === 'victory' || name === 'defeat' ? 0.3 : 1.2);
     if (!name) return;
+    const cfg = MUSIC_TRACKS[name];
+    if (cfg && this.ctx) {
+      this._loadTrack(name).then((buf) => {
+        if (this.musicName !== name || this._track) return;
+        if (!buf) { this._proceduralMusic(name); return; }
+        const src = this.ctx.createBufferSource(), g = this.ctx.createGain();
+        src.buffer = buf;
+        src.loop = cfg.loop;
+        const t = this.ctx.currentTime;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(cfg.gain, t + (cfg.loop ? 1.5 : 0.05));
+        src.connect(g); g.connect(this.musicGain);
+        src.start(t);
+        src.onended = () => { if (this._track?.src === src) { this._track = null; if (!cfg.loop && this.musicName === name) this.musicName = null; } };
+        this._track = { src, g, name };
+      });
+      return;
+    }
+    this._proceduralMusic(name);
+  }
+
+  _proceduralMusic(name) {
+    if (name === 'victory' || name === 'defeat') { this.play(name); return; }
+    if (name !== 'lobby') return;
     this._bar = 0;
     const tick = () => {
       if (!this.ctx || this.ctx.state !== 'running' || this.muted) return;

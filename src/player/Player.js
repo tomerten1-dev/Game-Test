@@ -38,6 +38,7 @@ export class Player extends Actor {
 
   // Landing quest: which named place did we touch down in?
   onLanded() {
+    if (this.game.sound.musicName === 'bus') this.game.sound.music(null);
     for (const t of TOWNS) if (Math.hypot(this.pos.x - t.x, this.pos.z - t.z) < t.r) { this.game.meta?.track('land', 1, t.name); break; }
   }
 

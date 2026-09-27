@@ -321,7 +321,7 @@ export class Game {
       const alive = Math.max(0, (this.deathInfo?.time ?? this.time) - this.matchStart);
       const rewards = this.meta.finishMatch({ place, timeAlive: alive });
       this.menus.showEnd({ victory, place, killer: killer?.name, cause: p.deathCause, kills: p.kills, time: alive, rewards });
-      this.sound.play(victory ? 'victory' : 'defeat');
+      this.sound.music(victory ? 'victory' : 'defeat');
     }, delay);
   }
 
@@ -409,7 +409,7 @@ export class Game {
       a.setBuildMode?.(null);
       for (const k of Object.keys(a.ammo)) a.ammo[k] = 0;
       for (const k of Object.keys(a.mats)) a.mats[k] = 0;
-      a.health = 100; a.shield = 0; a.kills = 0; a.emote = null; a.crouched = false;
+      a.health = 100; a.shield = 0; a.kills = 0; a.emote = null; a.crouched = false; a.dmgDealt = 0;
       a.vel.set(0, 0, 0);
       a.setState('bus');
       a.pos.copy(this.bus.pos);
@@ -427,6 +427,7 @@ export class Game {
     this.hud.banner(isTouch ? 'Tap JUMP to drop from the Storm Bus' : 'Press SPACE to jump from the Storm Bus', 6);
     this.sound.play('bus');
     this.sound.sting();
+    this.sound.music('bus');
   }
 
   // Bots pick a landing spot (often a town) and a moment to jump.
@@ -494,6 +495,9 @@ export class Game {
     else if (this.inv.open && (this.input.pressed('pause') || !p.alive)) this.toggleInventory(false);
     if (this.inv.open) this.inv.tick(dt);
     if (this.spectating) this.updateSpectate(dt);
+    // final circles: tense music
+    if (this.state === 'playing' && p.alive && !p.victory && p.state !== 'bus' && this.warmup <= 0 &&
+        (this.storm.phase >= 4 || this.aliveCount <= 8) && this.sound.musicName !== 'endgame') this.sound.music('endgame');
     if (this.warmup > 0) this.updateWarmup(dt);
     this.updateEmoteWheel(dt);
     if (p.alive) {
@@ -883,7 +887,15 @@ export class Game {
   }
 
   updateSpectate() {
-    if (this.input.pressed('jump') || this.input.pressed('interact')) this.finishSpectate();
+    if (this.input.pressed('jump') || this.input.pressed('interact')) { this.finishSpectate(); return; }
+    // click / aim: switch to the next / previous player still alive (nearest first)
+    const dirn = this.input.pressed('fire') ? 1 : this.input.pressed('aim') ? -1 : 0;
+    if (!dirn || !this.spectating) return;
+    const cur = this.spectating;
+    const list = this.actors.filter((a) => a.alive && !a.npc && !a.isPlayer && a.state !== 'bus').sort((a, b) => a.pos.distanceTo(cur.pos) - b.pos.distanceTo(cur.pos));
+    if (list.length < 2) return;
+    const i = list.indexOf(cur);
+    this.startSpectate(list[(i + dirn + list.length) % list.length]);
   }
 
   finishSpectate() {
@@ -895,6 +907,7 @@ export class Game {
     const ev = this.storm.update(dt * (this.stormScale || 1), this.time);
     if (ev === 'shrink') { this.hud.banner?.(this.storm.moving ? 'The storm is moving!' : 'The storm is closing in!', 3); this.sound.play('phase'); }
     else if (ev === 'phase') { this.hud.banner?.('Storm shrinks again soon', 3); if (this.player.alive) this.meta.track('circle'); }
+    this._updateSurge(dt);
     this.stormTick += dt;
     const outside = this.player.alive && this.player.state !== 'bus' && !this.storm.isInside(this.player.pos.x, this.player.pos.z);
     this.hud.stormTint?.(outside);
@@ -909,6 +922,36 @@ export class Game {
         if (a.isPlayer) { this.sound.play('storm'); this.effects.damageNumber(this.player.chest(_origin), dmg, false, false); }
         if (a.health <= 0) { a.health = 0; a.die(null); }
       }
+    }
+  }
+
+  // Storm surge: from the third circle on, while more players are alive than the circle allows,
+  // whoever has dealt the least damage takes a hit every 10 s. Deal damage to stay safe.
+  _updateSurge(dt) {
+    const st = this.storm, limits = [0, 0, 60, 40, 26, 15, 8];
+    const scale = (this.actors.filter((a) => !a.npc).length) / 100;
+    const limit = Math.max(3, Math.round((limits[st.phase] || 0) * scale));
+    const alive = this.actors.filter((a) => a.alive && !a.npc && a.state !== 'bus');
+    this.surge = st.phase >= 2 && limit > 3 && alive.length > limit ? { limit, over: alive.length - limit } : null;
+    if (!this.surge) { this._surgeT = 10; return; }
+    const sorted = alive.sort((a, b) => (a.dmgDealt || 0) - (b.dmgDealt || 0));
+    this.surge.need = Math.round((sorted[this.surge.over]?.dmgDealt || 0) + 1);
+    if (!this._surgeWarned || this._surgeWarned !== st.phase) {
+      this._surgeWarned = st.phase;
+      this.hud.banner?.(`STORM SURGE · deal ${this.surge.need}+ damage to stay safe`, 3.5);
+    }
+    this._surgeT = (this._surgeT ?? 10) - dt;
+    if (this._surgeT > 0) return;
+    this._surgeT = 10;
+    for (const a of sorted.slice(0, this.surge.over)) {
+      a.health -= 20;
+      a.lastHurtTime = this.time;
+      if (a.isPlayer) {
+        this.sound.play('storm');
+        this.effects.damageNumber(a.chest(_origin), 20, false, false);
+        this.hud.banner?.(`Storm Surge! Deal ${this.surge.need}+ damage to stay safe`, 2.5);
+      }
+      if (a.health <= 0) { a.health = 0; a.deathCause = 'storm'; a.die(null); }
     }
   }
 
@@ -945,6 +988,7 @@ export class Game {
     if (actor === p) {
       this.hud.hurt();
       this.hud.prompt(null);
+      if (this.sound.musicName === 'endgame' || this.sound.musicName === 'bus') this.sound.music(null);
       this.deathInfo = { place: this.aliveCount + 1, killer: killer && killer !== p ? killer : null, time: this.time };
       // watch whoever got you (after a beat), like the real thing
       const k = this.deathInfo.killer;
@@ -965,6 +1009,7 @@ export class Game {
     } else if (p.alive && this.aliveCount === 1) {
       p.victory = true;
       this.hud.banner('#1 VICTORY!', 4);
+      this.sound.music(null);
       this.effects.confetti(p.pos);
       setTimeout(() => this.effects.confetti(p.pos), 700);
       setTimeout(() => this.effects.confetti(p.pos), 1600);

@@ -257,7 +257,9 @@ body.touch #compass { top: 6px; height: 32px; width: min(300px, 44vw); }
 #spectate { position: absolute; left: 50%; top: 62px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 18px 10px; border-radius: 14px; background: rgba(10,18,40,0.6); pointer-events: auto; }
 #spectate .sp-label { font-size: 12px; letter-spacing: 3px; opacity: 0.8; font-weight: 700; }
 #spectate .sp-name { font-family: var(--title); font-size: 28px; line-height: 1; }
-#spectate .sp-info { font-size: 14px; font-weight: 700; opacity: 0.9; margin-bottom: 6px; }
+#spectate .sp-info { font-size: 14px; font-weight: 700; opacity: 0.9; margin-bottom: 4px; }
+#spectate .sp-hint { font-size: 12px; opacity: 0.7; margin-bottom: 6px; }
+body.touch #spectate .sp-hint { display: none; }
 #spectate .btn { font-size: 15px; padding: 6px 14px; }
 .kbd { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 4px; background: rgba(0,0,0,0.25); font-size: 12px; }
 body.touch .kbd { display: none; }

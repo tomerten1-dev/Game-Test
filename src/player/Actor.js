@@ -676,6 +676,7 @@ export class Actor {
     this.health -= dmg;
     this.lastHurtTime = this.game.time;
     this.lastAttacker = attacker;
+    if (attacker && attacker !== this && !this.npc) attacker.dmgDealt = (attacker.dmgDealt || 0) + amount;
     this.flashT = 0.25;
     if (attacker?.isPlayer && attacker !== this) {
       this.game.meta?.track('damage', amount);

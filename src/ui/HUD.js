@@ -36,6 +36,7 @@ export class HUD {
           <div class="sp-label">SPECTATING</div>
           <div class="sp-name" id="sp-name"></div>
           <div class="sp-info" id="sp-info"></div>
+          <div class="sp-hint">Click: next player · Right-click: previous</div>
           <button class="btn" id="sp-skip">SEE RESULTS <span class="kbd">SPACE</span></button>
         </div>
         <div id="banner"></div>
@@ -497,7 +498,9 @@ export class HUD {
       this.set('stormLabel', this.el.stormLabel, `Warm-up · bus leaves in ${fmtTime(g.warmup)}`);
     } else {
       this.set('storm', this.el.storm, storm.stage === 'done' ? '0:00' : fmtTime(storm.timer));
-      this.set('stormLabel', this.el.stormLabel, storm.stage === 'done' ? 'Final circle' : storm.stage === 'wait' ? `Storm shrinks in ${fmtTime(storm.timer)}` : 'Storm is shrinking!');
+      const base = storm.stage === 'done' ? 'Final circle' : storm.stage === 'wait' ? `Storm shrinks in ${fmtTime(storm.timer)}` : 'Storm is shrinking!';
+      const s = g.surge;
+      this.set('stormLabel', this.el.stormLabel, s && p.alive ? `${base} · SURGE: ${Math.round(p.dmgDealt || 0)}/${s.need} dmg` : base);
     }
     this.set('stormCls', this.el.stormLabel, storm.stage === 'shrink' ? 'urgent' : '', 'className');
 
