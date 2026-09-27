@@ -167,7 +167,7 @@ export class Combat {
     if (mat) {
       const amount = 7 + Math.floor(Math.random() * 4);
       actor.addMat(mat, amount);
-      if (actor.isPlayer) g.effects.matNumber?.(_end, amount, mat);
+      if (actor.isPlayer) { g.effects.matNumber?.(_end, amount, mat); g.meta?.track('harvest', amount); }
       g.sound.play(`harvest_${mat}`, actor.isPlayer ? null : _end, { range: 50 });
     } else if (actor.isPlayer) g.sound.play('impact');
     return mat || true;

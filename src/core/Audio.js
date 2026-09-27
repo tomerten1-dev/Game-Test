@@ -4,6 +4,9 @@ export class Sound {
   constructor() {
     this.ctx = null;
     this.muted = false;
+    this.volume = 0.55;
+    this.musicVolume = 0.5;
+    this.musicName = null;
     this.listener = null; // THREE.Vector3 (camera position)
     this.right = { x: 1, y: 0, z: 0 }; // listener right vector for stereo panning
     const unlock = () => this.ensure();
@@ -18,7 +21,10 @@ export class Sound {
       if (!AC) return null;
       this.ctx = new AC();
       this.master = this.ctx.createGain();
-      this.master.gain.value = 0.55;
+      this.master.gain.value = this.muted ? 0 : this.volume;
+      this.musicGain = this.ctx.createGain();
+      this.musicGain.gain.value = this.musicVolume;
+      this.musicGain.connect(this.master);
       const comp = this.ctx.createDynamicsCompressor();
       this.master.connect(comp);
       comp.connect(this.ctx.destination);
@@ -71,8 +77,74 @@ export class Sound {
 
   toggleMute() {
     this.muted = !this.muted;
-    if (this.master) this.master.gain.value = this.muted ? 0 : 0.55;
+    if (this.master) this.master.gain.value = this.muted ? 0 : this.volume;
     return this.muted;
+  }
+
+  // master: 0..1 (UI slider), music: 0..1
+  setVolumes(master, music) {
+    this.volume = 0.7 * master;
+    this.musicVolume = music * 0.6;
+    if (this.master) this.master.gain.value = this.muted ? 0 : this.volume;
+    if (this.musicGain) this.musicGain.gain.value = this.musicVolume;
+  }
+
+  // ---- procedural music: a relaxed lobby loop and short stings ----
+  music(name) {
+    if (name === this.musicName) return;
+    this.musicName = name;
+    clearInterval(this._musicTimer);
+    this._musicTimer = null;
+    if (!name) return;
+    this._bar = 0;
+    const tick = () => {
+      if (!this.ctx || this.ctx.state !== 'running' || this.muted) return;
+      if (this.musicName === 'lobby') this._lobbyBar();
+    };
+    this._musicTimer = setInterval(tick, 2400);
+    tick();
+  }
+
+  _note(t, freq, dur, type, gain, attack = 0.02) {
+    const ctx = this.ctx;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type;
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(this.musicGain);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+
+  // One 2.4 s bar: soft pad chord, bass, and a bouncy arpeggio (I–V–vi–IV in C).
+  _lobbyBar() {
+    const t = this.ctx.currentTime + 0.05;
+    const chords = [[261.6, 329.6, 392.0], [196.0, 246.9, 293.7], [220.0, 261.6, 329.6], [174.6, 220.0, 261.6]];
+    const ch = chords[this._bar % 4];
+    this._bar++;
+    for (const f of ch) this._note(t, f, 2.3, 'triangle', 0.05, 0.25);
+    this._note(t, ch[0] / 2, 1.1, 'sine', 0.12, 0.01);
+    this._note(t + 1.2, ch[0] / 2, 1.1, 'sine', 0.1, 0.01);
+    const arp = [0, 1, 2, 1, 2, 0, 2, 1];
+    arp.forEach((k, i) => this._note(t + i * 0.3, ch[k] * 2, 0.26, 'square', 0.022, 0.005));
+    // soft hat
+    if (this.noise) for (let i = 0; i < 8; i++) {
+      const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+      const f = this.ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7000;
+      const g = this.ctx.createGain(); const tt = t + i * 0.3 + 0.15;
+      g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime(i % 2 ? 0.03 : 0.015, tt + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, tt + 0.08);
+      src.connect(f); f.connect(g); g.connect(this.musicGain); src.start(tt, Math.random() * 0.5); src.stop(tt + 0.1);
+    }
+  }
+
+  // Drop-in sting when the bus takes off.
+  sting() {
+    if (!this.ctx || this.ctx.state !== 'running' || this.muted) return;
+    const t = this.ctx.currentTime + 0.02;
+    [392, 523.3, 659.3, 784, 1046.5].forEach((f, i) => this._note(t + i * 0.09, f, 0.5, 'square', 0.035, 0.005));
+    this._note(t + 0.45, 196, 1.2, 'triangle', 0.12, 0.02);
+    this._note(t + 0.45, 392, 1.2, 'triangle', 0.08, 0.02);
   }
 
   _vol(pos, range = 90) {

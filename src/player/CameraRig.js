@@ -43,11 +43,12 @@ export class CameraRig {
       const r = Math.min(this.recoil, dt * 6 * Math.max(0.05, this.recoil));
       this.recoil -= r;
     }
-    let dist = 3.6, side = 0.72, up = 0.28, fov = 70, pivotH = 1.55;
-    if (mode === 'aim') { dist = 2.3; side = 0.65; fov = 55; }
+    const base = this.baseFov || 70;
+    let dist = 3.6, side = 0.72, up = 0.28, fov = base, pivotH = 1.55;
+    if (mode === 'aim') { dist = 2.3; side = 0.65; fov = base - 15; }
     else if (mode === 'scope') { dist = 1.6; side = 0.55; fov = 20; }
-    else if (mode === 'skydive' || mode === 'glide') { dist = 7.5; side = 0; up = 1.2; fov = 78; pivotH = 1.0; }
-    else if (mode === 'bus') { dist = 18; side = 0; up = 4; fov = 70; pivotH = 0; }
+    else if (mode === 'skydive' || mode === 'glide') { dist = 7.5; side = 0; up = 1.2; fov = base + 8; pivotH = 1.0; }
+    else if (mode === 'bus') { dist = 18; side = 0; up = 4; fov = base; pivotH = 0; }
     else if (mode === 'dead') { dist = 6; side = 0; up = 1.5; }
     this.side = damp(this.side, side, 8, dt);
     this.up = damp(this.up, up, 8, dt);

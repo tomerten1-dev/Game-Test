@@ -53,6 +53,14 @@ export class Bot extends Actor {
     this.shootWall = false; // target hides behind a build: shoot through it
   }
 
+  // Fresh brain for the real match (after the warm-up).
+  resetAI() {
+    this.target = null; this.mode = 'idle'; this.hasGoal = false;
+    this.boxed = false; this.retreatT = 0; this.exitT = 0; this.peekT = 0; this.peekWall = null;
+    this.lootChest = null; this.pickup = null; this.tree = null; this.huntT = 0;
+    this.landTime = undefined; this.useT = 0; this.shootWall = false; this.targetVisible = false;
+  }
+
   get armed() { return this.items.some((it) => it && it.isGun); }
 
   onDamaged(amount, attacker) {

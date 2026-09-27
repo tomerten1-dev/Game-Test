@@ -41,6 +41,7 @@ Production build: `npm run build` (output in `dist/`), preview it with `npm run 
 | 1 – 6 / mouse wheel | Switch slot (1 = harvesting axe) · leaves build mode |
 | M | Full-screen map (click: marker, right-click: clear, wheel: zoom, drag: pan) |
 | Middle click | Ping what you're looking at |
+| T | Emote |
 | N | Mute |
 | Esc | Pause |
 
@@ -52,6 +53,18 @@ Production build: `npm run build` (output in `dist/`), preview it with `npm run 
 - **Slots 2–6** hold guns or stacks of heals: Bandages (+15 up to 75), Medkit (full health), Small Shield (+25 up to 50), Shield Potion (+50). Hold still-ish while the ring fills.
 - Guns use **light / medium / shells** ammo; reserve shows after the slash. Green **ammo boxes** near houses and anything dropped on the ground are picked up by walking over it.
 - Sprinting is fast but inaccurate; standing still gives a perfectly accurate first shot. Falls from high up hurt.
+
+## Lobby & progression
+
+- **Lobby:** your hero stands on a floating stage off the island's coast. Tabs: **Play**, **Locker**, **Item Shop**, **Quests**, **Career**, **Settings**. Drag to spin your hero; the Emote button (or **T** in a match) plays your equipped emote.
+- **Modes:** *Solo* (you vs 19 bots) or *Quick Match* (you vs 9 bots, faster storm). After a short matchmaking screen there's a **20-second warm-up**: everyone spawns with an AR, a shotgun and 100 wood, respawns on death, and nothing counts. Then inventories are wiped and the Storm Bus leaves.
+- **XP & levels:** earned for time survived, eliminations, chests, supply drops, damage, placement and quests; the results screen itemises it. Every level gives Storm Coins, and the **Season 1 reward track** (levels 2–30) unlocks outfits colours, gliders, contrails, emotes, weapon wraps and heroes.
+- **Daily quests:** three per day (e.g. "Open 3 chests", "Land at Candy Corners"), +500 XP and 100 Storm Coins each.
+- **Item Shop — no real money:** Storm Coins are only earned by playing (matches, quests, level-ups). The shop has two featured items (plus a 20% bundle) and six daily items that rotate at midnight; click to preview on your hero, then buy with coins. There is no payment code anywhere in the game.
+- **Locker:** 5 heroes, outfit colours, gliders, contrails, 8 emotes and weapon wraps — all visible in matches.
+- **Career:** matches, wins, top 5/10, eliminations, K/D, damage, chests, builds, harvest, time alive, best placement.
+- **Settings:** mouse sensitivity, field of view, master/music volume, HUD scale, graphics, sound visualizer and full **key rebinding**. Everything (progress, locker, settings) is saved in your browser.
+- **Music:** a relaxed procedural lobby theme, a sting when the bus takes off, victory/defeat jingles.
 
 ## Loot & world events
 

@@ -185,6 +185,7 @@ export class Loot {
   }
 
   openAmmoBox(b, actor) {
+    if (this.game.warmup > 0) return;
     if (b.opened) return;
     b.opened = true;
     b.group.visible = false;
@@ -334,7 +335,8 @@ export class Loot {
   }
 
   openChest(c, actor) {
-    if (c.opened) return;
+    if (c.opened || this.game.warmup > 0) return;
+    if (actor.isPlayer) this.game.meta?.track('chest');
     c.opened = true;
     c.glow.visible = false;
     this.game.sound.play('chest', actor.isPlayer ? null : _v.set(c.x, c.y, c.z));
@@ -362,7 +364,7 @@ export class Loot {
 
   // Returns a message if the actor can't take it.
   collect(p, actor) {
-    if (!p.alive) return null;
+    if (!p.alive || this.game.warmup > 0) return null;
     const g = this.game;
     if (p.type === 'weapon') {
       const free = actor.items.findIndex((it, i) => i > 0 && !it);

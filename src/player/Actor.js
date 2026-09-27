@@ -14,15 +14,34 @@ const JUMP_VEL = 8.2;
 const GLIDE_HEIGHT = 35;
 
 // Shared body for the player and bots: state machine, physics, animation, health.
+const _tc = new THREE.Color();
+
+// Cosmetic weapon wrap: recolour the gun body (keeps the rarity stripe).
+export function applyWrap(mesh, wrap) {
+  if (!wrap || !mesh) return mesh;
+  mesh.traverse((o) => {
+    if (!o.isMesh || o.material.emissiveIntensity > 0.8) return;
+    const m = o.material.clone();
+    m.color.lerp(new THREE.Color(wrap.color), 0.75);
+    if (m.vertexColors) m.color.set(wrap.color);
+    m.emissive = new THREE.Color(wrap.emissive);
+    m.emissiveIntensity = 0.35;
+    m.metalness = 0.5;
+    m.roughness = 0.3;
+    o.material = m;
+  });
+  return mesh;
+}
+
 export class Actor {
-  constructor(game, { name, color, isPlayer = false, type = 'Knight' }) {
+  constructor(game, { name, color, isPlayer = false, type = 'Knight', glider = null, tint, outfit = null }) {
     this.game = game;
     this.name = name;
     this.isPlayer = isPlayer;
     this.color = new THREE.Color(color);
-    this.character = new Character(game.assets, color, type, isPlayer ? 0.35 : 0.3);
+    this.character = new Character(game.assets, color, type, tint ?? (isPlayer ? 0.35 : 0.3), outfit);
     this.root = this.character.root;
-    this.glider = makeGlider(color);
+    this.glider = glider ? makeGlider(glider[0], glider[1]) : makeGlider(color);
     this.root.add(this.glider);
     game.scene.add(this.root);
 
@@ -228,6 +247,7 @@ export class Actor {
     }
     if (this.state === 'ground') {
       const mlen = Math.hypot(it.mx, it.mz);
+      if (this.emote && (mlen > 0.2 || it.jump || this.slideT > 0)) this.emote = null;
       // sprint only when moving roughly forward and not busy
       const fwdDot = mlen > 0.1 ? (it.mx * Math.sin(this.aimYaw) + it.mz * Math.cos(this.aimYaw)) / mlen : 0;
       this.sprinting = !!it.sprint && !this.crouched && this.useT <= 0 && mlen > 0.3 && (fwdDot > 0.3 || !this.aiming) && !this.aiming;
@@ -333,7 +353,8 @@ export class Actor {
     this.distToCam = camPos ? this.pos.distanceTo(camPos) : 0;
     this.root.position.copy(this.pos);
     const hspeed = Math.hypot(this.vel.x, this.vel.z);
-    const armed = !!this.weapon && this.state === 'ground' && this.alive && !this.victory && !this.sprinting && this.slideT <= 0;
+    const emoting = !!this.emote && this.state === 'ground' && this.alive && !this.victory;
+    const armed = !!this.weapon && this.state === 'ground' && this.alive && !this.victory && !this.sprinting && this.slideT <= 0 && !emoting;
     const held = this.held;
     this.swingT = Math.max(0, this.swingT - dt);
     this.crouchAmt = damp(this.crouchAmt, this.crouched && this.state === 'ground' ? 1 : 0, 12, dt);
@@ -351,7 +372,8 @@ export class Actor {
       else if (armed) targetYaw = this.aimYaw;
       this.bodyYaw = dampAngle(this.bodyYaw, targetYaw, combat ? 25 : 12, dt);
       this.airT = this.onGround ? 0 : (this.airT || 0) + dt;
-      if (this.victory) ch.setPose('Cheer', null, 0.3);
+      if (this.victory) ch.setPose(this.victoryEmote || 'Cheer', null, 0.3);
+      else if (emoting) ch.setPose(this.emote, null, 0.25);
       else if (!this.alive) { /* death pose set in setState */ }
       else if (this.airT > 0.12 && this.vel.y > -25) {
         ch.setPose('Jump_Idle', upperArmed, 0.15);
@@ -391,6 +413,7 @@ export class Actor {
       ch.model.position.y = damp(ch.model.position.y, ch.footOffset, 4, dt);
       this.glider.rotation.z = Math.sin(this.game.time * 1.3) * 0.05;
     }
+    if ((this.state === 'skydive' || this.state === 'glide') && this.trail && this.distToCam < 90) this._emitTrail();
     if (this.state === 'ground' || this.state === 'dead') ch.model.position.y = damp(ch.model.position.y, ch.footOffset - this.crouchAmt * 0.3 - (this.slideT > 0 ? 0.25 : 0), 10, dt);
     this.root.rotation.y = this.bodyYaw;
 
@@ -443,7 +466,7 @@ export class Actor {
   _equip() {
     const h = this.held;
     if (this.buildMode) this.character.setWeapon(null);
-    else if (h && h.isGun) this.character.setWeapon(makeWeaponMesh(h.type, h.rarity));
+    else if (h && h.isGun) this.character.setWeapon(applyWrap(makeWeaponMesh(h.type, h.rarity), this.wrap));
     else if (h && h.isPickaxe) this.character.setWeapon(makePickaxeMesh(), true);
     else this.character.setWeapon(null);
   }
@@ -467,12 +490,39 @@ export class Actor {
     this.lastHurtTime = this.game.time;
     this.lastAttacker = attacker;
     this.flashT = 0.25;
+    if (attacker?.isPlayer && attacker !== this) this.game.meta?.track('damage', amount);
     if (this.health <= 0) {
       this.health = 0;
       this.die(attacker);
     }
     this.onDamaged?.(amount, attacker, headshot);
     return amount;
+  }
+
+  // Cosmetic contrail: particles streaming from both hands while skydiving / gliding.
+  _emitTrail() {
+    const fx = this.game.effects;
+    const t = this.trail;
+    const s = Math.sin(this.bodyYaw), c = Math.cos(this.bodyYaw);
+    for (const side of [-1, 1]) {
+      const x = this.pos.x + c * 0.55 * side, z = this.pos.z - s * 0.55 * side;
+      if (t === 'rainbow') _tc.setHSL((this.game.time * 0.5 + side * 0.1) % 1, 1, 0.45);
+      else _tc.set(t[Math.random() < 0.5 ? 0 : 1]);
+      fx.sparks.emit(x, this.pos.y + 1.1, z, (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.4, _tc, 0.9, 0.16, 0);
+    }
+  }
+
+  // Warm-up respawn: back on your feet somewhere else with a fresh loadout slot.
+  revive(x, z) {
+    this.alive = true;
+    this.health = 100;
+    this.shield = 0;
+    this.killer = null;
+    this.deathCause = null;
+    this.useT = 0;
+    this.emote = null;
+    this.spawnGround(x, z);
+    this.character.setPose('Idle', null, 0);
   }
 
   die(killer) {

@@ -294,6 +294,7 @@ export class Building {
     this.keys.set(s.key, s);
     this.structures.push(s);
     actor.mats[mat] -= COST;
+    if (actor.isPlayer) this.game.meta?.track('build');
     this.game.sound.play('build', actor.isPlayer ? null : actor.pos);
     return s;
   }

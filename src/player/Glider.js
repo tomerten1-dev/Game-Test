@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import { part, merge, mat } from '../world/geomUtils.js';
 
 // Stylized delta-wing glider shown above a character while gliding.
-export function makeGlider(color) {
+export function makeGlider(color, accentColor = '#ffd23f') {
   const c = new THREE.Color(color);
-  const accent = new THREE.Color('#ffd23f');
+  const accent = new THREE.Color(accentColor);
   const wing = new THREE.BufferGeometry();
   const v = [
     0, 0, 1.2, -2.2, -0.35, -0.9, 0, 0.1, -0.5,

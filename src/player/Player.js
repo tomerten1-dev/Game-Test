@@ -1,10 +1,17 @@
 import * as THREE from 'three';
 import { Actor } from './Actor.js';
+import { TOWNS } from '../world/Terrain.js';
 
 // The human-controlled actor: turns input into movement intent relative to the camera.
 export class Player extends Actor {
   constructor(game) {
-    super(game, { name: 'You', color: '#20d6c0', isPlayer: true, type: 'Rogue_Hooded' });
+    const prof = game.meta?.profile;
+    const look = (slot) => prof?.equippedItem(slot)?.value;
+    super(game, { name: 'You', color: '#20d6c0', isPlayer: true, type: look('hero') || 'Rogue_Hooded', glider: look('glider'), tint: look('tint') ? 0.1 : 0.3, outfit: look('tint') });
+    this.trail = look('trail') || null;
+    this.wrap = look('wrap') || null;
+    this.emoteClip = look('emote') || 'Cheer';
+    this.victoryEmote = this.emoteClip;
     this._addBackpack();
   }
 
@@ -27,6 +34,11 @@ export class Player extends Actor {
     const torso = this.character.chestBone || this.character.spine;
     if (torso) torso.attach(g);
     this.backpack = g;
+  }
+
+  // Landing quest: which named place did we touch down in?
+  onLanded() {
+    for (const t of TOWNS) if (Math.hypot(this.pos.x - t.x, this.pos.z - t.z) < t.r) { this.game.meta?.track('land', 1, t.name); break; }
   }
 
   onDamaged(amount, attacker) {

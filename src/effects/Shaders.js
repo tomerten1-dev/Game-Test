@@ -50,3 +50,38 @@ export function addWind(material, { amount = 0.12, pivot = 0.0, speed = 1.4 } = 
         transformed.z += cos(windPh * 0.8) * windH * ${(amount * 0.5).toFixed(3)};`);
   });
 }
+
+// Outfit recolour: shifts one hue band of the texture (the outfit's main colour) to a target colour,
+// keeping shading, skin and leather untouched.
+export function addHueSwap(material, srcHue, range, color) {
+  const c = new THREE.Color(color);
+  const hsl = {};
+  c.getHSL(hsl);
+  const uniforms = { uSrcHue: { value: srcHue }, uHueRange: { value: range }, uDstHue: { value: hsl.h }, uDstSat: { value: hsl.s }, uDstLight: { value: hsl.l } };
+  patch(material, 'hueswap', (shader) => {
+    Object.assign(shader.uniforms, uniforms);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>
+uniform float uSrcHue; uniform float uHueRange; uniform float uDstHue; uniform float uDstSat; uniform float uDstLight;
+vec3 hs_rgb2hsv(vec3 c) {
+  vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+  float d = q.x - min(q.w, q.y);
+  return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + 1e-10)), d / (q.x + 1e-10), q.x);
+}
+vec3 hs_hsv2rgb(vec3 c) {
+  vec3 p = abs(fract(c.xxx + vec3(1.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0);
+  return c.z * mix(vec3(1.0), clamp(p - 1.0, 0.0, 1.0), c.y);
+}`)
+      .replace('#include <map_fragment>', `#include <map_fragment>
+      {
+        vec3 hsv = hs_rgb2hsv(diffuseColor.rgb);
+        float dh = abs(fract(hsv.x - uSrcHue + 0.5) - 0.5);
+        float w = (1.0 - smoothstep(uHueRange * 0.6, uHueRange, dh)) * smoothstep(0.18, 0.35, hsv.y);
+        vec3 swapped = hs_hsv2rgb(vec3(uDstHue, mix(hsv.y, uDstSat, 0.7), clamp(hsv.z * (0.7 + uDstLight * 0.8), 0.0, 1.0)));
+        diffuseColor.rgb = mix(diffuseColor.rgb, swapped, w);
+      }`);
+  });
+  return uniforms;
+}

@@ -1,6 +1,6 @@
 // Keyboard + mouse (pointer lock) + touch controls merged into one action state.
 
-const KEYMAP = {
+export const DEFAULT_KEYMAP = {
   KeyW: 'forward', ArrowUp: 'forward',
   KeyS: 'back', ArrowDown: 'back',
   KeyA: 'left', ArrowLeft: 'left',
@@ -9,7 +9,7 @@ const KEYMAP = {
   KeyR: 'reload',
   KeyE: 'interact', KeyF: 'interact',
   KeyQ: 'wall', KeyZ: 'floor', KeyV: 'ramp', KeyX: 'cone',
-  KeyB: 'build', KeyG: 'edit',
+  KeyB: 'build', KeyG: 'edit', KeyT: 'emote',
   Digit1: 'slot1', Digit2: 'slot2', Digit3: 'slot3', Digit4: 'slot4', Digit5: 'slot5', Digit6: 'slot6',
   ShiftLeft: 'sprint', ShiftRight: 'sprint',
   KeyC: 'crouch', ControlLeft: 'crouch',
@@ -31,15 +31,18 @@ export class Input {
     this.touchMove = { x: 0, y: 0 };
     this.touchHeld = new Set();
 
+    this.keymap = { ...DEFAULT_KEYMAP };
+    this.capture = null; // callback while the settings screen waits for a key
     window.addEventListener('keydown', (e) => {
-      const a = KEYMAP[e.code];
+      if (this.capture) { e.preventDefault(); const cb = this.capture; this.capture = null; cb(e.code); return; }
+      const a = this.keymap[e.code];
       if (!a) return;
       if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
       if (!this.held.has(a)) this.pressedSet.add(a);
       this.held.add(a);
     });
     window.addEventListener('keyup', (e) => {
-      const a = KEYMAP[e.code];
+      const a = this.keymap[e.code];
       if (a) this.held.delete(a);
     });
     window.addEventListener('blur', () => { this.held.clear(); this.touchHeld.clear(); });
@@ -63,6 +66,21 @@ export class Input {
     window.addEventListener('wheel', (e) => {
       if (document.pointerLockElement === canvas) this.wheel += Math.sign(e.deltaY);
     }, { passive: true });
+  }
+
+  // Rebinding: `custom` maps action -> key code (from settings). Arrow keys stay as extra movement keys.
+  applyBindings(custom = {}) {
+    this.keymap = { ...DEFAULT_KEYMAP };
+    for (const [action, code] of Object.entries(custom)) {
+      for (const [c, a] of Object.entries(this.keymap)) if (a === action && !c.startsWith('Arrow')) delete this.keymap[c];
+      delete this.keymap[code];
+      this.keymap[code] = action;
+    }
+    this.held.clear();
+  }
+
+  keyFor(action) {
+    return Object.keys(this.keymap).find((c) => this.keymap[c] === action && !c.startsWith('Arrow')) || '';
   }
 
   requestLock() {

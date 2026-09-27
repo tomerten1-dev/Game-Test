@@ -29,6 +29,13 @@ import { StormFX } from '../effects/StormFX.js';
 import { Projectiles } from '../weapons/Projectiles.js';
 import { Events } from '../world/Events.js';
 import { applyMood, pickMood } from '../world/TimeOfDay.js';
+import { Meta } from '../meta/Meta.js';
+import { LobbyStage } from '../ui/LobbyStage.js';
+import { applySettings } from '../ui/Settings.js';
+import { Pickaxe } from '../weapons/Items.js';
+import { Weapon } from '../weapons/Weapon.js';
+
+const WARMUP_TIME = 20;
 import { isTouch } from './device.js';
 
 export class Game {
@@ -68,6 +75,7 @@ export class Game {
     this.world = new World(this.scene, this.renderer, this.models);
     progress(0.8, 'Growing trees…');
     await nextFrame();
+    this.meta = new Meta(this);
     this.input = new Input(this.renderer.domElement);
     this.sound = new Sound();
     this.sound.listener = this.camera.position;
@@ -92,29 +100,106 @@ export class Game {
     this.map = new MapScreen(ui, this);
     this.stormFX = new StormFX(this.scene);
     this.sound.onPositional = (name, pos, v) => this.hud.soundViz(name, pos, v);
+    this.stage = new LobbyStage(this);
+    this.warmup = 0;
+    this.respawns = [];
     this.menus = new Menus(ui, this);
+    applySettings(this);
+    const q = this.meta.profile.d.settings.quality;
+    if (q && q !== this.quality.setting) this.quality.set(q);
     if (isTouch) {
       document.body.classList.add('touch');
       this.touch = new TouchControls(ui, this.input, this);
     }
     document.addEventListener('pointerlockchange', () => this.onPointerLockChange());
     this.state = 'menu';
+    this.stage.show(true);
     this.menus.showMenu(true);
+    this.sound.music('lobby');
     progress(1, 'Ready!');
   }
 
   // Menu "Play" / end screen "Play Again": new match without reloading the page.
-  play() {
+  // PLAY: a short matchmaking screen, then the warm-up island, then the bus.
+  play(mode = 'solo') {
+    this.mode = mode;
     this.map.show(false);
     this.menus.showMenu(false);
     this.menus.hideEnd();
     this.menus.showPause(false);
     this.paused = false;
+    if (this.state !== 'menu') this.toLobby(true);
+    this.state = 'matchmaking';
+    const total = mode === 'quick' ? 10 : 20;
+    this.menus.showMatchmaking(true);
+    let found = 1;
+    this.menus.setMatchmaking(found, total);
+    clearInterval(this._mmTimer);
+    this._mmTimer = setInterval(() => {
+      found = Math.min(total, found + 1 + Math.floor(Math.random() * 3));
+      this.menus.setMatchmaking(found, total);
+      if (found >= total) {
+        clearInterval(this._mmTimer);
+        setTimeout(() => { if (this.state === 'matchmaking') this._enterMatch(); }, 350);
+      }
+    }, 260);
+  }
+
+  cancelMatchmaking() {
+    clearInterval(this._mmTimer);
+    this.menus.showMatchmaking(false);
+    this.state = 'menu';
+    this.menus.showMenu(true);
+  }
+
+  _enterMatch() {
+    this.menus.showMatchmaking(false);
+    this.stage.show(false);
+    this.sound.music(null);
     this.hud.reset();
     this.startMatch();
     this.state = 'playing';
     this.touch?.show(true);
     if (!isTouch) this.input.requestLock();
+  }
+
+  // Back to the lobby from the results screen (or when starting a new match from it).
+  toLobby(silent = false) {
+    for (const a of this.actors) a.destroy();
+    this.actors = [];
+    this.bots = [];
+    this.player = null;
+    this.spectating = null;
+    this.warmup = 0;
+    this.respawns = [];
+    this.effects.clear();
+    this.building.reset();
+    this.projectiles.reset();
+    this.pings.reset();
+    this.storm.reset();
+    this.hud.show(false);
+    this.hud.showSpectate(null);
+    this.hud.scope?.(false);
+    this.menus.hideEnd();
+    this.menus.showPause(false);
+    this.map.show(false);
+    this.touch?.show(false);
+    this.paused = false;
+    if (document.pointerLockElement) document.exitPointerLock();
+    this.state = 'menu';
+    this.stage.show(true);
+    if (!silent) { this.menus.showMenu(true); this.sound.music('lobby'); }
+  }
+
+  leaveMatch() {
+    if (this.state !== 'playing') return;
+    if (this.warmup > 0) { this.toLobby(); return; }
+    this.menus.showPause(false);
+    this.paused = false;
+    const p = this.player;
+    const place = p.alive ? this.aliveCount : this.deathInfo?.place ?? this.aliveCount;
+    if (p.alive) { p.deathCause = 'left'; this.deathInfo = { place, killer: null, time: this.time }; }
+    this.endMatch(false, place, this.deathInfo?.killer ?? null, 200);
   }
 
   resume() {
@@ -159,8 +244,9 @@ export class Game {
       this.state = 'ended';
       this.touch?.show(false);
       if (document.pointerLockElement) document.exitPointerLock();
-      const alive = (this.deathInfo?.time ?? this.time) - this.matchStart;
-      this.menus.showEnd({ victory, place, killer: killer?.name, cause: p.deathCause, kills: p.kills, time: Math.max(0, alive) });
+      const alive = Math.max(0, (this.deathInfo?.time ?? this.time) - this.matchStart);
+      const rewards = this.meta.finishMatch({ place, timeAlive: alive });
+      this.menus.showEnd({ victory, place, killer: killer?.name, cause: p.deathCause, kills: p.kills, time: alive, rewards });
       this.sound.play(victory ? 'victory' : 'defeat');
     }, delay);
   }
@@ -172,8 +258,8 @@ export class Game {
     this.time = 0;
     this.stormTick = 0;
     this.matchStart = 0;
-    this.bus.launch();
     this.storm.reset();
+    this.stormScale = this.mode === 'quick' ? 1.6 : 1;
     this.building.reset();
     this.pings.reset();
     this.projectiles.reset();
@@ -181,28 +267,84 @@ export class Game {
     this.mood = applyMood(this, pickMood());
     this.spectating = null;
     this.deathInfo = null;
+    this.respawns = [];
     this.hud.showSpectate(null);
     if (!this._firstMatch) this.loot.reset();
     this._firstMatch = false;
 
     this.player = new Player(this);
     this.actors.push(this.player);
-
-    const colors = botColors(19);
+    const n = this.mode === 'quick' ? 9 : 19;
+    const colors = botColors(n);
     this.bots = [];
-    for (let i = 0; i < 19; i++) {
+    for (let i = 0; i < n; i++) {
       const b = new Bot(this, BOT_NAMES[i], colors[i], Math.random(), CHARACTER_TYPES[i % CHARACTER_TYPES.length]);
       this.bots.push(b);
       this.actors.push(b);
     }
+    this.hud.show(true);
+    this.input.enabled = true;
+    // warm-up island: everyone spawns armed, respawns on death, nothing counts
+    this.warmup = WARMUP_TIME;
+    for (const a of this.actors) this._warmupSpawn(a);
+    this.hud.banner('Warm-up! The Storm Bus leaves in 20 seconds', 4);
+    this.rig.pitch = -0.1;
+  }
+
+  _warmupSpot() {
+    for (let i = 0; i < 40; i++) {
+      const a = Math.random() * Math.PI * 2, d = 20 + Math.sqrt(Math.random()) * 120;
+      const x = Math.cos(a) * d, z = Math.sin(a) * d;
+      if (this.world.heightAt(x, z) > 2.5 && this.world.terrain.normalAt(x, z).y > 0.8 && !this.world.colliders.query(x - 4, x + 4, z - 4, z + 4, []).length) return [x, z];
+    }
+    return [0, 0];
+  }
+
+  _warmupSpawn(a) {
+    const [x, z] = this._warmupSpot();
+    if (a.alive) a.spawnGround(x, z); else a.revive(x, z);
+    a.items = [new Pickaxe(), new Weapon('ar', 0), new Weapon('shotgun', 0), null, null, null];
+    a.ammo.medium = 120; a.ammo.shells = 20;
+    a.mats.wood = 100;
+    a.slot = -1;
+    a.switchSlot(1);
+    if (!a.isPlayer) { a.target = null; a.mode = 'idle'; a.landTime = this.time - 200; }
+  }
+
+  // Warm-up over: wipe inventories and put everyone on the bus.
+  beginBus() {
+    this.warmup = 0;
+    this.respawns = [];
+    this.building.reset();
+    this.projectiles.reset();
+    this.effects.clear();
+    this.hud.reset();
+    this.time = 0;
+    this.stormTick = 0;
+    this.storm.reset();
+    this.events.reset();
+    this.bus.launch();
+    for (const a of this.actors) {
+      if (!a.alive) a.revive(0, 0);
+      a.items = [new Pickaxe(), null, null, null, null, null];
+      a.slot = -1;
+      a.switchSlot(0);
+      a.setBuildMode?.(null);
+      for (const k of Object.keys(a.ammo)) a.ammo[k] = 0;
+      for (const k of Object.keys(a.mats)) a.mats[k] = 0;
+      a.health = 100; a.shield = 0; a.kills = 0; a.emote = null; a.crouched = false;
+      a.vel.set(0, 0, 0);
+      a.setState('bus');
+      a.pos.copy(this.bus.pos);
+      a.resetAI?.();
+    }
     for (const b of this.bots) this._planDrop(b);
-    for (const a of this.actors) { a.setState('bus'); a.pos.copy(this.bus.pos); }
     this.rig.yaw = Math.atan2(-this.bus.vel.x, -this.bus.vel.z) + 0.6;
     this.rig.pitch = -0.25;
-    this.hud.show(true);
+    this.meta.startMatch();
     this.hud.banner(isTouch ? 'Tap JUMP to drop from the Storm Bus' : 'Press SPACE to jump from the Storm Bus', 6);
     this.sound.play('bus');
-    this.input.enabled = true;
+    this.sound.sting();
   }
 
   // Bots pick a landing spot (often a town) and a moment to jump.
@@ -235,7 +377,7 @@ export class Game {
   frame() {
     this.timer.update();
     const dt = Math.min(this.timer.getDelta(), 0.05);
-    if (this.state === 'menu') this.updateMenu(dt);
+    if (this.state === 'menu' || this.state === 'matchmaking') this.updateMenu(dt);
     else if (!this.paused) {
       this.update(dt);
       if (this.state === 'playing') this.quality.monitor(dt);
@@ -244,12 +386,13 @@ export class Game {
   }
 
   // Slow cinematic orbit behind the start screen.
+  // Lobby: camera on the floating stage with your hero.
   updateMenu(dt) {
     this.time += dt;
-    const t = this.time * 0.04;
-    this.camera.position.set(Math.cos(t) * 185, 70, Math.sin(t) * 185);
-    this.camera.lookAt(0, 8, 0);
-    this.focus.set(0, 0, 0);
+    this.stage.frameCamera(this.camera, dt);
+    this.stage.update(dt);
+    this.rig.fov = this.camera.fov;
+    this.focus.copy(this.stage.group.position);
     this.world.update(dt, this.time, this.focus, this.camera);
     this.loot.update(dt, this.time);
     this.ambient.update(dt, this.time);
@@ -263,6 +406,8 @@ export class Game {
     if (this.input.pressed('map')) this.toggleMap();
     else if (this.map.open && this.input.pressed('pause')) this.toggleMap(false);
     if (this.spectating) this.updateSpectate(dt);
+    if (this.warmup > 0) this.updateWarmup(dt);
+    if (this.input.pressed('emote') && p.alive && p.state === 'ground' && !p.buildMode) { p.emote = p.emote ? null : p.emoteClip; }
     if (p.alive) {
       p.readInput(dt, this.input, this.rig);
       this.updatePlayerCombat(dt);
@@ -274,27 +419,27 @@ export class Game {
     }
     this.bus.update(dt, this.time);
     for (const a of this.actors) if (a.state === 'bus') a.pos.copy(this.bus.pos);
-    if (p.state === 'bus' && ((this.input.pressed('jump') && this.bus.canDrop) || !this.bus.active)) {
+    if (p.state === 'bus' && this.warmup <= 0 && ((this.input.pressed('jump') && this.bus.canDrop) || !this.bus.active)) {
       p.jumpFromBus(this.bus.pos, this.bus.vel);
       this.hud.banner(isTouch ? 'Steer with the stick — glider opens automatically' : 'Steer with WASD — glider opens automatically', 4);
       this.sound.play('glider');
     }
     for (const b of this.bots) {
-      if (b.state === 'bus' && !this.bus.active) b.jumpFromBus(this.bus.pos, this.bus.vel);
+      if (b.state === 'bus' && !this.bus.active && this.warmup <= 0) b.jumpFromBus(this.bus.pos, this.bus.vel);
       b.update(dt);
     }
-    this.updateStorm(dt);
+    if (this.warmup <= 0) this.updateStorm(dt);
     this.loot.update(dt, this.time);
     this.building.update(dt);
     this.projectiles.update(dt);
-    this.events.update(dt, this.time);
+    if (this.warmup <= 0) this.events.update(dt, this.time);
     this.ambient.update(dt, this.time);
     for (const a of this.actors) {
       a.updateMovement(dt);
       for (const w of a.items) {
         if (w && w.update(dt) === 'reloaded') { a.finishReload(w); if (a.isPlayer) this.sound.play('reloaded'); }
       }
-      this.loot.autoPickup(a);
+      if (this.warmup <= 0) this.loot.autoPickup(a);
     }
     this.sound.updateListener?.(this.camera);
     this.sound.chestHum?.(p.alive && p.state === 'ground' ? this.loot.nearestChest(p.pos, 18) : null, p.pos);
@@ -347,7 +492,8 @@ export class Game {
       const near = this.events.nearestInteractable(p.pos) || this.loot.nearestInteractable(p.pos);
       const text = !near ? null : near.text || (near.kind === 'chest' ? (near.chest.rare ? 'Open Rare Chest' : 'Open Chest') : near.kind === 'ammobox' ? 'Open Ammo Box' : `Pick up ${this.loot.label(near.pickup)}`);
       this.hud.prompt?.(text, near?.pickup?.weapon?.rarity ?? near?.rarity);
-      if (near && input.pressed('interact')) {
+      if (near && input.pressed('interact') && this.warmup > 0) this.hud.toast?.('Loot unlocks when the match starts');
+      else if (near && input.pressed('interact')) {
         if (near.kind === 'supply') this.events.openSupply(near.supply, p);
         else if (near.kind === 'vending') { const msg = this.events.buy(near.vending, p); if (msg) this.hud.toast?.(msg); }
         else if (near.kind === 'chest') this.loot.openChest(near.chest, p);
@@ -356,6 +502,7 @@ export class Game {
       }
     } else this.hud.prompt?.(null);
     this.updateConsumable(dt);
+    if (input.down('fire')) p.emote = null;
     const held = p.held;
     if (!held || p.state !== 'ground') return;
     if (held.isConsumable && held.def.throw) {
@@ -459,8 +606,24 @@ export class Game {
     const p = this.player;
     const it = p.tickUse(dt);
     if (!it) return;
+    this.meta.track('heal');
     this.sound.play(it.def.heal ? 'heal' : 'shield');
     if (it.count > 0 && p.held === it && this.input.down('fire')) p.startUse();
+  }
+
+  updateWarmup(dt) {
+    const before = Math.ceil(this.warmup);
+    this.warmup -= dt;
+    const now = Math.ceil(this.warmup);
+    if (now !== before && (now === 10 || now <= 5) && now > 0) this.hud.banner(`Bus leaves in ${now}`, 1);
+    this.hud.warmupLabel?.(this.warmup);
+    for (const r of [...this.respawns]) {
+      if (this.time < r.t) continue;
+      this.respawns.splice(this.respawns.indexOf(r), 1);
+      this._warmupSpawn(r.a);
+      if (r.a.isPlayer) this.hud.banner('Back in!', 1.2);
+    }
+    if (this.warmup <= 0) this.beginBus();
   }
 
   startSpectate(actor) {
@@ -478,9 +641,9 @@ export class Game {
   }
 
   updateStorm(dt) {
-    const ev = this.storm.update(dt, this.time);
+    const ev = this.storm.update(dt * (this.stormScale || 1), this.time);
     if (ev === 'shrink') { this.hud.banner?.(this.storm.moving ? 'The storm is moving!' : 'The storm is closing in!', 3); this.sound.play('phase'); }
-    else if (ev === 'phase') this.hud.banner?.('Storm shrinks again soon', 3);
+    else if (ev === 'phase') { this.hud.banner?.('Storm shrinks again soon', 3); if (this.player.alive) this.meta.track('circle'); }
     this.stormTick += dt;
     const outside = this.player.alive && this.player.state !== 'bus' && !this.storm.isInside(this.player.pos.x, this.player.pos.z);
     this.hud.stormTint?.(outside);
@@ -503,6 +666,14 @@ export class Game {
   onActorDied(actor, killer) {
     this.effects.eliminate(actor.pos, actor.color);
     this.sound.play(killer?.isPlayer ? 'elim' : 'break', actor.pos);
+    if (this.warmup > 0) {
+      // warm-up: nothing counts, respawn shortly
+      this.hud.killFeed?.(killer, actor);
+      this.respawns.push({ a: actor, t: this.time + 2.5 });
+      if (actor.isPlayer) this.hud.banner('Respawning…', 2);
+      return;
+    }
+    if (killer?.isPlayer && actor !== killer) this.meta.track('kill');
     if (killer && killer !== actor) killer.kills++;
     this.hud.killFeed?.(killer, actor);
     this.loot?.dropInventory(actor);

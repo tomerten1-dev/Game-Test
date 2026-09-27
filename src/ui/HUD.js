@@ -411,8 +411,13 @@ export class HUD {
     this.set('alive', this.el.alive, String(g.aliveCount));
     this.set('kills', this.el.kills, String(p.kills));
     const storm = g.storm;
-    this.set('storm', this.el.storm, storm.stage === 'done' ? '0:00' : fmtTime(storm.timer));
-    this.set('stormLabel', this.el.stormLabel, storm.stage === 'done' ? 'Final circle' : storm.stage === 'wait' ? `Storm shrinks in ${fmtTime(storm.timer)}` : 'Storm is shrinking!');
+    if (g.warmup > 0) {
+      this.set('storm', this.el.storm, fmtTime(g.warmup));
+      this.set('stormLabel', this.el.stormLabel, `Warm-up · bus leaves in ${fmtTime(g.warmup)}`);
+    } else {
+      this.set('storm', this.el.storm, storm.stage === 'done' ? '0:00' : fmtTime(storm.timer));
+      this.set('stormLabel', this.el.stormLabel, storm.stage === 'done' ? 'Final circle' : storm.stage === 'wait' ? `Storm shrinks in ${fmtTime(storm.timer)}` : 'Storm is shrinking!');
+    }
     this.set('stormCls', this.el.stormLabel, storm.stage === 'shrink' ? 'urgent' : '', 'className');
 
     // damage direction indicator

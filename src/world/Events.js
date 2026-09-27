@@ -107,6 +107,7 @@ export class Events {
         if (!a.alive || a.state !== 'ground') continue;
         if (Math.abs(a.pos.x - p.x) > r || Math.abs(a.pos.z - p.z) > r || Math.abs(a.pos.y - p.y) > 0.8) continue;
         if (Math.hypot(a.pos.x - p.x, a.pos.z - p.z) > r) continue;
+        if (a.isPlayer) g.meta?.track('pad');
         if (p.kind === 'launch') a.launch(40);
         else { a.vel.y = 21; a.onGround = false; a.noFallT = 4; a.crouched = false; }
         g.sound.play(p.kind === 'launch' ? 'launch' : 'jumppad', a.isPlayer ? null : a.pos, { range: 60 });
@@ -175,6 +176,7 @@ export class Events {
   }
 
   buy(v, actor) {
+    if (this.game.warmup > 0) return 'Vending opens when the match starts';
     const o = v.offers[v.i];
     if (actor.mats[o.mat] < o.price) return `Need ${o.price} ${o.mat}`;
     actor.mats[o.mat] -= o.price;
@@ -184,6 +186,7 @@ export class Events {
     this.game.loot.spawnPickup({ type: 'weapon', weapon: w }, at, new THREE.Vector3(f[0] * 2, 3, f[1] * 2));
     this.game.loot.spawnPickup(Loot.ammoFor(w), at, new THREE.Vector3(f[0] * 2.5, 3.5, f[1] * 1.5));
     this.game.sound.play('buy');
+    if (actor.isPlayer) this.game.meta?.track('vend');
     return null;
   }
 
@@ -224,6 +227,7 @@ export class Events {
 
   openSupply(s, actor) {
     if (!s.landed || s.opened) return;
+    if (actor.isPlayer) this.game.meta?.track('supply');
     s.opened = true;
     const loot = this.game.loot;
     const items = [];

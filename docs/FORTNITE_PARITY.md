@@ -172,7 +172,7 @@ Each phase ends with a playable build, a screenshot check and a git commit (same
 3. Launch pads (redeploy glider), jump pads, vending machines (4 towns, paid in materials).
 4. Day/evening lighting variation per match.
 
-### Phase E — Lobby & progression · ~3 days
+### Phase E — Lobby & progression · ✅ done
 1. 3D lobby scene: your hero on a platform, idle/emote animation, "PLAY" + mode select.
 2. Matchmaking screen + warm-up island (20 s respawn deathmatch before the bus).
 3. Locker: hero (5 KayKit heroes), color tint, glider color, contrail, emote picks — saved in localStorage.

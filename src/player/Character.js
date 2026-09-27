@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { addRim } from '../effects/Shaders.js';
+import { addRim, addHueSwap } from '../effects/Shaders.js';
 
 // KayKit "Adventurers" characters (CC0, Kay Lousberg). All share one rig + animation set.
 export const CHARACTER_TYPES = ['Knight', 'Barbarian', 'Mage', 'Rogue', 'Rogue_Hooded'];
 const HEIGHT = 1.95;
+// Main outfit hue band per hero (0..1), used by outfit colours.
+const OUTFIT_HUE = { Knight: [0.95, 0.05], Barbarian: [0.5, 0.06], Mage: [0.93, 0.06], Rogue: [0.43, 0.07], Rogue_Hooded: [0.43, 0.07] };
 
 // Bones driven by the upper-body layer (aiming / shooting / reloading).
 const UPPER = /^(spine|chest|upperarm|lowerarm|wrist|hand|handslot|head|elbowIK|handIK)/;
@@ -50,7 +52,7 @@ export class CharacterAssets {
 const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _axis = new THREE.Vector3();
 
 export class Character {
-  constructor(assets, color = '#2ee6c9', type = 'Knight', tint = 0.28) {
+  constructor(assets, color = '#2ee6c9', type = 'Knight', tint = 0.28, outfit = null) {
     this.assets = assets;
     const src = assets.types[type] || assets.types.Knight;
     this.root = new THREE.Group();
@@ -73,6 +75,7 @@ export class Character {
         m.color.copy(tintColor);
         m.roughness = 0.6;
         m.metalness = 0;
+        if (outfit) { const [h, r] = OUTFIT_HUE[type] || OUTFIT_HUE.Knight; addHueSwap(m, h, r, outfit); }
         addRim(m, '#e6f4ff', 0.45);
         o.material = m;
         this.materials.push(m);
