@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
-const PING_LIFE = 14;
+const PING_LIFE = 10; // Fortnite pings last about 10 s
+const DOUBLE_TAP = 0.35; // a second ping this soon makes it a danger ping
 const _v = new THREE.Vector3();
 
 // Map marker (one, yours) + quick pings (middle mouse): a light beam in the world and an
@@ -43,31 +44,53 @@ export class Pings {
     this.game.sound.play('click');
   }
 
-  // Ping what's under the crosshair and describe it.
+  // Ping what's under the crosshair and describe it: an item (with its name and rarity colour), a
+  // container, an enemy, or a location. Pinging twice quickly turns it into a red danger ping.
   ping(origin, dir) {
     const g = this.game;
     const hit = g.world.raycast(origin, dir, 350);
     const t = hit ? hit.t : 120;
     const pos = origin.clone().addScaledVector(dir, t);
     pos.y = Math.max(pos.y, g.world.heightAt(pos.x, pos.z));
-    let label = 'Location';
+    const last = this.pings[this.pings.length - 1];
+    if (last && !last.danger && g.time - last.born < DOUBLE_TAP) {
+      this._removePing(last);
+      return this.pingAt(last.pos, { danger: true });
+    }
+    let label = 'Location', color = null, kind = 'ping';
     for (const a of g.actors) {
       if (a.isPlayer || !a.alive || a.state === 'bus') continue;
-      if (a.pos.distanceTo(pos) < 3.5) { label = 'Enemy!'; break; }
+      if (a.pos.distanceTo(pos) < 3.5) { label = 'Enemy!'; kind = 'ping enemy'; break; }
     }
     if (label === 'Location') {
-      const c = g.loot.nearestChest(pos, 4);
-      if (c) label = 'Chest';
+      // floor loot close to where you looked
+      let best = null, bd = 2.5;
+      for (const pk of g.loot.pickups) { if (!pk.alive) continue; const d = pk.pos.distanceTo(pos) + (pk.type === 'weapon' ? 0 : 0.8); if (d < bd) { bd = d; best = pk; } }
+      if (best) {
+        label = g.loot.label(best);
+        if (best.type === 'weapon') color = best.weapon.rarityInfo.color;
+        kind = 'ping item';
+      } else if (g.loot.nearestChest(pos, 4)) label = 'Chest';
+      else if (g.loot.ammoBoxes?.some((b) => !b.opened && Math.hypot(b.x - pos.x, b.z - pos.z) < 3)) label = 'Ammo Box';
       else if (hit?.collider?.structure) label = 'Build';
     }
+    return this.pingAt(pos, { label, color, kind });
+  }
+
+  // Place a ping at a world point (also used from the big map).
+  pingAt(pos, { label = 'Location', color = null, kind = 'ping', danger = false } = {}) {
+    const g = this.game;
+    if (danger) { label = 'Danger!'; kind = 'ping danger'; color = '#ff4d4d'; }
     while (this.pings.length >= 3) this._removePing(this.pings[0]);
-    const p = { pos, t: 0, label, beam: this._beam(label === 'Enemy!' ? '#ff6b6b' : '#5fd4ff'), tag: this._tag(label === 'Enemy!' ? 'ping enemy' : 'ping') };
+    const beamCol = color || (kind.includes('enemy') ? '#ff6b6b' : '#5fd4ff');
+    const p = { pos: pos.clone(), t: 0, born: g.time, label, danger, beam: this._beam(beamCol), tag: this._tag(kind) };
     p.beam.visible = true;
     p.beam.position.copy(pos);
     p.tag.lbl.textContent = label;
+    if (color) p.tag.el.style.setProperty('--pc', color);
     p.tag.el.classList.remove('hidden');
     this.pings.push(p);
-    g.sound.play('ping');
+    g.sound.play(danger ? 'pingDanger' : 'ping');
     return p;
   }
 

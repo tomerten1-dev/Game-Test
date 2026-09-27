@@ -664,16 +664,16 @@ export class Events {
   // Icons for the minimap / big map.
   mapIcons() {
     const out = [];
-    for (const s of this.supplies) if (!s.opened) out.push({ x: s.x, z: s.z, color: '#58a6ff', shape: 'square' });
-    for (const v of this.vending) out.push({ x: v.x, z: v.z, color: '#4fd1ff', shape: 'vending' });
-    for (const b of this.benches) out.push({ x: b.x, z: b.z, color: '#ffb52b', shape: 'vending' });
-    for (const p of this.pads) if (p.kind === 'jump') out.push({ x: p.x, z: p.z, color: '#39e0ff', shape: 'dot' });
+    for (const s of this.supplies) if (!s.opened) out.push({ x: s.x, z: s.z, color: '#58a6ff', shape: 'square', label: 'Supply drop' });
+    for (const v of this.vending) out.push({ x: v.x, z: v.z, color: '#4fd1ff', shape: 'vending', label: 'Vending machine' });
+    for (const b of this.benches) out.push({ x: b.x, z: b.z, color: '#ffb52b', shape: 'vending', label: 'Upgrade bench' });
+    for (const p of this.pads) if (p.kind === 'jump') out.push({ x: p.x, z: p.z, color: '#39e0ff', shape: 'dot', label: 'Jump pad' });
     const boss = this.game.boss;
-    for (const b of boss?.bosses || []) if (b.alive) out.push({ x: b.pos.x, z: b.pos.z, color: b.bossCfg.color, shape: 'square' });
+    for (const b of boss?.bosses || []) if (b.alive) out.push({ x: b.pos.x, z: b.pos.z, color: b.bossCfg.color, shape: 'square', label: 'Boss' });
     // medallion carriers are revealed to everyone
-    for (const a of this.game.actors) if (a.alive && !a.npc && !a.isPlayer && a.medallions?.size) out.push({ x: a.pos.x, z: a.pos.z, color: '#ffd23f', shape: 'medal' });
+    for (const a of this.game.actors) if (a.alive && !a.npc && !a.isPlayer && a.medallions?.size) out.push({ x: a.pos.x, z: a.pos.z, color: '#ffd23f', shape: 'medal', label: 'Medallion carrier' });
     const v = boss?.vault;
-    if (v && !v.opened) out.push({ x: v.x, z: v.z, color: '#ffe94d', shape: 'vending' });
+    if (v && !v.opened) out.push({ x: v.x, z: v.z, color: '#ffe94d', shape: 'vending', label: 'Vault' });
     return out;
   }
 

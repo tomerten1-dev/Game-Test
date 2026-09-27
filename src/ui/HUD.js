@@ -464,7 +464,7 @@ export class HUD {
     if (p) {
       const storm = g.storm;
       if (p.alive && storm.stage !== 'done' && !storm.isSafe(p.pos.x, p.pos.z)) icon(storm.nextCenter.x, storm.nextCenter.y, '#ffffff', 'circle');
-      for (const pg of g.pings.pings) icon(pg.pos.x, pg.pos.z, pg.label === 'Enemy!' ? '#ff6b6b' : '#5fd4ff', 'diamond');
+      for (const pg of g.pings.pings) icon(pg.pos.x, pg.pos.z, pg.label === 'Enemy!' || pg.danger ? '#ff4d4d' : '#5fd4ff', 'diamond');
       if (g.pings.marker) icon(g.pings.marker.x, g.pings.marker.z, '#ffd23f', 'diamond');
     }
     // center notch + heading

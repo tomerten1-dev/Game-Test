@@ -19,9 +19,10 @@ export class MapScreen {
           <div id="bm-alive" class="bm-line"></div>
           <div class="bm-legend">
             <div><i class="lg you"></i>You</div><div><i class="lg mark"></i>Your marker</div>
-            <div><i class="lg ping"></i>Ping</div><div><i class="lg next"></i>Next safe zone</div>
+            <div><i class="lg ping"></i>Ping</div><div><i class="lg danger"></i>Danger ping</div><div><i class="lg next"></i>Next safe zone</div>
+            ${[['#58a6ff', 'sq', 'Supply drop'], ['#4fd1ff', 'vd', 'Vending machine'], ['#ffb52b', 'vd', 'Upgrade bench'], ['#39e0ff', 'dt', 'Jump pad'], ['#ff8a2a', 'sq', 'Boss'], ['#ffd23f', 'md', 'Medallion carrier'], ['#ffe94d', 'vd', 'Vault']].map(([c, sh, n]) => `<div><i class="lg ic ${sh}" style="--c:${c}"></i>${n}</div>`).join('')}
           </div>
-          <div class="bm-help">Click: marker · Right-click: clear · Wheel: zoom · Drag: pan · M: close</div>
+          <div class="bm-help">Click: marker · Middle-click or ping key: ping · Right-click: clear · Wheel: zoom · Drag: pan · M: close</div>
           <button id="bm-close" class="btn">CLOSE MAP</button>
         </div>
       </div>`);
@@ -50,6 +51,7 @@ export class MapScreen {
     c.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       if (e.button === 2) { game.pings.setMarker(null); return; }
+      if (e.button === 1) return; // the ping key (middle mouse by default) is handled by the game
       this.drag = { x: e.clientX, y: e.clientY, cx: this.cx, cz: this.cz, moved: false };
       c.setPointerCapture?.(e.pointerId);
     });
@@ -74,7 +76,16 @@ export class MapScreen {
       else game.pings.setMarker({ x, z });
     });
     c.addEventListener('contextmenu', (e) => e.preventDefault());
+    c.addEventListener('pointermove', (e) => { this.hover = [e.offsetX, e.offsetY]; });
+    c.addEventListener('pointerleave', () => { this.hover = null; });
     window.addEventListener('resize', () => this.open && this.resize());
+  }
+
+  // Ping a spot on the map (middle-click, or the ping key while hovering the map).
+  pingHere(ox, oy) {
+    const [x, z] = this.toWorld(ox * this.dpr, oy * this.dpr);
+    const g = this.game;
+    g.pings.pingAt(new (g.player.pos.constructor)(x, g.world.heightAt(x, z), z));
   }
 
   show(v) {
@@ -180,6 +191,23 @@ export class MapScreen {
     }
 
 
+    // moving zones: arrow from the current eye to the next one
+    if (storm.stage !== 'done' && Math.hypot(storm.nextCenter.x - storm.center.x, storm.nextCenter.y - storm.center.y) > 8) {
+      const [ax, ay] = this.toScreen(storm.center.x, storm.center.y), [bx, by] = this.toScreen(storm.nextCenter.x, storm.nextCenter.y);
+      const ang = Math.atan2(by - ay, bx - ax), hl = W * 0.02;
+      ctx.strokeStyle = '#ffd23f'; ctx.fillStyle = '#ffd23f'; ctx.lineWidth = Math.max(2, W * 0.004);
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx - Math.cos(ang) * hl, by - Math.sin(ang) * hl); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx - Math.cos(ang - 0.45) * hl, by - Math.sin(ang - 0.45) * hl); ctx.lineTo(bx - Math.cos(ang + 0.45) * hl, by - Math.sin(ang + 0.45) * hl); ctx.fill();
+    }
+
+    // landmarks (smaller names, shown once you zoom in)
+    if (this.zoom >= 1.4) {
+      ctx.font = `700 ${Math.round(W * 0.017)}px "Barlow Condensed", sans-serif`;
+      ctx.lineWidth = Math.max(2, W * 0.003); ctx.strokeStyle = 'rgba(15,25,55,0.7)'; ctx.fillStyle = '#e8f1ff';
+      ctx.textAlign = 'center';
+      for (const lm of game.world.towns?.landmarks || []) { const [x, y] = this.toScreen(lm.x, lm.z); ctx.strokeText(lm.name, x, y); ctx.fillText(lm.name, x, y); }
+    }
+
     // world events: supply drops, vending machines, jump pads
     for (const ic of game.events?.mapIcons() || []) {
       const [ix, iy] = this.toScreen(ic.x, ic.z);
@@ -221,7 +249,7 @@ export class MapScreen {
       ctx.fillStyle = '#0b1a33';
       ctx.beginPath(); ctx.arc(mx, my - r * 1.75, r * 0.35, 0, Math.PI * 2); ctx.fill();
     };
-    for (const pg of game.pings.pings) pin(pg.pos.x, pg.pos.z, '#5fd4ff');
+    for (const pg of game.pings.pings) pin(pg.pos.x, pg.pos.z, pg.danger ? '#ff4d4d' : '#5fd4ff');
     const m = game.pings.marker;
     if (m) pin(m.x, m.z, '#ffd23f');
 
@@ -243,7 +271,7 @@ export class MapScreen {
       ctx.restore();
     }
 
-    this.stormEl.textContent = storm.stage === 'done' ? 'Final circle' : storm.stage === 'wait' ? `Storm shrinks in ${fmt(storm.timer)}` : `Storm closing: ${fmt(storm.timer)}`;
+    this.stormEl.textContent = storm.stage === 'done' ? 'Final storm circle' : storm.stage === 'wait' ? `Storm eye shrinks in ${fmt(storm.timer)}` : `Storm eye shrinking: ${fmt(storm.timer)}`;
     this.aliveEl.textContent = `${game.aliveCount} players left · ${p?.kills || 0} eliminations`;
   }
 }

@@ -769,3 +769,14 @@ body.no-minimap #minimap-wrap, body.no-compass #compass, body.no-killfeed #killf
 body.hud-editing #top-right, body.hud-editing #bottom-left, body.hud-editing #bottom-right, body.hud-editing #killfeed, body.hud-editing #compass { outline: 2px dashed #ffd23f; outline-offset: 4px; cursor: move; pointer-events: auto !important; }
 #hud-edit-bar { position: fixed; left: 50%; top: 40%; transform: translateX(-50%); z-index: 50; display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(10,18,40,0.9); color: #fff; font-weight: 800; }
 #hud-edit-bar button { cursor: pointer; border: 0; border-radius: 6px; padding: 6px 14px; font-weight: 800; background: #ffd23f; color: #14204a; }
+
+/* pings: item pings take the item's rarity colour, danger pings are red with an exclamation mark */
+.wtag.ping.item .lbl { color: var(--pc, #fff); white-space: nowrap; }
+.wtag.ping.danger { --pc: #ff4d4d; }
+.wtag.ping.danger .lbl { color: #ff6b6b; font-weight: 900; }
+.wtag.ping.danger i { background: #ff4d4d !important; animation: dping 0.6s ease-in-out infinite; }
+.wtag.ping.danger i::after { content: '!'; position: absolute; inset: 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 900; font-size: 13px; }
+@keyframes dping { 50% { transform: scale(1.25); } }
+.bm-legend .lg.danger { background: #ff4d4d; }
+.bm-legend .lg.ic { flex: none; align-self: center; width: 12px; height: 12px; box-sizing: border-box; background: var(--c); border: 2px solid #0b1a33; }
+.bm-legend .lg.ic.sq { border-radius: 2px; } .bm-legend .lg.ic.vd { border-radius: 3px; width: 9px; height: 13px; } .bm-legend .lg.ic.dt { border-radius: 50%; width: 9px; height: 9px; } .bm-legend .lg.ic.md { border-radius: 50%; }

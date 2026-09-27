@@ -578,6 +578,9 @@ export class Sound {
       case 'supply':
         [392, 523, 659, 784].forEach((f, i) => this._tone(t + i * 0.12, 0.5, { type: 'triangle', freq: f, gain: 0.16 }));
         break;
+      case 'pingDanger':
+        [0, 0.14, 0.28].forEach((d) => this._tone(t + d, 0.1, { type: 'square', freq: 1480, gain: 0.1 }));
+        break;
       case 'stormChime':
         [392, 523, 659].forEach((f, i) => this._tone(t + i * 0.16, 0.5, { type: 'sine', freq: f, gain: 0.12 }));
         break;
