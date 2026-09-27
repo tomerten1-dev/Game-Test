@@ -40,6 +40,7 @@ export class Terrain {
     this.heights = new Float32Array(this.n * this.n);
     this.grass = new Float32Array(this.n * this.n); // 0..1 grass density
     this.variation = new Float32Array(this.n * this.n); // 0..1 color variation
+    this.path = new Float32Array(this.n * this.n); // 0..1 dirt path
     this._generate();
   }
 
@@ -102,6 +103,22 @@ export class Terrain {
           const d = Math.hypot(x - t.x, z - t.z);
           g *= smoothstep(t.r * 0.72, t.r * 0.95, d);
         }
+        // dirt paths from the central town to the others (wobbly)
+        let pth = 0;
+        const hub = TOWNS[0];
+        for (let ti = 1; ti < TOWNS.length; ti++) {
+          const t = TOWNS[ti];
+          const ax = hub.x, az = hub.z, bx = t.x - ax, bz = t.z - az;
+          const L = Math.hypot(bx, bz);
+          const u = ((x - ax) * bx + (z - az) * bz) / (L * L);
+          if (u < 0 || u > 1) continue;
+          const side = ((x - ax) * -bz + (z - az) * bx) / L;
+          const wob = this.noise.noise(u * 4 + ti * 7, ti) * 9 * Math.sin(u * Math.PI);
+          const dd = Math.abs(side - wob);
+          pth = Math.max(pth, 1 - smoothstep(1.1, 2.3, dd));
+        }
+        this.path[k] = pth * smoothstep(1.5, 2.5, y);
+        g *= 1 - this.path[k];
         // patchy meadows
         g *= clamp(0.55 + this.noise.fbm(x * 0.045 - 7, z * 0.045 + 3, 2) * 1.1, 0, 1);
         this.grass[k] = g;
@@ -165,6 +182,7 @@ export class Terrain {
       const d = Math.hypot(x - t.x, z - t.z);
       out.lerp(P.dirt, (1 - smoothstep(t.r * 0.55, t.r * 0.9, d)) * 0.85);
     }
+    out.lerp(_tmp2.set('#c79f63'), this.path[k] * 0.85);
     // rock on steep slopes / high ground
     const rockW = Math.max((1 - smoothstep(0.66, 0.8, ny)) * smoothstep(3, 6, y), smoothstep(24, 33, y));
     const rockC = _tmp.copy(P.rock).lerp(P.rockDark, clamp(this.variation[k] * 1.3 - 0.2, 0, 1));

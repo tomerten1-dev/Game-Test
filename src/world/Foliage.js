@@ -321,7 +321,8 @@ export class Foliage {
           uniform sampler2D uBakeTex;
           varying float vTip;
           varying float vVar;
-          varying float vAO;`)
+          varying float vAO;
+          varying vec3 vFlower;`)
         .replace('#include <begin_vertex>', `
           vec2 base = uCenter + mod(aOffset.xy - uCenter + uSize * 0.5, uSize) - uSize * 0.5;
           vec2 tuv = (base + uHalf) / (uHalf * 2.0);
@@ -337,16 +338,24 @@ export class Foliage {
           vec3 transformed = vec3(base.x, hd.r - 0.04, base.y) + p;
           vTip = aTip;
           vVar = hd.b;
-          vAO = texture2D(uBakeTex, tuv).g;`);
+          vAO = texture2D(uBakeTex, tuv).g;
+          float fh = fract(sin(dot(aOffset.xy, vec2(12.9898, 78.233))) * 43758.5453);
+          vFlower = vec3(0.0);
+          if (fh < 0.045) {
+            float fc = fract(fh * 97.0);
+            vFlower = fc < 0.33 ? vec3(1.0, 0.35, 0.6) : fc < 0.66 ? vec3(1.0, 0.85, 0.2) : vec3(1.0, 1.0, 1.0);
+          }`);
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>
           uniform vec3 uGrassA, uGrassB;
           varying float vTip;
           varying float vVar;
-          varying float vAO;`)
+          varying float vAO;
+          varying vec3 vFlower;`)
         .replace('#include <color_fragment>', `#include <color_fragment>
           vec3 gcol = mix(uGrassA, uGrassB, vVar);
-          diffuseColor.rgb = mix(gcol * 0.6, gcol * 1.25 + vec3(0.03, 0.04, 0.0), vTip) * (1.0 - vAO);`);
+          diffuseColor.rgb = mix(gcol * 0.6, gcol * 1.25 + vec3(0.03, 0.04, 0.0), vTip) * (1.0 - vAO);
+          if (vFlower.r + vFlower.g > 0.0) diffuseColor.rgb = mix(diffuseColor.rgb, vFlower, smoothstep(0.6, 0.85, vTip));`);
     };
     const mesh = new THREE.Mesh(geo, mat);
     mesh.frustumCulled = false;
