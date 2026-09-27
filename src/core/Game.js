@@ -1,6 +1,10 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { World } from '../world/World.js';
+import { TOWNS } from '../world/Terrain.js';
+import { CharacterAssets } from '../player/Character.js';
+import { Player } from '../player/Player.js';
+import { CameraRig } from '../player/CameraRig.js';
+import { Input } from './Input.js';
 import { quality } from './device.js';
 
 export class Game {
@@ -21,23 +25,34 @@ export class Game {
     this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1400);
     this.timer = new THREE.Timer();
     this.time = 0;
+    this.actors = [];
     window.addEventListener('resize', () => this.onResize());
   }
 
   async init(progress = () => {}) {
-    progress(0.2, 'Shaping the island…');
+    progress(0.1, 'Loading robots…');
+    this.assets = await CharacterAssets.load();
+    progress(0.35, 'Shaping the island…');
     await nextFrame();
     this.world = new World(this.scene, this.renderer);
     progress(0.8, 'Growing trees…');
     await nextFrame();
-
-    // Stage 1 preview camera
-    this.camera.position.set(140, 90, 160);
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.target.set(0, 10, 0);
-    this.controls.enableDamping = true;
+    this.input = new Input(this.renderer.domElement);
+    this.rig = new CameraRig(this.camera, this.world);
     this.focus = new THREE.Vector3();
+    this.startMatch();
     progress(1, 'Ready!');
+  }
+
+  startMatch() {
+    for (const a of this.actors) a.destroy();
+    this.actors = [];
+    this.player = new Player(this);
+    this.actors.push(this.player);
+    const t = TOWNS[0];
+    this.player.spawnGround(t.x + 4, t.z + 4);
+    this.rig.yaw = 0;
+    this.input.enabled = true;
   }
 
   start() {
@@ -48,10 +63,16 @@ export class Game {
     this.timer.update();
     const dt = Math.min(this.timer.getDelta(), 0.05);
     this.time += dt;
-    this.controls.update();
-    this.focus.copy(this.controls.target);
+    const p = this.player;
+    p.readInput(dt, this.input, this.rig);
+    for (const a of this.actors) a.updateMovement(dt);
+    const mode = p.state === 'ground' ? (p.aiming ? 'aim' : 'ground') : p.state;
+    this.rig.update(dt, p.pos, mode);
+    for (const a of this.actors) a.updateVisual(dt, this.camera.position);
+    this.focus.copy(p.pos);
     this.world.update(dt, this.time, this.focus, this.camera);
     this.renderer.render(this.scene, this.camera);
+    this.input.endFrame();
   }
 
   onResize() {
