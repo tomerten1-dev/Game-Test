@@ -38,6 +38,56 @@ function buildBusMesh() {
     flames.push(f);
   }
   group.userData.flames = flames;
+  // roof railing
+  const rail = [];
+  for (const s of [-1, 1]) {
+    rail.push(part(new THREE.BoxGeometry(0.08, 0.08, 7.4), white, mat(s * 1.45, 3.75, 0)));
+    for (let z = -3.5; z <= 3.5; z += 1.4) rail.push(part(new THREE.BoxGeometry(0.07, 0.6, 0.07), white, mat(s * 1.45, 3.45, z)));
+  }
+  rail.push(part(new THREE.BoxGeometry(2.9, 0.08, 0.08), white, mat(0, 3.75, 3.7)), part(new THREE.BoxGeometry(2.9, 0.08, 0.08), white, mat(0, 3.75, -3.7)));
+  const railMesh = new THREE.Mesh(merge(rail), body.material);
+  group.add(railMesh);
+  // striped hot-air balloon holding it all up
+  const env = new THREE.SphereGeometry(4.2, 16, 12);
+  const col = [];
+  const pos = env.attributes.position;
+  const cA = new THREE.Color('#ff5a5f'), cB = new THREE.Color('#fff4d6'), cC = new THREE.Color('#2f6bff');
+  for (let i = 0; i < pos.count; i++) {
+    const a = Math.atan2(pos.getZ(i), pos.getX(i));
+    const band = Math.floor(((a + Math.PI) / (Math.PI * 2)) * 16) % 2;
+    const c = pos.getY(i) < -2.8 ? cC : band ? cA : cB;
+    col.push(c.r, c.g, c.b);
+  }
+  env.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  env.scale(1, 1.18, 1);
+  const balloon = new THREE.Mesh(env, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, flatShading: true }));
+  balloon.position.y = 12.5;
+  balloon.castShadow = true;
+  group.add(balloon);
+  const ropePts = [];
+  for (const [x, z] of [[-1.4, -3.6], [1.4, -3.6], [-1.4, 3.6], [1.4, 3.6]]) ropePts.push(new THREE.Vector3(x, 3.1, z), new THREE.Vector3(x * 1.5, 8.6, z * 0.55));
+  group.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(ropePts), new THREE.LineBasicMaterial({ color: '#3a2f25' })));
+  // little riders on the roof (they hop off as people drop)
+  const riders = [];
+  const riderCols = ['#20d6c0', '#ff5a5f', '#ffd23f', '#a15cff', '#6ef0a8', '#ff8a4c', '#5fd4ff', '#ff7ab8'];
+  riderCols.forEach((c, i) => {
+    const r = new THREE.Group();
+    const bodyM = new THREE.MeshStandardMaterial({ color: c, roughness: 0.6 });
+    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.45, 4, 8), bodyM);
+    torso.position.y = 0.55;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), new THREE.MeshStandardMaterial({ color: '#f1c7a0', roughness: 0.7 }));
+    head.position.y = 1.12;
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.45, 3, 6), bodyM);
+    arm.position.set(0.33, 1.0, 0);
+    r.add(torso, head, arm);
+    r.position.set(i % 2 ? 0.7 : -0.7, 3.15, -2.9 + Math.floor(i / 2) * 1.9);
+    r.userData.arm = arm;
+    r.userData.phase = i * 0.8;
+    group.add(r);
+    riders.push(r);
+  });
+  group.userData.riders = riders;
+  group.userData.balloon = balloon;
   return group;
 }
 
@@ -45,7 +95,7 @@ function buildBusMesh() {
 export class Bus {
   constructor(scene) {
     this.mesh = buildBusMesh();
-    this.mesh.scale.setScalar(1.4);
+    this.mesh.scale.setScalar(1.8);
     this.mesh.visible = false;
     scene.add(this.mesh);
     this.pos = new THREE.Vector3();
@@ -53,6 +103,12 @@ export class Bus {
     this.start = new THREE.Vector3();
     this.end = new THREE.Vector3();
     this.active = false;
+  }
+
+  // Riders on the roof reflect how many players are still aboard (0..1).
+  setAboard(frac) {
+    const rs = this.mesh.userData.riders;
+    rs.forEach((r, i) => { r.visible = i < Math.ceil(frac * rs.length); });
   }
 
   launch() {
@@ -82,6 +138,12 @@ export class Bus {
     this.mesh.position.y += Math.sin(t * 1.5) * 0.4;
     this.mesh.rotation.z = Math.sin(t * 0.9) * 0.04;
     for (const f of this.mesh.userData.flames) f.scale.set(1, 0.8 + Math.random() * 0.4, 1);
+    for (const r of this.mesh.userData.riders) {
+      if (!r.visible) continue;
+      r.userData.arm.rotation.z = -2.2 + Math.sin(t * 6 + r.userData.phase) * 0.5; // waving
+      r.position.y = 3.15 + Math.max(0, Math.sin(t * 3 + r.userData.phase)) * 0.12;
+    }
+    this.mesh.userData.balloon.rotation.y += dt * 0.15;
     if (this.progress >= 1.05) { this.active = false; this.mesh.visible = false; }
   }
 }

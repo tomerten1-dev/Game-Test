@@ -324,6 +324,16 @@ export class HUD {
     this.el.stormTint.classList.toggle('on', on);
   }
 
+  thankDriver(a) {
+    const row = document.createElement('div');
+    row.className = 'kf-row' + (a.isPlayer ? ' me' : '');
+    row.innerHTML = `<b style="color:${a.isPlayer ? '#20e6c9' : '#' + a.color.getHexString()}">${a.isPlayer ? 'You' : a.name}</b> <span>thanked the bus driver</span>`;
+    this.el.killfeed.prepend(row);
+    while (this.el.killfeed.children.length > 5) this.el.killfeed.lastChild.remove();
+    setTimeout(() => row.classList.add('fade'), 5000);
+    setTimeout(() => row.remove(), 5600);
+  }
+
   killFeed(killer, victim) {
     const row = document.createElement('div');
     row.className = 'kf-row' + (victim.isPlayer || killer?.isPlayer ? ' me' : '');

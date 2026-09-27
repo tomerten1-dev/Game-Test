@@ -352,6 +352,8 @@ export class Game {
     this.rig.yaw = Math.atan2(-this.bus.vel.x, -this.bus.vel.z) + 0.6;
     this.rig.pitch = -0.25;
     this.meta.startMatch();
+    this._thanked = false;
+    this._botThanks = 0;
     this.hud.banner(isTouch ? 'Tap JUMP to drop from the Storm Bus' : 'Press SPACE to jump from the Storm Bus', 6);
     this.sound.play('bus');
     this.sound.sting();
@@ -428,7 +430,25 @@ export class Game {
       this.rig.addLook(look.x, look.y);
     }
     this.bus.update(dt, this.time);
-    for (const a of this.actors) if (a.state === 'bus') a.pos.copy(this.bus.pos);
+    let aboard = 0, players = 0;
+    for (const a of this.actors) {
+      if (a.npc) continue;
+      players++;
+      if (a.state === 'bus') { a.pos.copy(this.bus.pos); aboard++; }
+    }
+    if (this.bus.active) {
+      this.bus.setAboard(players ? aboard / players : 0);
+      // thank the bus driver (you once; a few bots too)
+      if (p.state === 'bus' && this.input.pressed('interact') && !this._thanked) {
+        this._thanked = true;
+        this.hud.thankDriver?.(p);
+        this.sound.play('pickup');
+      }
+      if (this.bots.length && Math.random() < dt * 0.35 && (this._botThanks || 0) < 6) {
+        const b = this.bots[Math.floor(Math.random() * this.bots.length)];
+        if (b.state === 'bus' && !b.thanked) { b.thanked = true; this._botThanks = (this._botThanks || 0) + 1; this.hud.thankDriver?.(b); }
+      }
+    }
     if (p.state === 'bus' && this.warmup <= 0 && ((this.input.pressed('jump') && this.bus.canDrop) || !this.bus.active)) {
       p.jumpFromBus(this.bus.pos, this.bus.vel);
       this.hud.banner(isTouch ? 'Steer with the stick — glider opens automatically' : 'Steer with WASD — glider opens automatically', 4);
@@ -518,7 +538,7 @@ export class Game {
         else if (near.kind === 'ammobox') this.loot.openAmmoBox(near.box, p);
         else { const msg = this.loot.collect(near.pickup, p); if (msg) this.hud.toast?.(msg); }
       }
-    } else this.hud.prompt?.(null);
+    } else this.hud.prompt?.(p.state === 'bus' && !this._thanked && this.bus.active ? 'Thank the bus driver' : null);
     this.updateConsumable(dt);
     if (input.down('fire')) p.emote = null;
     const held = p.held;
