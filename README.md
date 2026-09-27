@@ -65,6 +65,20 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
   - Settings add preferred slots per gun type, toggles for the minimap, compass, kill feed, quest tracker and an FPS counter, and a HUD layout editor (pause menu → Edit layout: drag the HUD blocks).
   - Visualize sound draws coloured arcs on a ring around the crosshair: white steps, gold chests, red gunfire.
 - **Pings and map:** a single ping names what's under your crosshair (floor loot in its rarity colour, chests, ammo boxes, enemies) and lasts 10 s. Ping twice quickly for a red danger ping with an alert sound. On the big map, hover and press the ping key to ping a spot. The map legend explains every icon (supply drops, vending, benches, jump pads, bosses, medallion carriers, the vault), and a yellow arrow shows where a moving storm eye is heading.
+- **Movement (Chapter 6–7 style):**
+  - **Wall Scramble** (jump into a wall in front of you) and Wall Kick (a wall beside you).
+  - **Ledge Jump** (sprint off an edge for extra distance) and **Roll Landing** (hold or tap Jump as you land: keep your speed, +16 stamina, less fall damage).
+  - Outside Arena a deadly fall leaves you on **1 HP** with a short splat.
+  - **Shoulder-bash** doors by sprinting, sliding or rolling into them.
+  - **Auto-run** (=), sprint-by-default and toggle-sprint settings.
+  - Slides keep going downhill.
+  - Dolphin-dive by jumping while swimming; swimming refills stamina.
+  - Look down to skydive faster. In Zero Build, jump to cut your glider and redeploy from lower.
+- **Getting around:**
+  - **Lookout towers** on hills with ladders (walk into them) and **ziplines** from the top (interact to ride, forward/back to steer, jump to let go, no fall damage until you land).
+  - An **ascender** up the Rusty Works smokestack, and **hot air balloons** you can ride up and down.
+  - New items: **Bouncer** (placed), **Crash Pad** (thrown), **Wingsuit** (10 launches; dive to build speed, pull up to climb) and **Seven Sliders** boots (jet-slide while sprinting, even on water; overheat after ~5 s).
+- **Match starts:** sometimes you **drive the Battle Bus** (steer through 5 rings: +50 XP each and a supply drop under every ring). About 1 match in 5 is **Storm Surfing**: everyone rides a wave in from the sea, moves along it and gets launched onto the island (jump as it launches for a boost).
 - **Floor loot tag:** when you're next to something on the ground, a tag beside the item shows the key and 'Pick up' (or 'Swap' when your slots are full), the name, a rarity chip and the ammo in the gun or the stack count.
 - **Using items:** a countdown dial beside the crosshair shows the seconds left for heals, shields and reloads. The outfit characters drink shield potions and slurps (blue sparkles) and kneel to use bandages and medkits (green sparkles).
 - **HP bars:** hitting a build, a house wall or door, a tree, a rock or furniture shows a Fortnite-style health bar with its HP (e.g. `150 / 300`).

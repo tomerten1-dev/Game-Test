@@ -71,6 +71,7 @@ export class Meta {
     else if (event === 'circle') m.circles += amount;
     else if (event === 'land') m.landed = extra;
     else if (event === 'crownKill') m.crownKills = (m.crownKills || 0) + amount;
+    else if (event === 'ring') m.rings = (m.rings || 0) + amount;
     if (event === 'shot' || event === 'hit' || event === 'buildDamage' || event === 'tree' || event === 'bossKill') return;
     if (event === 'chest' || event === 'supply') g.hud.accolade?.(event === 'chest' ? 'Chest Opened' : 'Supply Drop Opened', event === 'chest' ? 40 : 100);
     for (const q of [...this.ensureQuests(), ...this.ensureWeekly()]) {

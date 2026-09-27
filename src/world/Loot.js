@@ -297,6 +297,7 @@ export class Loot {
     const table = [
       ['bandage', 20], ['smallshield', 15], ['bigshield', 13], ['medkit', 9], ['medmist', 6], ['slurp', 5], ['chug', 2], ['keg', 2], ['campfire', 3],
       ['grenade', 8], ['smoke', 3], ['impulse', 3], ['fire', 3], ['launchpad', 2], ['shockwave', 3], ['grappler', 2], ['rift', 1.5], ['trap', 4],
+      ['bouncer', 2], ['crashpad', 2.5], ['wingsuit', 1.5], ['sliders', 1.5],
     ];
     let k = r * table.reduce((a, t) => a + t[1], 0), type = table[0][0];
     for (const [t, w] of table) { if ((k -= w) <= 0) { type = t; break; } }

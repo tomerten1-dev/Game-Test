@@ -65,6 +65,11 @@ export class Projectiles {
     const g = this.game, pos = p.pos.clone(), def = p.def;
     if (p.nade === 'grenade' || !p.nade) { this._explode(p, pos); return; }
     this._remove(p);
+    if (p.nade === 'crashpad') {
+      g.events.addBouncePad(pos.x, g.world.groundAt(pos.x, pos.z, pos.y + 0.5, 0.5), pos.z, 'crash', p.owner);
+      g.sound.play('bounce', pos, { range: 40 });
+      return;
+    }
     if (p.nade === 'smoke') {
       const s = { x: pos.x, y: pos.y + 1.2, z: pos.z, r: 0.5 };
       g.world.smokes.push(s);

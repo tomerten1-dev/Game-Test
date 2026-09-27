@@ -43,6 +43,10 @@ export const CONSUMABLES = {
   rift: { name: 'Rift-to-Go', rift: true, time: 0.6, max: 1, stack: 1, icon: 'RFT', color: '#c86bff', desc: 'Warp high into the sky and glide' },
   launchpad: { name: 'Launch Pad', place: 'launchpad', max: 1, stack: 1, icon: '⇑', color: '#ffcf3f', desc: 'Place it: launch into the air and glide' },
   trap: { name: 'Spike Trap', trap: true, max: 3, stack: 1, icon: 'TRP', color: '#ffc629', desc: 'Place it on a floor, wall or ceiling: spikes hit anyone who walks in for 75' },
+  bouncer: { name: 'Bouncer', place: 'bouncer', max: 2, stack: 1, icon: 'BNC', color: '#5fe4ff', desc: 'Place it: bounce high · no fall damage when you land on it' },
+  crashpad: { name: 'Crash Pad', throw: 'crashpad', max: 4, stack: 2, icon: 'CRP', color: '#ff7ab8', impact: true, fuse: 3, radius: 1, desc: 'Throw it: it inflates into a pad that bounces you and cancels fall damage' },
+  wingsuit: { name: 'Wingsuit', wingsuit: true, max: 10, stack: 10, icon: 'WNG', color: '#6ff0c0', desc: 'Launch up and fly: dive to build speed, pull up to climb · 10 launches, 20 s cooldown' },
+  sliders: { name: 'Seven Sliders', sliders: true, max: 1, stack: 1, icon: 'SLD', color: '#ff5a3d', desc: 'Slide while sprinting to jet-slide (even on water) · overheats after ~5 s, water cools it' },
   keycard: { name: 'Vault Keycard', key: true, max: 1, stack: 1, icon: '⌘', color: '#ffe94d' },
 };
 export const CONSUMABLE_TYPES = Object.keys(CONSUMABLES);

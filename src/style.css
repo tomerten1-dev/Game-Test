@@ -761,7 +761,8 @@ body.touch #loot-tag .lt-name { font-size: 16px; }
 #quest-track .qt-row span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } #quest-track .qt-row b { color: #ffd23f; }
 #quest-track .qt-row i { position: absolute; left: 0; bottom: 0; height: 2px; background: #ffd23f; }
 /* hold-to-interact fill */
-#prompt, #loot-tag .lt-box { position: relative; --hold: 0%; }
+#prompt { --hold: 0%; }
+#loot-tag .lt-box { position: relative; --hold: 0%; }
 #prompt::after, #loot-tag .lt-box::after { content: ''; position: absolute; left: 0; bottom: 0; height: 3px; width: var(--hold); background: #ffd23f; border-radius: 0 0 0 10px; }
 #fps { position: absolute; left: 12px; bottom: 6px; font: 700 12px monospace; color: #b8ffb0; text-shadow: 0 1px 2px #000; pointer-events: none; }
 /* HUD element toggles and the layout editor */

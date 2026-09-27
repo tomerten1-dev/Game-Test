@@ -108,8 +108,42 @@ export class Events {
   }
 
   // Placeable items: launch pad, shield keg, campfire.
+  // Bouncer (placed) and Crash Pad (thrown) pads: bounce whoever lands on them, no fall damage.
+  addBouncePad(x, y, z, kind, owner = null) {
+    const g = new THREE.Group();
+    if (kind === 'crash') {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.32, 8, 20), new THREE.MeshStandardMaterial({ color: '#ff7ab8', roughness: 0.5 }));
+      ring.rotation.x = Math.PI / 2; ring.position.y = 0.3; g.add(ring);
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.2, 20), new THREE.MeshStandardMaterial({ color: '#ffd1e6', roughness: 0.6 }));
+      top.position.y = 0.35; g.add(top);
+    } else {
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.1, 0.25, 18), new THREE.MeshStandardMaterial({ color: '#2b3a55', roughness: 0.5, metalness: 0.4 }));
+      base.position.y = 0.12; g.add(base);
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.1, 18), new THREE.MeshStandardMaterial({ color: '#5fe4ff', emissive: '#2fa8ff', emissiveIntensity: 0.6, roughness: 0.3 }));
+      top.position.y = 0.3; g.add(top);
+    }
+    g.traverse((o) => { o.castShadow = true; });
+    g.position.set(x, y, z);
+    this.scene.add(g);
+    this.pads.push({ kind: kind === 'crash' ? 'crash' : 'bounce', x, z, y, group: g, cd: 0.2, owner, life: kind === 'crash' ? 20 : Infinity });
+  }
+
+  // Landing here doesn't hurt (bouncers, crash pads).
+  softLanding(pos) {
+    return this.pads.some((p) => (p.kind === 'bounce' || p.kind === 'crash') && Math.hypot(pos.x - p.x, pos.z - p.z) < 1.4 && Math.abs(pos.y - p.y) < 1.2);
+  }
+
   placeItem(actor, kind) {
     if (kind === 'launchpad') return this.placeLaunchPad(actor);
+    if (kind === 'bouncer') {
+      const f = [Math.sin(actor.aimYaw), Math.cos(actor.aimYaw)];
+      const x = actor.pos.x + f[0] * 2.2, z = actor.pos.z + f[1] * 2.2;
+      const y = this.world.groundAt(x, z, actor.pos.y + 1, 0.6);
+      if (Math.abs(y - actor.pos.y) > 1.5) return false;
+      this.addBouncePad(x, y, z, 'bounce', actor);
+      this.game.sound.play('build', actor.isPlayer ? null : actor.pos);
+      return true;
+    }
     const f = [Math.sin(actor.aimYaw), Math.cos(actor.aimYaw)];
     const x = actor.pos.x + f[0] * 1.8, z = actor.pos.z + f[1] * 1.8;
     const y = this.world.groundAt(x, z, actor.pos.y + 1, 0.4);
@@ -163,8 +197,10 @@ export class Events {
   // Launch pads throw you high and open your glider; jump pads just bounce.
   _updatePads(dt) {
     const g = this.game;
+    for (let i = this.pads.length - 1; i >= 0; i--) if (this.pads[i].dead) { this.scene.remove(this.pads[i].group); this.pads.splice(i, 1); }
     for (const p of this.pads) {
       p.cd = Math.max(0, p.cd - dt);
+      if (p.life !== undefined && p.life !== Infinity && (p.life -= dt) <= 0) { p.dead = true; continue; }
       if (p.arrow) p.arrow.position.y = 1.2 + Math.sin(g.time * 3 + p.x) * 0.15;
       if (p.cd > 0) continue;
       const r = p.kind === 'launch' ? 1.5 : 1.15;
@@ -174,6 +210,7 @@ export class Events {
         if (Math.hypot(a.pos.x - p.x, a.pos.z - p.z) > r) continue;
         if (a.isPlayer) g.meta?.track('pad');
         if (p.kind === 'launch') a.launch(40);
+        else if (p.kind === 'bounce' || p.kind === 'crash') { a.vel.y = p.kind === 'crash' ? 16 : 24; a.onGround = false; a.noFallT = 8; a.crouched = false; p.cd = 0.3; }
         else { a.vel.y = 21; a.onGround = false; a.noFallT = 4; a.crouched = false; }
         g.sound.play(p.kind === 'launch' ? 'launch' : 'jumppad', a.isPlayer ? null : a.pos, { range: 60 });
         for (let i = 0; i < 16; i++) {
@@ -522,11 +559,11 @@ export class Events {
   }
 
   // ---------- supply drops ----------
-  _spawnSupply() {
+  _spawnSupply(at = null) {
     const g = this.game, storm = g.storm;
     const c = storm.safeCenter(), r = storm.safeRadius();
-    let x = c.x, z = c.y;
-    for (let i = 0; i < 40; i++) {
+    let x = at ? at.x : c.x, z = at ? at.z : c.y;
+    for (let i = 0; i < (at ? 0 : 40); i++) {
       const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * r * 0.7;
       const tx = c.x + Math.cos(a) * d, tz = c.y + Math.sin(a) * d;
       if (this.world.heightAt(tx, tz) > 2.5 && this.world.terrain.normalAt(tx, tz).y > 0.85) { x = tx; z = tz; break; }
@@ -551,8 +588,7 @@ export class Events {
     this.scene.add(grp);
     const s = { x, z, ground, y: ground + 110, group: grp, balloon, landed: false, opened: false, smokeT: 0 };
     this.supplies.push(s);
-    g.hud.banner('Supply drop incoming!', 3);
-    g.sound.play('supply');
+    if (!at) { g.hud.banner('Supply drop incoming!', 3); g.sound.play('supply'); }
     return s;
   }
 
@@ -680,7 +716,7 @@ export class Events {
   reset() {
     for (const s of this.supplies) this.scene.remove(s.group);
     this.supplies = [];
-    for (const p of this.pads.filter((q) => q.kind === 'launch')) this.scene.remove(p.group);
+    for (const p of this.pads.filter((q) => q.kind !== 'jump')) this.scene.remove(p.group);
     this.pads = this.pads.filter((q) => q.kind === 'jump');
     for (const v of this.vending) { this._rollOffers(v); v.i = 0; this._showOffer(v); }
     this.dropIdx = 0;

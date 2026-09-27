@@ -412,7 +412,10 @@ export class Game {
     this.homes.reset();
     this.world.destructibles.reset();
     this.traps.reset();
-    this.bus.launch();
+    // how this match starts: the usual bus, you driving the bus through rings, or Storm Surfing
+    const rs = Math.random();
+    this.startMode = (typeof window !== 'undefined' && window.__startMode) || (rs < 0.2 ? 'surf' : rs < 0.4 ? 'drive' : 'bus');
+    this.bus.launch(this.startMode);
     for (const a of this.actors) {
       if (!a.alive) a.revive(0, 0);
       a.items = [new Pickaxe(), null, null, null, null, null];
@@ -426,6 +429,7 @@ export class Game {
       a.vel.set(0, 0, 0);
       a.setState('bus');
       a.pos.copy(this.bus.pos);
+      a.surfLat = a.isPlayer ? 0 : (Math.random() - 0.5) * 170;
       a.resetAI?.();
     }
     for (const b of this.bots) this._planDrop(b);
@@ -444,7 +448,9 @@ export class Game {
     this._thanked = false;
     this._firstBlood = false;
     this._botThanks = 0;
-    this.hud.banner(isTouch ? 'Tap JUMP to drop from the Storm Bus' : 'Press SPACE to jump from the Storm Bus', 6);
+    if (this.startMode === 'surf') this.hud.banner(isTouch ? 'Storm Surfing! Steer along the wave · tap JUMP as it launches for a boost' : 'Storm Surfing! A / D to move along the wave · SPACE as it launches for a boost', 7);
+    else if (this.startMode === 'drive') this.hud.banner(isTouch ? "You're driving the Battle Bus! Steer through the rings" : "You're driving the Battle Bus! A / D to steer through the rings · SPACE to jump", 7);
+    else this.hud.banner(isTouch ? 'Tap JUMP to drop from the Storm Bus' : 'Press SPACE to jump from the Storm Bus', 6);
     this.sound.play('bus');
     this.sound.sting();
     this.sound.music('bus');
@@ -471,6 +477,14 @@ export class Game {
     const dx = e.x - s.x, dz = e.z - s.z;
     const k = ((x - s.x) * dx + (z - s.z) * dz) / (dx * dx + dz * dz);
     b.jumpAt = Math.min(0.92, Math.max(0.12, k - 0.08 + (Math.random() - 0.5) * 0.12));
+  }
+
+  // Driving the bus through a ring: XP for you and a supply drop under the ring.
+  _busRing(r) {
+    this.sound.play('pickup');
+    this.hud.accolade?.('Battle Bus Ring', 50);
+    this.meta.track('ring');
+    this.events._spawnSupply({ x: r.pos.x, z: r.pos.z });
   }
 
   start() {
@@ -527,34 +541,48 @@ export class Game {
       const look = this.input.consumeLook();
       this.rig.addLook(look.x, look.y);
     }
-    this.bus.update(dt, this.time);
+    const busMove = p.state === 'bus' ? this.input.move() : null;
+    this.bus.update(dt, this.time, this.bus.mode === 'drive' && busMove ? busMove.x : 0, (r) => this._busRing(r));
+    if (this.bus.mode === 'surf' && p.state === 'bus' && busMove) {
+      p.surfLat = Math.max(-88, Math.min(88, (p.surfLat || 0) + busMove.x * 12 * dt));
+      if (this.input.pressed('jump')) p.surfJumpT = this.time;
+    }
     let aboard = 0, players = 0;
     for (const a of this.actors) {
       if (a.npc) continue;
       players++;
-      if (a.state === 'bus') { a.pos.copy(this.bus.pos); aboard++; }
+      if (a.state === 'bus') { if (this.bus.mode === 'surf') { this.bus.surfPos(a.surfLat || 0, a.pos); a.root.visible = true; a.bodyYaw = this.bus.heading; } else a.pos.copy(this.bus.pos); aboard++; }
     }
     if (this.bus.active) {
       this.bus.setAboard(players ? aboard / players : 0);
       this.sound.busEngine(p.state === 'bus');
       // thank the bus driver (you once; a few bots too)
-      if (p.state === 'bus' && this.input.pressed('interact') && !this._thanked) {
+      if (p.state === 'bus' && this.bus.mode === 'bus' && this.input.pressed('interact') && !this._thanked) {
         this._thanked = true;
         this.hud.thankDriver?.(p);
         this.sound.play('pickup');
       }
-      if (this.bots.length && Math.random() < dt * 0.35 && (this._botThanks || 0) < 6) {
+      if (this.bus.mode !== 'surf' && this.bots.length && Math.random() < dt * 0.35 && (this._botThanks || 0) < 6) {
         const b = this.bots[Math.floor(Math.random() * this.bots.length)];
         if (b.state === 'bus' && !b.thanked) { b.thanked = true; this._botThanks = (this._botThanks || 0) + 1; this.hud.thankDriver?.(b); }
       }
     }
     if (p.state === 'bus' && this.warmup <= 0 && ((this.input.pressed('jump') && this.bus.canDrop) || !this.bus.active)) {
-      p.jumpFromBus(this.bus.pos, this.bus.vel);
+      p.jumpFromBus(this.bus.mode === 'surf' ? this.bus.surfPos(p.surfLat || 0, _origin).setY(this.bus.pos.y + 2) : this.bus.pos, this.bus.vel);
+      if (this.bus.mode === 'surf') {
+        // the wave throws you onto the island; jumping right as it launches gives extra height
+        const perfect = this.time - (p.surfJumpT ?? -9) < 0.6;
+        p.vel.set(this.bus.vel.x * 1.6, perfect ? 30 : 22, this.bus.vel.z * 1.6);
+        if (perfect) this.hud.accolade?.('Perfect Launch', 25);
+      }
       this.hud.banner(isTouch ? 'Steer with the stick — glider opens automatically' : 'Steer with WASD — glider opens automatically', 4);
       this.sound.play('glider');
     }
     for (const b of this.bots) {
-      if (b.state === 'bus' && !this.bus.active && this.warmup <= 0) b.jumpFromBus(this.bus.pos, this.bus.vel);
+      if (b.state === 'bus' && !this.bus.active && this.warmup <= 0) {
+        b.jumpFromBus(this.bus.mode === 'surf' ? this.bus.surfPos(b.surfLat || 0, _origin).setY(this.bus.pos.y + 2) : this.bus.pos, this.bus.vel);
+        if (this.bus.mode === 'surf') b.vel.set(this.bus.vel.x * 1.6, 20 + Math.random() * 8, this.bus.vel.z * 1.6);
+      }
       b.update(dt);
     }
     if (this.warmup <= 0) this.updateStorm(dt);
@@ -565,6 +593,7 @@ export class Game {
     this.traps.update(dt, this.actors);
     this.projectiles.update(dt);
     this.combat.updateBursts(dt);
+    this.world.traversal.update(dt, this.time, this.actors);
     if (this.warmup <= 0) this.events.update(dt, this.time);
     this.boss.update(dt);
     if (this.warmup <= 0) this.dayCycle.update(this.time);
@@ -651,7 +680,7 @@ export class Game {
     if (this.updateBuild(dt)) return;
     if (p.state === 'ground') {
       const door = this.homes.nearestDoor(p.pos, 1.7);
-      const near = (door && { kind: 'door', door, text: door.open ? 'Close Door' : 'Open Door' }) || this.events.nearestInteractable(p.pos) || this.boss.nearestInteractable(p) || this.loot.nearestInteractable(p.pos);
+      const near = (door && { kind: 'door', door, text: door.open ? 'Close Door' : 'Open Door' }) || this.world.traversal.nearestInteractable(p) || this.events.nearestInteractable(p.pos) || this.boss.nearestInteractable(p) || this.loot.nearestInteractable(p.pos);
       const text = !near ? null : near.text || (near.kind === 'chest' ? (near.chest.rare ? 'Open Rare Chest' : 'Open Chest') : near.kind === 'ammobox' ? 'Open Ammo Box' : `Pick up ${this.loot.label(near.pickup)}`);
       this.hud.prompt?.(text || (p.canRedeploy() ? `Deploy glider · ${keyLabel(this.input.keyFor('jump'))}` : null), near?.pickup?.weapon?.rarity ?? near?.rarity, near?.pickup?.weapon || null, near?.pickup || null);
       // containers are searched by holding interact (Fortnite-style), unless "tap to search" is on;
@@ -678,6 +707,7 @@ export class Game {
         else if (near.kind === 'vault') { const msg = this.boss.openVault(p); if (msg) this.hud.toast?.(msg); }
         else if (near.kind === 'vending') { const msg = this.events.buy(near.vending, p); if (msg) this.hud.toast?.(msg); }
         else if (near.kind === 'door') this.homes.setDoor(near.door, !near.door.open);
+        else if (near.kind === 'zip' || near.kind === 'ascender') this.world.traversal.grab(p, near);
         else if (near.kind === 'llama') this.events.openLlama(near.llama, p);
         else if (near.kind === 'forage') { const msg = this.events.eat(near.forage, p); if (msg) this.hud.toast?.(msg); }
         else if (near.kind === 'hide') { const msg = this.events.hide(near.hide, p); if (msg) this.hud.toast?.(msg); }
@@ -686,7 +716,7 @@ export class Game {
         else if (near.kind === 'ammobox') this.loot.openAmmoBox(near.box, p);
         else { const msg = this.loot.collect(near.pickup, p); if (msg) this.hud.toast?.(msg); }
       }
-    } else this.hud.prompt?.(p.state === 'bus' && !this._thanked && this.bus.active ? 'Thank the bus driver' : null);
+    } else this.hud.prompt?.(p.state === 'bus' && !this._thanked && this.bus.active && this.bus.mode === 'bus' ? 'Thank the bus driver' : null);
     this.updateConsumable(dt);
     this.combat.updateWeak(p);
     if (input.down('fire')) p.emote = null;
@@ -703,6 +733,14 @@ export class Game {
     }
     if (held.isConsumable && held.def.key) {
       if (input.pressed('fire')) this.hud.toast?.('Take it to the vault at Rusty Works');
+      return;
+    }
+    if (held.isConsumable && held.def.wingsuit) {
+      if (input.pressed('fire') && p.startWingsuit()) p.consumeHeld();
+      return;
+    }
+    if (held.isConsumable && held.def.sliders) {
+      if (input.pressed('fire')) this.hud.toast?.('Sprint, then slide (crouch) to jet-slide');
       return;
     }
     if (held.isConsumable && held.def.grapple) {

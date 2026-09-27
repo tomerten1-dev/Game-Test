@@ -165,6 +165,7 @@ function buildBusMesh() {
 // The flying battle bus that carries everyone across the island.
 export class Bus {
   constructor(scene) {
+    this.scene = scene;
     this.mesh = buildBusMesh();
     this.mesh.scale.setScalar(1.8);
     this.mesh.visible = false;
@@ -174,6 +175,7 @@ export class Bus {
     this.start = new THREE.Vector3();
     this.end = new THREE.Vector3();
     this.active = false;
+    this.rings = [];
   }
 
   // Riders on the roof reflect how many players are still aboard (0..1).
@@ -182,7 +184,12 @@ export class Bus {
     rs.forEach((r, i) => { r.visible = i < Math.ceil(frac * rs.length); });
   }
 
-  launch() {
+  // mode: 'bus' (autopilot), 'drive' (you steer it through rings), 'surf' (Storm Surfing: a wave
+  // carries everyone in from the sea and launches them onto the island)
+  launch(mode = 'bus') {
+    this.mode = mode;
+    this._clearExtras();
+    if (mode === 'surf') return this._launchSurf();
     const a = Math.random() * Math.PI * 2;
     const dx = Math.cos(a), dz = Math.sin(a);
     const off = (Math.random() - 0.5) * 160;
@@ -196,13 +203,91 @@ export class Bus {
     this.mesh.visible = true;
     this.pos.copy(this.start);
     this.mesh.rotation.set(0, Math.atan2(dx, dz), 0);
+    this.heading = Math.atan2(dx, dz);
+    if (mode === 'drive') {
+      // five rings along the route (off to the sides) to steer through
+      this.rings = [];
+      for (let i = 0; i < 5; i++) {
+        const t = 0.25 + i * 0.12, side = (Math.random() - 0.5) * 70;
+        const p = new THREE.Vector3().lerpVectors(this.start, this.end, t);
+        p.x += -dz * side; p.z += dx * side; p.y = BUS_HEIGHT + (Math.random() - 0.5) * 6;
+        const m = new THREE.Mesh(new THREE.TorusGeometry(11, 0.9, 10, 36), new THREE.MeshBasicMaterial({ color: '#ffd23f', transparent: true, opacity: 0.85 }));
+        m.position.copy(p); m.rotation.y = this.heading;
+        this.scene.add(m);
+        this.rings.push({ pos: p, mesh: m, hit: false });
+      }
+    }
   }
 
-  // Doors open once the bus is over (or about to be over) the island.
-  get canDrop() { return this.active && this.pos.length() < 350; }
+  _clearExtras() {
+    for (const r of this.rings || []) this.scene.remove(r.mesh);
+    this.rings = [];
+    if (this.wave) this.wave.visible = false;
+  }
 
-  update(dt, t) {
+  _launchSurf() {
+    const a = Math.random() * Math.PI * 2;
+    const dx = -Math.cos(a), dz = -Math.sin(a); // heading in toward the middle
+    this.start.set(Math.cos(a) * 460, 5, Math.sin(a) * 460);
+    this.end.set(Math.cos(a) * 290, 5, Math.sin(a) * 290);
+    this.length = this.start.distanceTo(this.end);
+    this.vel.set(dx * 14, 0, dz * 14);
+    this.side = new THREE.Vector3(-dz, 0, dx);
+    this.progress = 0;
+    this.active = true;
+    this.mesh.visible = false;
+    this.pos.copy(this.start);
+    this.heading = Math.atan2(dx, dz);
+    if (!this.wave) {
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 190, 20, 1, true, 0, Math.PI), new THREE.MeshStandardMaterial({ color: '#2f9fe0', roughness: 0.25, metalness: 0.1, transparent: true, opacity: 0.92, side: THREE.DoubleSide }));
+      body.rotation.z = Math.PI / 2;
+      const foam = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 190, 10), new THREE.MeshStandardMaterial({ color: '#f4fbff', roughness: 0.6, emissive: '#b8e6ff', emissiveIntensity: 0.3 }));
+      foam.rotation.z = Math.PI / 2; foam.position.set(0, 5.4, 1.2);
+      g.add(body, foam);
+      this.scene.add(g);
+      this.wave = g;
+    }
+    this.wave.visible = true;
+    this.wave.position.copy(this.pos).setY(-1);
+    this.wave.rotation.y = this.heading;
+  }
+
+  // Wave position of a surfer at a lateral offset.
+  surfPos(lat, out) { return out.copy(this.pos).addScaledVector(this.side, lat).setY(this.pos.y + Math.sin(this.progress * 40 + lat) * 0.3); }
+
+  // Doors open once the bus is over (or about to be over) the island. Surfers can't bail early.
+  get canDrop() { return this.active && this.mode !== 'surf' && this.pos.length() < 350; }
+
+  // steer: -1..1 (driver input, 'drive' mode). onRing(ring) fires when a ring is flown through.
+  update(dt, t, steer = 0, onRing = null) {
     if (!this.active) return;
+    if (this.mode === 'surf') {
+      this.progress += (14 * dt) / this.length;
+      this.pos.lerpVectors(this.start, this.end, Math.min(1, this.progress));
+      this.wave.position.set(this.pos.x, -1 + Math.sin(t * 2) * 0.3, this.pos.z);
+      if (this.progress >= 1) { this.active = false; this.wave.visible = false; }
+      return;
+    }
+    if (this.mode === 'drive' && steer) {
+      this.heading -= steer * 0.55 * dt;
+      this.vel.set(Math.sin(this.heading) * SPEED, 0, Math.cos(this.heading) * SPEED);
+    }
+    if (this.mode === 'drive') {
+      this.pos.addScaledVector(this.vel, dt);
+      const dx = this.end.x - this.start.x, dz = this.end.z - this.start.z;
+      this.progress = ((this.pos.x - this.start.x) * dx + (this.pos.z - this.start.z) * dz) / (dx * dx + dz * dz);
+      this.mesh.position.copy(this.pos);
+      this.mesh.rotation.y = this.heading;
+      for (const r of this.rings) {
+        if (r.hit) continue;
+        r.mesh.rotation.z += dt;
+        if (this.pos.distanceTo(r.pos) < 11) { r.hit = true; r.mesh.material.color.set('#5bd43b'); onRing?.(r); }
+      }
+      if (this.progress >= 1.05 || (this.progress > 0.5 && this.pos.length() > 470)) { this.active = false; this.mesh.visible = false; this._clearExtras(); }
+      for (const f of this.mesh.userData.flames) f.scale.set(1, 0.8 + Math.random() * 0.4, 1);
+      return;
+    }
     this.progress += (SPEED * dt) / this.length;
     this.pos.lerpVectors(this.start, this.end, Math.min(1, this.progress));
     this.mesh.position.copy(this.pos);

@@ -328,6 +328,22 @@ export class Actor {
     }
   }
 
+  // Wingsuit launch (uses one charge; 20 s cooldown between launches).
+  startWingsuit() {
+    if (this.state !== 'ground' || this.swimming) return false;
+    if ((this.wingCd || 0) > this.game.time) { if (this.isPlayer) this.game.hud?.toast?.(`Wingsuit ready in ${Math.ceil(this.wingCd - this.game.time)} s`); return false; }
+    this.wingCd = this.game.time + 20;
+    this.setBuildMode?.(null);
+    this.useT = 0;
+    this.vel.set(this.vel.x * 0.5, 24, this.vel.z * 0.5);
+    this.onGround = false;
+    this.wingBoost = 0.9;
+    this.setState('wing');
+    this.game.sound?.play('launch', this.isPlayer ? null : this.pos);
+    if (this.distToCam < 40) this.game.effects.dust(this.pos, 10, 1.6);
+    return true;
+  }
+
   // Rift-to-Go: warp up into the sky and skydive / glide from there.
   riftUp() {
     if (this.state !== 'ground') return;
@@ -418,6 +434,8 @@ export class Actor {
     const hs = Math.hypot(this.vel.x, this.vel.z);
     if (hs < 5) return;
     this.slideT = SLIDE_TIME;
+    this.powerSlide = !!this.held?.def?.sliders && (this.sliderHeat || 0) < 4.5;
+    if (this.powerSlide) this.game.sound?.play('launch', this.isPlayer ? null : this.pos, { vol: 0.4 });
     this.slideKicked = false;
     this.slideDir.set(this.vel.x / hs, 0, this.vel.z / hs);
     this.crouched = true;
@@ -529,6 +547,8 @@ export class Actor {
     }
     if (this.state === 'ground' && this.mantleT > 0) { this._updateMantle(dt); return; }
     if (this.state === 'ground' && this.grapple) { this._updateGrapple(dt); return; }
+    const trav = this.game.world.traversal;
+    if (this.state === 'ground' && (this.zip || this.asc) && trav.ride(this, dt, it)) return;
     if (this.hiddenIn) { this.vel.set(0, 0, 0); this.sprinting = false; return; }
     if (this.splatT > 0) { this.splatT -= dt; this.vel.x = this.vel.z = 0; this.sprinting = false; world.moveBody(this, dt); return; }
     if (this.state === 'ground') {
@@ -546,7 +566,7 @@ export class Actor {
       if (this.swimming) {
         // swimming: steady strokes, a bit faster when "sprinting"; no crouch / slide
         speed = it.sprint ? 5.8 : 4.4;
-        this.crouched = false; this.slideT = 0; this.sprinting = false; this.tacSprint = false;
+        this.crouched = false; if (!this.powerSlide) this.slideT = 0; this.sprinting = false; this.tacSprint = false;
         if (!this._wasSwimming) { this.setBuildMode?.(null); if (this.distToCam < 40) this.game.effects.dust(this.pos, 8, 1.2); }
         this.stamina = Math.min(100, this.stamina + STAMINA_REGEN * 1.5 * dt); // swimming refills stamina
       } else if (this.inWater) speed *= 0.65;
@@ -557,6 +577,12 @@ export class Actor {
       if (this.slideT > 0) {
         this.slideT -= dt;
         let sp = 3 + 9 * Math.max(0, this.slideT / SLIDE_TIME);
+        // Seven Sliders: jet-powered slide while you keep sprinting, until the boots overheat
+        if (this.powerSlide) {
+          this.sliderHeat = (this.sliderHeat || 0) + dt;
+          if (it.sprint && this.sliderHeat < 5 && this.held?.def?.sliders) { this.slideT = Math.max(this.slideT, 0.2); sp = 16; if (Math.hypot(it.mx, it.mz) > 0.3) { const l = Math.hypot(it.mx, it.mz); this.slideDir.x = damp(this.slideDir.x, it.mx / l, 3, dt); this.slideDir.z = damp(this.slideDir.z, it.mz / l, 3, dt); } if (this.distToCam < 40 && Math.random() < 0.5) this.game.effects.dust(this.pos, 1, 0.4); }
+          else { if (this.sliderHeat >= 5 && this.isPlayer) this.game.hud?.toast?.('Seven Sliders overheated'); this.powerSlide = false; }
+        }
         // sliding downhill keeps going (and speeds up) for as long as the slope lasts
         const drop = world.heightAt(this.pos.x, this.pos.z) - world.heightAt(this.pos.x + this.slideDir.x * 1.5, this.pos.z + this.slideDir.z * 1.5);
         if (drop > 0.2 && this.onGround && !this.swimming) { this.slideT = Math.max(this.slideT, 0.3); sp = Math.max(sp, Math.min(14, 9 + drop * 3)); }
@@ -565,9 +591,12 @@ export class Actor {
         if (this.slideT <= 0 && !this.crouchHeld) this.crouched = false;
         if (!this.slideKicked && sp > 6) this._slideKick();
       } else {
+        if (!this.powerSlide && this.sliderHeat > 0) this.sliderHeat = Math.max(0, this.sliderHeat - dt * (this.swimming || this.inWater ? 3 : 1));
         this.vel.x = damp(this.vel.x, it.mx * speed, k, dt);
         this.vel.z = damp(this.vel.z, it.mz * speed, k, dt);
       }
+      // ladders: walk into one to climb
+      if (trav.ladders.length && trav.climb(this, it, dt)) return;
       // mantle onto ledges: jumping into something waist-to-head high, or reaching one mid-air
       if (mlen > 0.3 && this.slideT <= 0 && ((it.jump && this.onGround) || (!this.onGround && this.vel.y < 4)) && this._tryMantle(it.mx / mlen, it.mz / mlen)) return;
       // mid-air jump press next to a wall: kick off it
@@ -612,7 +641,7 @@ export class Actor {
           this.stamina = Math.min(100, this.stamina + 16);
           dmgK = 0.6;
         }
-        if (this.landSpeed > FALL_SAFE && !(this.noFallT > 0)) this.fallDamage(Math.round((this.landSpeed - FALL_SAFE) * 5.5 * dmgK));
+        if (this.landSpeed > FALL_SAFE && !(this.noFallT > 0) && !this.game.events?.softLanding?.(this.pos)) this.fallDamage(Math.round((this.landSpeed - FALL_SAFE) * 5.5 * dmgK));
       }
       // shoulder bash: sprint, slide or roll into a closed door to burst through it
       this._bashCheck(dt);
@@ -655,6 +684,19 @@ export class Actor {
       const hag = this.heightAboveGround();
       if (hag < GLIDE_HEIGHT || it.deploy) this.setState('glide');
       if (this.onGround) this.land();
+    } else if (this.state === 'wing') {
+      // Wingsuit: a short boost up, then fly where you look. Diving builds speed, pulling up trades
+      // it for height; landing never hurts.
+      if (this.wingBoost > 0) { this.wingBoost -= dt; world.moveBody(this, dt, 1); if (this.onGround) { this.land(); return; } if (this.wingBoost > 0) return; this.wingSpeed = 16; }
+      const pch = Math.max(-1.3, Math.min(0.45, this.aimPitch || 0)), yaw = this.aimYaw;
+      this.wingSpeed = Math.max(9, Math.min(48, (this.wingSpeed || 16) + (-Math.sin(pch) * 20 - 0.01 * this.wingSpeed * this.wingSpeed + 3) * dt));
+      const cp = Math.cos(pch);
+      this.vel.set(Math.sin(yaw) * cp * this.wingSpeed, Math.sin(pch) * this.wingSpeed - 2.5, Math.cos(yaw) * cp * this.wingSpeed);
+      this.bodyYaw = yaw;
+      world.moveBody(this, dt, 0);
+      this.noFallT = 3;
+      if (this.onGround) this.land();
+      else if (it.jumpPress) { this.setState('glide'); }
     } else if (this.state === 'glide') {
       const hs = 12;
       this.vel.x = damp(this.vel.x, it.mx * hs, 2.5, dt);
@@ -797,11 +839,28 @@ export class Actor {
           if (this._splashT <= 0) { this._splashT = 0.12; _sc.setRGB(0.85, 0.95, 1); this.game.effects.debris.emit(this.pos.x + (Math.random() - 0.5), 0.05, this.pos.z + (Math.random() - 0.5), (Math.random() - 0.5) * 2, 1.5 + Math.random(), (Math.random() - 0.5) * 2, _sc, 0.5, 0.18, 9, 0.8); }
         }
       } else ch.model.rotation.x = damp(ch.model.rotation.x, this.slideT > 0 ? -0.75 : 0, 10, dt);
+    } else if (this.state === 'wing') {
+      ch.setPose('Jump_Idle', null, 0.3);
+      ch.model.rotation.x = damp(ch.model.rotation.x, 1.35 - Math.max(-0.6, Math.min(0.6, this.aimPitch || 0)) * 0.5, 5, dt);
+      ch.model.position.y = damp(ch.model.position.y, 0.9, 4, dt);
     } else if (this.state === 'skydive') {
       if (hspeed > 1) this.bodyYaw = dampAngle(this.bodyYaw, Math.atan2(this.vel.x, this.vel.z), 4, dt);
       ch.setPose('Jump_Idle', null, 0.3);
       ch.model.rotation.x = damp(ch.model.rotation.x, 1.25, 4, dt);
       ch.model.position.y = damp(ch.model.position.y, 0.9, 4, dt);
+    } else if (this.state === 'wing') {
+      // Wingsuit: a short boost up, then fly where you look. Diving builds speed, pulling up trades
+      // it for height; landing never hurts.
+      if (this.wingBoost > 0) { this.wingBoost -= dt; world.moveBody(this, dt, 1); if (this.onGround) { this.land(); return; } if (this.wingBoost > 0) return; this.wingSpeed = 16; }
+      const pch = Math.max(-1.3, Math.min(0.45, this.aimPitch || 0)), yaw = this.aimYaw;
+      this.wingSpeed = Math.max(9, Math.min(48, (this.wingSpeed || 16) + (-Math.sin(pch) * 20 - 0.01 * this.wingSpeed * this.wingSpeed + 3) * dt));
+      const cp = Math.cos(pch);
+      this.vel.set(Math.sin(yaw) * cp * this.wingSpeed, Math.sin(pch) * this.wingSpeed - 2.5, Math.cos(yaw) * cp * this.wingSpeed);
+      this.bodyYaw = yaw;
+      world.moveBody(this, dt, 0);
+      this.noFallT = 3;
+      if (this.onGround) this.land();
+      else if (it.jumpPress) { this.setState('glide'); }
     } else if (this.state === 'glide') {
       if (hspeed > 1) this.bodyYaw = dampAngle(this.bodyYaw, Math.atan2(this.vel.x, this.vel.z), 4, dt);
       ch.setPose('Jump_Idle', null, 0.3);
@@ -809,7 +868,7 @@ export class Actor {
       ch.model.position.y = damp(ch.model.position.y, ch.footOffset, 4, dt);
       this.glider.rotation.z = Math.sin(this.game.time * 1.3) * 0.05;
     }
-    if ((this.state === 'skydive' || this.state === 'glide') && this.trail && this.distToCam < 90) this._emitTrail();
+    if ((this.state === 'skydive' || this.state === 'glide' || this.state === 'wing') && this.trail && this.distToCam < 90) this._emitTrail();
     if (this.state === 'dead' && this.beamT > 0) {
       this.beamT -= dt;
       const k = Math.max(0, this.beamT / 1.1);

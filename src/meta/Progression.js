@@ -142,6 +142,7 @@ export function matchRewards(s) {
   if (s.supply) xp.push(['Supply drops', s.supply * 100]);
   if (s.damage) xp.push(['Damage dealt', Math.round(s.damage / 4)]);
   if (s.crownKills) xp.push(['Crown eliminations', s.crownKills * 100]);
+  if (s.rings) xp.push(['Battle Bus rings', s.rings * 50]);
   if (s.place === 1 && s.crowned) { xp.push(['Crowned Victory Royale!', 1500]); coins.push(['Crowned Victory Royale!', 200]); }
   if (s.place === 1) { xp.push(['Victory!', 1000]); coins.push(['Victory!', 250]); }
   else if (s.place <= 5) { xp.push(['Top 5', 300]); coins.push(['Top 5', 100]); }
