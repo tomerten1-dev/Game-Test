@@ -256,6 +256,17 @@ export class Actor {
     this.wallJumps = (this.wallJumps || 0) + 1;
     this.lastWallJump = this.game.time;
     const mlen = Math.hypot(it.mx, it.mz);
+    // Wall Scramble: jumping into a wall in front of you takes a big stride up it (you mantle the
+    // top automatically if you reach it); a wall beside you is a Wall Kick instead
+    if (mlen > 0.3 && (-(it.mx * best[0] + it.mz * best[1]) / mlen) > 0.6 && (this.scrambles || 0) < 2) {
+      this.scrambles = (this.scrambles || 0) + 1;
+      this.vel.set(-best[0] * 1.2, JUMP_VEL * 1.2, -best[1] * 1.2);
+      this.flungT = 0.3;
+      this.character.setPose(this.character.q ? 'ClimbUp_1m' : 'Jump_Start', null, 0.05, 1.6);
+      this.game.sound?.play('jump', this.isPlayer ? null : this.pos);
+      if (this.distToCam < 40) this.game.effects.dust(this.pos, 4, 0.6);
+      return true;
+    }
     const along = mlen > 0.2 ? 3.5 : 0;
     this.vel.set(best[0] * 7 + (mlen > 0.2 ? (it.mx / mlen) * along : 0), JUMP_VEL * 0.95, best[1] * 7 + (mlen > 0.2 ? (it.mz / mlen) * along : 0));
     this.flungT = 0.35; // keep the push-off momentum for a moment
@@ -427,6 +438,7 @@ export class Actor {
   setState(s) {
     this.state = s;
     this.glider.visible = s === 'glide';
+    if (s === 'glide') this.glideStart = this.game.time;
     this.root.visible = s !== 'bus';
     this.character.model.rotation.x = 0;
     if (s === 'dead') this.character.setPose('Death_A', null, 0.15);
@@ -441,7 +453,7 @@ export class Actor {
   }
 
   // falling from high enough (a cliff, a tall build, a launch) to open the glider again
-  canRedeploy() { return this.state === 'ground' && !this.onGround && !this.swimming && this.vel.y < -4 && this.heightAboveGround() > REDEPLOY_HEIGHT; }
+  canRedeploy() { return this.state === 'ground' && !this.onGround && !this.swimming && this.vel.y < (this.game.zeroBuild ? -1 : -4) && this.heightAboveGround() > (this.game.zeroBuild ? 7 : REDEPLOY_HEIGHT); }
 
   // Sparkles while using an item: blue at the mouth for drinks, green around the chest for heals.
   _useFx(dt, drink) {
@@ -518,6 +530,7 @@ export class Actor {
     if (this.state === 'ground' && this.mantleT > 0) { this._updateMantle(dt); return; }
     if (this.state === 'ground' && this.grapple) { this._updateGrapple(dt); return; }
     if (this.hiddenIn) { this.vel.set(0, 0, 0); this.sprinting = false; return; }
+    if (this.splatT > 0) { this.splatT -= dt; this.vel.x = this.vel.z = 0; this.sprinting = false; world.moveBody(this, dt); return; }
     if (this.state === 'ground') {
       const mlen = Math.hypot(it.mx, it.mz);
       if (this.emote && (mlen > 0.2 || it.jump || this.slideT > 0)) this.emote = null;
@@ -535,6 +548,7 @@ export class Actor {
         speed = it.sprint ? 5.8 : 4.4;
         this.crouched = false; this.slideT = 0; this.sprinting = false; this.tacSprint = false;
         if (!this._wasSwimming) { this.setBuildMode?.(null); if (this.distToCam < 40) this.game.effects.dust(this.pos, 8, 1.2); }
+        this.stamina = Math.min(100, this.stamina + STAMINA_REGEN * 1.5 * dt); // swimming refills stamina
       } else if (this.inWater) speed *= 0.65;
       this._wasSwimming = this.swimming;
       // flung by a shockwave: keep the momentum instead of braking in the air
@@ -542,7 +556,10 @@ export class Actor {
       const k = this.onGround ? 14 : this.flungT > 0 ? 0.35 : 3;
       if (this.slideT > 0) {
         this.slideT -= dt;
-        const sp = 3 + 9 * Math.max(0, this.slideT / SLIDE_TIME);
+        let sp = 3 + 9 * Math.max(0, this.slideT / SLIDE_TIME);
+        // sliding downhill keeps going (and speeds up) for as long as the slope lasts
+        const drop = world.heightAt(this.pos.x, this.pos.z) - world.heightAt(this.pos.x + this.slideDir.x * 1.5, this.pos.z + this.slideDir.z * 1.5);
+        if (drop > 0.2 && this.onGround && !this.swimming) { this.slideT = Math.max(this.slideT, 0.3); sp = Math.max(sp, Math.min(14, 9 + drop * 3)); }
         this.vel.x = this.slideDir.x * sp;
         this.vel.z = this.slideDir.z * sp;
         if (this.slideT <= 0 && !this.crouchHeld) this.crouched = false;
@@ -562,6 +579,18 @@ export class Actor {
         this.slideT = 0;
         this.vel.y = JUMP_VEL;
         this.onGround = false;
+        const hsp = Math.hypot(this.vel.x, this.vel.z);
+        if (this.swimming && hsp > 2) {
+          // dolphin dive: leap forward out of the water
+          this.vel.x *= 1.5; this.vel.z *= 1.5; this.vel.y = JUMP_VEL * 0.8; this.flungT = 0.5;
+        } else if (this.sprinting && hsp > 6) {
+          // Ledge Jump: sprinting off the very edge of a drop sends you further, with more hang time
+          const ex = this.pos.x + (this.vel.x / hsp) * 1.6, ez = this.pos.z + (this.vel.z / hsp) * 1.6;
+          if (this.pos.y - world.groundAt(ex, ez, this.pos.y, 0.3) > 2.5) {
+            this.vel.x *= 1.35; this.vel.z *= 1.35; this.vel.y = JUMP_VEL * 1.12;
+            this.flungT = 0.8; this.floatT = 0.7;
+          }
+        }
         this.character.setPose('Jump_Start', null, 0.08, 1.6);
         this.jumpT = 0;
         this.game.sound?.play('jump', this.pos);
@@ -569,13 +598,24 @@ export class Actor {
       if (it.redeploy && this.canRedeploy()) { this.setState('glide'); this.game.sound?.play('glider', this.isPlayer ? null : this.pos); return; }
 
       const wasGround = this.onGround;
-      world.moveBody(this, dt);
+      if (this.floatT > 0) this.floatT -= dt;
+      world.moveBody(this, dt, this.floatT > 0 && this.vel.y < 3 ? 0.55 : 1);
+      if (this.onGround) this.scrambles = 0;
       if (this.onGround && !wasGround && this.landSpeed > 7) {
         this.onHardLanding?.(this.landSpeed);
-        // a real drop while running: roll out of it and keep the speed
-        if (this.landSpeed > 11 && Math.hypot(this.vel.x, this.vel.z) > 3) { this.rollT = 0.5; this.character.setPose('Dodge_Forward', null, 0.06, 1.3); }
-        if (this.landSpeed > FALL_SAFE && !(this.noFallT > 0)) this.fallDamage(Math.round((this.landSpeed - FALL_SAFE) * 5.5));
+        // Roll Landing: hold or tap Jump just before landing to roll out of it, keep your speed and
+        // get some stamina back (bots roll automatically on big drops)
+        const wantRoll = this.isPlayer ? it.rollReady : this.landSpeed > 11;
+        let dmgK = 1;
+        if (wantRoll && this.landSpeed > 9 && Math.hypot(this.vel.x, this.vel.z) > 2) {
+          this.rollT = 0.5; this.character.setPose('Dodge_Forward', null, 0.06, 1.3);
+          this.stamina = Math.min(100, this.stamina + 16);
+          dmgK = 0.6;
+        }
+        if (this.landSpeed > FALL_SAFE && !(this.noFallT > 0)) this.fallDamage(Math.round((this.landSpeed - FALL_SAFE) * 5.5 * dmgK));
       }
+      // shoulder bash: sprint, slide or roll into a closed door to burst through it
+      this._bashCheck(dt);
       // sprinting into something low (fence, crate, rail): hurdle over it
       if (this.sprinting && this.blocked && this.onGround && mlen > 0.3) this._tryHurdle(it.mx / mlen, it.mz / mlen);
       // footsteps
@@ -607,7 +647,9 @@ export class Actor {
       const hs = 17;
       this.vel.x = damp(this.vel.x, it.mx * hs, 2.2, dt);
       this.vel.z = damp(this.vel.z, it.mz * hs, 2.2, dt);
-      const dive = Math.hypot(it.mx, it.mz) > 0.1 ? -30 : -24;
+      // look straight down to dive faster
+      const down = Math.max(0, Math.min(1, -(this.aimPitch || 0) / 1.2));
+      const dive = (Math.hypot(it.mx, it.mz) > 0.1 ? -30 : -24) - down * 14;
       this.vel.y = damp(this.vel.y, dive, 1.5, dt);
       world.moveBody(this, dt, 0);
       const hag = this.heightAboveGround();
@@ -620,6 +662,8 @@ export class Actor {
       this.vel.y = damp(this.vel.y, -6.5, 3, dt);
       world.moveBody(this, dt, 0);
       if (this.onGround) this.land();
+      // Zero Build: cut the glider (jump) and free-fall; you can redeploy whenever you're high enough
+      else if (this.game.zeroBuild && it.jumpPress && this.game.time - (this.glideStart || 0) > 0.4) { this.setState('ground'); this.onGround = false; this.character.setPose('Jump_Idle', null, 0.2); }
     }
   }
 
@@ -630,7 +674,42 @@ export class Actor {
     this.flashT = 0.25;
     this.game.sound?.play('fall', this.isPlayer ? null : this.pos);
     if (this.isPlayer) { this.game.hud.hurt(); this.game.effects.damageNumber(this.chest(new THREE.Vector3()), dmg, false, false); }
-    if (this.health <= 0) { this.health = 0; this.deathCause = 'fall'; this.die(null); }
+    if (this.health <= 0) {
+      // outside ranked (Arena), a fall that would finish you leaves you on 1 HP with no shield
+      // and a short "splat" where you can't shoot or build
+      if (this.game.mode !== 'arena') {
+        this.health = 1; this.shield = 0; this.overshield = 0;
+        this.splatT = 1.1;
+        this.vel.x = this.vel.z = 0;
+        this.character.setPose(this.character.q ? 'LayToIdle' : 'Hit_A', null, 0.05, 1.2);
+        if (this.isPlayer) this.game.hud?.toast?.('Splat! 1 HP left');
+        return;
+      }
+      this.health = 0; this.deathCause = 'fall'; this.die(null);
+    }
+  }
+
+  // Sprinting, sliding or rolling into a closed door bashes it open (once per sprint).
+  _bashCheck(dt) {
+    const moving = (this.sprinting && this.onGround) || this.slideT > 0 || this.rollT > 0;
+    if (!moving) { this.bashed = false; return; }
+    if (this.bashed || (this._bashT = (this._bashT || 0) - dt) > 0) return;
+    this._bashT = 0.1;
+    const H = this.game.homes;
+    const d = H?.nearestDoor(this.pos, 1.5);
+    if (!d || d.open || d.broken) return;
+    const c = H._doorCenter(d), hs = Math.hypot(this.vel.x, this.vel.z) || 1;
+    if (((c.x - this.pos.x) * this.vel.x + (c.z - this.pos.z) * this.vel.z) / (hs * (Math.hypot(c.x - this.pos.x, c.z - this.pos.z) || 1)) < 0.4) return;
+    H.setDoor(d, true);
+    this.bashed = true;
+    this.game.sound?.play('break', this.isPlayer ? null : this.pos, { vol: 0.5 });
+    if (this.isPlayer) this.game.rig.shake = Math.min(1, (this.game.rig.shake || 0) + 0.25);
+    // anyone right behind the door gets shoved back (no damage)
+    for (const a of this.game.actors) {
+      if (a === this || !a.alive || a.state !== 'ground') continue;
+      const dx = a.pos.x - c.x, dz = a.pos.z - c.z, dd = Math.hypot(dx, dz);
+      if (dd < 1.6 && dd > 0.01) { a.vel.x += (dx / dd) * 7; a.vel.z += (dz / dd) * 7; a.vel.y = Math.max(a.vel.y, 3); a.flungT = 0.3; }
+    }
   }
 
   onHardLanding(speed) {

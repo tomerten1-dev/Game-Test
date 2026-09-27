@@ -329,7 +329,7 @@ export class Building {
 
   // Place a planned piece. Returns the structure or null.
   build(actor, plan, mat) {
-    if (this.game.zeroBuild) return null;
+    if (this.game.zeroBuild || actor.splatT > 0) return null;
     mat = this.pickMat(actor, mat);
     if (!plan || actor.state !== 'ground' || !this.isValid(plan, actor, mat)) return null;
     const st = MAT_STATS[mat];

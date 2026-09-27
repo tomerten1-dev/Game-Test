@@ -1,3 +1,4 @@
+import { setting } from '../ui/Settings.js';
 import * as THREE from 'three';
 import { Actor } from './Actor.js';
 import { TOWNS } from '../world/Terrain.js';
@@ -42,17 +43,29 @@ export class Player extends Actor {
     this.aimPitch = rig.pitch + rig.recoil;
     this.aiming = input.down('aim') && !this.buildMode;
     const m = input.move();
+    // auto-run (= by default): keep running forward until you press forward or back
+    if (input.pressed('autorun')) this.autoRunning = !this.autoRunning;
+    if (this.autoRunning && (input.pressed('forward') || input.pressed('back') || this.state !== 'ground')) this.autoRunning = false;
+    const my = this.autoRunning && Math.abs(m.y) < 0.1 ? 1 : m.y;
     // camera-relative move direction
     const sy = Math.sin(rig.yaw), cy = Math.cos(rig.yaw);
-    this.intent.mx = -sy * m.y + cy * m.x;
-    this.intent.mz = -cy * m.y - sy * m.x;
-    // sprint: hold Shift (touch: push the stick all the way)
-    this.intent.sprint = input.down('sprint') || Math.hypot(input.touchMove.x, input.touchMove.y) > 0.95;
+    this.intent.mx = -sy * my + cy * m.x;
+    this.intent.mz = -cy * my - sy * m.x;
+    // sprint: hold Shift, or toggle it, or sprint by default (then Shift walks) — see Settings
+    const g = this.game;
+    let sprintOn;
+    if (setting(g, 'sprintByDefault', false)) sprintOn = !input.down('sprint');
+    else if (setting(g, 'toggleSprint', false)) {
+      if (input.pressed('sprint')) this.sprintToggled = !this.sprintToggled;
+      if (Math.hypot(m.x, my) < 0.1) this.sprintToggled = false;
+      sprintOn = !!this.sprintToggled;
+    } else sprintOn = input.down('sprint');
+    this.intent.sprint = sprintOn || Math.hypot(input.touchMove.x, input.touchMove.y) > 0.95;
     if (input.pressed('crouch') && this.state === 'ground') {
       if (this.sprinting && this.onGround) { this.crouchHeld = false; this.startSlide(); }
       else { this.crouchHeld = !this.crouchHeld; this.crouched = this.crouchHeld; }
     }
-    if (input.down('sprint') && this.crouchHeld && this.slideT <= 0) this.crouchHeld = this.crouched = false;
+    if (this.intent.sprint && input.down('sprint') && this.crouchHeld && this.slideT <= 0) this.crouchHeld = this.crouched = false;
     this.intent.jump = input.down('jump');
     // quick 90s: run up the ramp we just built
     if (this.autoRun && (this.autoRun.t -= dt) > 0 && this.pos.y < this.autoRun.top - 0.3) {
@@ -63,5 +76,8 @@ export class Player extends Actor {
     // glider redeploy: jump while falling from high up
     this.intent.redeploy = this.state === 'ground' && !this.onGround && input.pressed('jump');
     this.intent.jumpPress = input.pressed('jump');
+    // roll landing: jump held, or tapped just before touching down
+    if (this.intent.jumpPress) this._jumpPressT = g.time;
+    this.intent.rollReady = input.down('jump') || g.time - (this._jumpPressT || -9) < 0.3;
   }
 }

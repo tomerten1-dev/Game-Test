@@ -62,7 +62,7 @@ export class Combat {
   fire(shooter, origin, aimDir, muzzle) {
     const g = this.game;
     const w = shooter.weapon;
-    if (!w) return false;
+    if (!w || shooter.splatT > 0) return false; // no shooting while getting up from a splat
     if (!w.canFire()) {
       if (w.ammo <= 0 && !w.reloading) this.reload(shooter);
       return false;

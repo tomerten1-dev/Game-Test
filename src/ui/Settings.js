@@ -9,7 +9,7 @@ const BINDABLE = [
   ['wall', 'Wall'], ['floor', 'Floor'], ['ramp', 'Ramp'], ['cone', 'Cone'], ['build', 'Build mode'], ['edit', 'Edit'], ['ninety', 'Quick 90s'],
   ['map', 'Map'], ['emote', 'Emote'], ['mute', 'Mute'],
   ['slot1', 'Harvesting tool'], ['slot2', 'Weapon slot 2'], ['slot3', 'Weapon slot 3'], ['slot4', 'Weapon slot 4'], ['slot5', 'Weapon slot 5'], ['slot6', 'Weapon slot 6'],
-  ['inventory', 'Inventory'], ['drop', 'Drop held item'], ['ping', 'Ping (also middle mouse)'], ['shoulder', 'Swap camera shoulder'],
+  ['inventory', 'Inventory'], ['drop', 'Drop held item'], ['ping', 'Ping (also middle mouse)'], ['shoulder', 'Swap camera shoulder'], ['autorun', 'Auto-run'],
 ];
 const SLIDERS = [
   ['sensitivity', 'Mouse sensitivity', 0.3, 3, 0.05, (v) => `${v.toFixed(2)}×`],
@@ -22,6 +22,7 @@ const keyName = keyLabel;
 // on/off gameplay options (missing from older saves = on)
 const TOGGLES = [['autoPickup', 'Auto pick up weapons'], ['stackDamage', 'Stack damage numbers'], ['autoSort', 'Auto sort consumables right'],
   ['weaponReticles', 'Crosshair changes per weapon'], ['throwArc', 'Show throw arc'], ['legacyHitSound', 'Legacy headshot sound', false],
+  ['sprintByDefault', 'Sprint by default (sprint key walks)', false], ['toggleSprint', 'Toggle sprint (instead of hold)', false],
   ['tapToSearch', 'Tap to search (no holding)', false], ['holdToSwap', 'Hold to swap when inventory is full'],
   ['questTracker', 'Quest tracker in matches'], ['showMinimap', 'Show minimap'], ['showCompass', 'Show compass'], ['showKillfeed', 'Show kill feed'], ['showFps', 'FPS counter', false]];
 // preferred inventory slot per kind of gun (0 = any)
