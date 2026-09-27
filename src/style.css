@@ -69,3 +69,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1830; col
 .dmg-num.head { color: #ffd23f; font-size: 36px; }
 #banner { position: absolute; left: 50%; top: 22%; transform: translate(-50%, -10px); font-family: var(--title); font-size: clamp(20px, 3vw, 32px); text-align: center; white-space: nowrap; color: #fff; text-shadow: 0 3px 0 rgba(20,30,70,0.7), 0 0 20px rgba(0,0,0,0.35); opacity: 0; transition: opacity 0.35s, transform 0.35s; }
 #banner.show { opacity: 1; transform: translate(-50%, 0); }
+#prompt { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 8px 16px 8px 8px; border-radius: 12px; background: rgba(10,18,40,0.62); font-size: 22px; font-weight: 700; letter-spacing: 0.3px; white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,0.25); }
+#prompt .key { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; background: #fff; color: #14204a; font-family: var(--title); font-size: 20px; box-shadow: 0 3px 0 #9aa6c8; }
+#toast { position: absolute; left: 50%; top: 68%; transform: translateX(-50%); font-weight: 700; font-size: 20px; color: #ffd6d6; text-shadow: 0 2px 4px rgba(0,0,0,0.6); opacity: 0; }
+#toast.show { animation: toast 1.6s ease-out; }
+@keyframes toast { 0% { opacity: 0; transform: translate(-50%, 8px); } 12% { opacity: 1; transform: translate(-50%, 0); } 75% { opacity: 1; } 100% { opacity: 0; } }
+#mats { display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 22px; text-shadow: 0 2px 0 rgba(0,0,0,0.4); }
+.wood-icon { width: 22px; height: 16px; border-radius: 3px; background: repeating-linear-gradient(180deg, #d19a5b 0 5px, #a36c3a 5px 6px); box-shadow: 0 2px 0 rgba(0,0,0,0.35); transform: skewX(-8deg); }

@@ -15,11 +15,14 @@ export class HUD {
           <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
         </div>
         <div id="banner"></div>
+        <div id="prompt" class="hidden"><span class="key">E</span><span id="prompt-text"></span></div>
+        <div id="toast"></div>
         <div id="reload-ring" class="hidden"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16"/></svg><span>RELOADING</span></div>
         <div id="bottom-right">
           <div id="ammo"><span id="ammo-cur">0</span><span id="ammo-max">/0</span></div>
           <div id="weapon-name"></div>
           <div id="slots"></div>
+          <div id="mats"><span class="wood-icon"></span><span id="wood">0</span></div>
         </div>
       </div>`);
     this.el = {
@@ -35,6 +38,10 @@ export class HUD {
       stormTint: root.querySelector('#storm-tint'),
       hurt: root.querySelector('#hurt-flash'),
       banner: root.querySelector('#banner'),
+      prompt: root.querySelector('#prompt'),
+      promptText: root.querySelector('#prompt-text'),
+      toast: root.querySelector('#toast'),
+      wood: root.querySelector('#wood'),
     };
     this.el.slots.innerHTML = [0, 1, 2].map((i) => `<div class="slot" data-slot="${i}"><span class="key">${i + 1}</span><span class="icon"></span></div>`).join('');
     this.slotEls = [...this.el.slots.querySelectorAll('.slot')];
@@ -66,6 +73,25 @@ export class HUD {
     b.classList.add('show');
     clearTimeout(this._bannerT);
     this._bannerT = setTimeout(() => b.classList.remove('show'), seconds * 1000);
+  }
+
+  prompt(text, rarity) {
+    const key = text ? text + rarity : null;
+    if (this.cache.prompt === key) return;
+    this.cache.prompt = key;
+    this.el.prompt.classList.toggle('hidden', !text);
+    if (text) {
+      this.el.promptText.textContent = text;
+      this.el.promptText.style.color = rarity !== undefined ? RARITIES[rarity].color : '#fff';
+    }
+  }
+
+  toast(text) {
+    const t = this.el.toast;
+    t.textContent = text;
+    t.classList.remove('show');
+    void t.offsetWidth;
+    t.classList.add('show');
   }
 
   stormTint(on) {
@@ -109,6 +135,7 @@ export class HUD {
       s.style.setProperty('--rar', sw ? RARITIES[sw.rarity].color : 'rgba(255,255,255,0.15)');
       s.querySelector('.icon').textContent = sw ? sw.def.icon : '';
     });
+    this.set('wood', this.el.wood, String(p.wood));
     const rl = w?.reloading;
     this.el.reload.classList.toggle('hidden', !rl);
     if (rl) this.el.reloadCircle.style.strokeDashoffset = String(100.5 * (w.reloadT / w.def.reload));

@@ -14,6 +14,8 @@ import { Bot } from '../bots/Bot.js';
 import { BOT_NAMES, botColors } from '../bots/names.js';
 import { Storm } from '../world/Storm.js';
 import { Bus } from '../world/Bus.js';
+import { Loot } from '../world/Loot.js';
+import { Building } from '../world/Building.js';
 import { HUD } from '../ui/HUD.js';
 
 export class Game {
@@ -55,6 +57,9 @@ export class Game {
     this.hud = new HUD(ui, this);
     this.storm = new Storm(this.scene, this.world.terrain);
     this.bus = new Bus(this.scene);
+    this.loot = new Loot(this);
+    this.building = new Building(this);
+    this._firstMatch = true;
     this.rig = new CameraRig(this.camera, this.world);
     this.focus = new THREE.Vector3();
     this.startMatch();
@@ -70,6 +75,9 @@ export class Game {
     this.matchOver = false;
     this.bus.launch();
     this.storm.reset();
+    this.building.reset();
+    if (!this._firstMatch) this.loot.reset();
+    this._firstMatch = false;
 
     this.player = new Player(this);
     this.actors.push(this.player);
@@ -150,6 +158,8 @@ export class Game {
       b.update(dt);
     }
     this.updateStorm(dt);
+    this.loot.update(dt, this.time);
+    this.building.update(dt);
     for (const a of this.actors) {
       a.updateMovement(dt);
       for (const w of a.weapons) if (w && w.update(dt) === 'reloaded' && a.isPlayer) this.sound.play('reloaded');
@@ -176,6 +186,16 @@ export class Game {
       }
     }
     if (input.pressed('reload')) this.combat.reload(p);
+    if (p.state === 'ground') {
+      if (input.pressed('wall') && !this.building.buildWall(p) && p.wood < 10) this.hud.toast?.('Need 10 wood');
+      if (input.pressed('ramp') && !this.building.buildRamp(p) && p.wood < 10) this.hud.toast?.('Need 10 wood');
+      const near = this.loot.nearestInteractable(p.pos);
+      this.hud.prompt?.(near ? (near.kind === 'chest' ? 'Open Chest' : `Pick up ${this.loot.label(near.pickup)}`) : null, near?.pickup?.weapon?.rarity);
+      if (near && input.pressed('interact')) {
+        if (near.kind === 'chest') this.loot.openChest(near.chest, p);
+        else { const msg = this.loot.collect(near.pickup, p); if (msg) this.hud.toast?.(msg); }
+      }
+    } else this.hud.prompt?.(null);
     if (input.down('fire') && p.weapon && p.state === 'ground') {
       if (!p.weapon.canFire()) {
         if (input.pressed('fire') && p.weapon.ammo <= 0) this.sound.play('empty');
