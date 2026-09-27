@@ -103,8 +103,8 @@ export class Actor {
   ammoFor(type) { return this.infiniteAmmo ? Infinity : this.ammo[type] || 0; }
 
   // Move rounds from the reserve into the magazine when a reload completes.
-  finishReload(w) {
-    const need = w.def.mag - w.ammo;
+  finishReload(w, max = Infinity) {
+    const need = Math.min(max, w.def.mag - w.ammo);
     const take = this.infiniteAmmo ? need : Math.min(need, this.ammo[w.def.ammoType] || 0);
     w.ammo += take;
     if (!this.infiniteAmmo) this.ammo[w.def.ammoType] -= take;
@@ -633,9 +633,17 @@ export class Actor {
     if (i < 0 || i > 5) return false;
     if (this.buildMode) { this.buildMode = null; if (i === this.slot) { this._equip(); return true; } }
     if (i === this.slot) return false;
-    this.weapon?.cancelReload();
+    const prev = this.weapon;
+    prev?.cancelReload();
     this.useT = 0;
     this.slot = i;
+    // draw time; switching from a shotgun you just fired to another shotgun costs extra (no double pumping)
+    const w = this.weapon;
+    if (w) {
+      const shotgun = (x) => x && (x.def.key === 'pump' || x.def.key === 'shotgun');
+      const penalty = shotgun(w) && shotgun(prev) && this.game.time - prev.lastShot < 1 ? 0.6 : 0;
+      w.drawT = Math.max(w.drawT, (w.def.draw || 0.3) + penalty);
+    }
     this._equip();
     return true;
   }

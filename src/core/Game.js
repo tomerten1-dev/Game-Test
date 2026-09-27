@@ -535,7 +535,13 @@ export class Game {
     for (const a of this.actors) {
       a.updateMovement(dt);
       for (const w of a.items) {
-        if (w && w.update(dt) === 'reloaded') { a.finishReload(w); if (a.isPlayer) this.sound.play('reloaded'); }
+        const ev = w && w.update(dt);
+        if (ev === 'reloaded') { a.finishReload(w); if (a.isPlayer) this.sound.play('reloaded'); }
+        else if (ev === 'shell') {
+          a.finishReload(w, 1);
+          if (w.ammo < w.def.mag && a.ammoFor(w.def.ammoType) > 0) { w.reloadT = w.def.shellReload; if (a.isPlayer) this.sound.play('reload'); }
+          else { w.reloading = false; if (a.isPlayer) this.sound.play('reloaded'); }
+        }
       }
       if (this.warmup <= 0) this.loot.autoPickup(a);
     }

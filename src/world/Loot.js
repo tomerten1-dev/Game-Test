@@ -357,8 +357,11 @@ export class Loot {
     g.add(mesh);
     // rarity light beam + base ring
     // soft rarity light: thin and faint (it only has to catch your eye, not light up the area)
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.2, 2.4, 10, 1, true), new THREE.MeshBasicMaterial({ map: beamTexture(), color, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-    beam.position.y = 1.2;
+    // grey barely shows, gold stands out
+    const rar = item.type === 'weapon' ? item.weapon.rarity : 1;
+    const bh = 1.4 + rar * 0.35;
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.2, bh, 10, 1, true), new THREE.MeshBasicMaterial({ map: beamTexture(), color, transparent: true, opacity: 0.08 + rar * 0.06, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    beam.position.y = bh / 2;
     g.add(beam);
     const ring = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTex, color, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
     ring.material.opacity = 0.3;
@@ -395,7 +398,8 @@ export class Loot {
     c.glow.visible = false;
     this.game.sound.play('chest', actor.isPlayer ? null : _v.set(c.x, c.y, c.z));
     const out = [];
-    const w = new Weapon(rollWeaponType(c.rare ? 'rare' : 'chest'), rollRarity(Math.random, c.rare ? 2.2 : 1));
+    // chests never give grey weapons
+    const w = new Weapon(rollWeaponType(c.rare ? 'rare' : 'chest'), Math.max(1, rollRarity(Math.random, c.rare ? 2.2 : 1)));
     out.push({ type: 'weapon', weapon: w });
     out.push(Loot.ammoFor(w));
     if (c.rare) {

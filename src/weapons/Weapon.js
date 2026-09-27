@@ -13,6 +13,7 @@ export class Weapon {
     this.cooldown = 0;
     this.reloading = false;
     this.reloadT = 0;
+    this.drawT = 0; // equip time before it can fire
   }
 
   get rarityInfo() { return RARITIES[this.rarity]; }
@@ -28,10 +29,13 @@ export class Weapon {
 
   update(dt) {
     this.cooldown = Math.max(0, this.cooldown - dt);
+    this.drawT = Math.max(0, this.drawT - dt);
     this.bloom = Math.max(0, this.bloom - this.def.recover * dt);
     if (this.reloading) {
       this.reloadT -= dt;
       if (this.reloadT <= 0) {
+        // shotguns load one shell at a time (the owner decides whether to keep going)
+        if (this.def.shellReload) return 'shell';
         this.reloading = false;
         return 'reloaded'; // the owner moves ammo from its reserve (Actor.finishReload)
       }
@@ -49,9 +53,11 @@ export class Weapon {
     return (d.spread + this.bloom + (moving ? d.spread * 1.2 : 0) + (airborne ? d.spread * 3 : 0)) * crouch;
   }
 
-  canFire() { return !this.reloading && this.cooldown <= 0 && this.ammo > 0; }
+  // shotguns can fire mid-reload (that stops the reload); nothing fires while being drawn
+  canFire() { return (!this.reloading || (this.def.shellReload && this.ammo > 0)) && this.cooldown <= 0 && this.ammo > 0 && this.drawT <= 0; }
 
   onFire(now = 0) {
+    if (this.reloading) this.reloading = false;
     this.lastShot = now;
     this.ammo--;
     this.cooldown = 1 / this.def.rate;
@@ -61,7 +67,7 @@ export class Weapon {
   startReload(reserve = Infinity) {
     if (this.reloading || this.ammo >= this.def.mag || reserve <= 0) return false;
     this.reloading = true;
-    this.reloadT = this.def.reload;
+    this.reloadT = this.def.shellReload || this.def.reload;
     return true;
   }
 
