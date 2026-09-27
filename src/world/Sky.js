@@ -80,14 +80,22 @@ function makeCloudGeometry(rand) {
 }
 
 export class Clouds {
-  constructor(scene, count = 26) {
+  constructor(scene, count = 26, models = null) {
     const rand = mulberry32(99);
     const mat = new THREE.MeshLambertMaterial({ color: '#ffffff', emissive: '#aebfd9', emissiveIntensity: 0.45, fog: false });
     this.templates = [];
     this.items = [];
     const perTemplate = Math.ceil(count / 4);
+    // KayKit cloud shapes (normalized to ~28 m) mixed with procedural puffs
+    const kk = ['kk/cloud_big', 'kk/cloud_small'].map((n) => models?.get(n)).filter(Boolean).map((info) => {
+      const g = info.parts[0].geometry.clone();
+      g.scale(28 / info.size.x, 28 / info.size.x, 28 / info.size.x);
+      for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
+      return g;
+    });
     for (let t = 0; t < 4; t++) {
-      const im = new THREE.InstancedMesh(makeCloudGeometry(rand), mat, perTemplate);
+      const geo = kk[t] || makeCloudGeometry(rand);
+      const im = new THREE.InstancedMesh(geo, mat, perTemplate);
       im.frustumCulled = false;
       scene.add(im);
       this.templates.push(im);

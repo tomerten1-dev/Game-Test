@@ -10,12 +10,12 @@ const GLIDE_HEIGHT = 35;
 
 // Shared body for the player and bots: state machine, physics, animation, health.
 export class Actor {
-  constructor(game, { name, color, isPlayer = false }) {
+  constructor(game, { name, color, isPlayer = false, type = 'Knight' }) {
     this.game = game;
     this.name = name;
     this.isPlayer = isPlayer;
     this.color = new THREE.Color(color);
-    this.character = new Character(game.assets, color);
+    this.character = new Character(game.assets, color, type, isPlayer ? 0.35 : 0.3);
     this.root = this.character.root;
     this.glider = makeGlider(color);
     this.root.add(this.glider);
@@ -62,8 +62,8 @@ export class Actor {
     this.glider.visible = s === 'glide';
     this.root.visible = s !== 'bus';
     this.character.model.rotation.x = 0;
-    if (s === 'dead') this.character.play('Death', 0.15);
-    else if (s === 'skydive' || s === 'glide') this.character.play('Jump', 0.25, 0.6);
+    if (s === 'dead') this.character.setPose('Death_A', null, 0.15);
+    else if (s === 'skydive' || s === 'glide') this.character.setPose('Jump_Idle', null, 0.25);
   }
 
   jumpFromBus(busPos, busVel) {
@@ -93,7 +93,7 @@ export class Actor {
       if (it.jump && this.onGround) {
         this.vel.y = JUMP_VEL;
         this.onGround = false;
-        this.character.play('Jump', 0.1, 1.4);
+        this.character.setPose('Jump_Start', null, 0.08, 1.6);
         this.jumpT = 0;
         this.game.sound?.play('jump', this.pos);
       }
@@ -134,7 +134,8 @@ export class Actor {
     this.onHardLanding(12);
     this.setState('ground');
     this.vel.y = 0;
-    this.character.play('Idle', 0.2);
+    this.character.setPose('Jump_Land', null, 0.1, 1.3);
+    this.landT = 0.25;
     this.onLanded?.();
   }
 
@@ -145,37 +146,54 @@ export class Actor {
     const hspeed = Math.hypot(this.vel.x, this.vel.z);
     const armed = !!this.weapon && this.state === 'ground' && this.alive && !this.victory;
     const combat = armed && (this.game.time - this.lastFireTime < 1.5 || this.aiming);
+    const w = this.weapon;
+    const hand = w && w.type === 'pistol' ? '1H' : '2H';
+    const firing = this.game.time - this.lastFireTime < 0.25;
+    const upperArmed = !armed ? null : w.reloading ? `${hand}_Ranged_Reload` : firing ? `${hand}_Ranged_Shooting` : `${hand}_Ranged_Aiming`;
     if (this.state === 'ground') {
       let targetYaw = this.bodyYaw;
       if (combat) targetYaw = this.aimYaw;
       else if (hspeed > 0.6) targetYaw = Math.atan2(this.vel.x, this.vel.z);
       else if (armed) targetYaw = this.aimYaw;
       this.bodyYaw = dampAngle(this.bodyYaw, targetYaw, combat ? 25 : 12, dt);
-      if (this.victory) ch.play('Dance', 0.3);
-      else if (!this.onGround && this.vel.y > -20) {
-        this.jumpT = (this.jumpT || 0) + dt;
-        if (ch.currentName !== 'Jump') ch.play('Jump', 0.15, 1.2);
-      } else if (hspeed > 3.2) {
-        ch.play('Running', 0.2);
-        ch.setTimeScale(Math.min(1.5, Math.max(0.6, hspeed / RUN_SPEED)) * 1.0);
+      this.airT = this.onGround ? 0 : (this.airT || 0) + dt;
+      if (this.victory) ch.setPose('Cheer', null, 0.3);
+      else if (!this.alive) { /* death pose set in setState */ }
+      else if (this.airT > 0.12 && this.vel.y > -25) {
+        ch.setPose('Jump_Idle', upperArmed, 0.15);
+        this._wasAir = this.airT > 0.35;
+      } else if (this.landT > 0) {
+        this.landT -= dt;
       } else if (hspeed > 0.5) {
-        ch.play('Walking', 0.2);
-        ch.setTimeScale(Math.max(0.6, hspeed / 2.4));
+        // direction of travel relative to where the body faces
+        const fx = Math.sin(this.bodyYaw), fz = Math.cos(this.bodyYaw);
+        const fwd = (this.vel.x * fx + this.vel.z * fz) / hspeed;
+        const right = (this.vel.x * -fz + this.vel.z * fx) / hspeed;
+        const rate = Math.min(1.5, Math.max(0.6, hspeed / RUN_SPEED));
+        let lower;
+        if (hspeed < 3) lower = fwd > -0.5 ? 'Walking_A' : 'Walking_Backwards';
+        else if (fwd > 0.55) lower = 'Running_A';
+        else if (fwd < -0.55) lower = 'Walking_Backwards';
+        else lower = right > 0 ? 'Running_Strafe_Right' : 'Running_Strafe_Left';
+        ch.setPose(lower, upperArmed, 0.18, lower === 'Walking_Backwards' ? rate * 1.4 : rate);
       } else {
-        ch.play('Idle', 0.2);
+        ch.setPose(armed ? `${hand}_Ranged_Aiming` : 'Idle', upperArmed, 0.2);
       }
+      if (this.onGround && this._wasAir) { this._wasAir = false; this.landT = 0.2; ch.setPose('Jump_Land', upperArmed, 0.08, 1.4); }
       ch.model.rotation.x = damp(ch.model.rotation.x, 0, 10, dt);
     } else if (this.state === 'skydive') {
       if (hspeed > 1) this.bodyYaw = dampAngle(this.bodyYaw, Math.atan2(this.vel.x, this.vel.z), 4, dt);
-      ch.model.rotation.x = damp(ch.model.rotation.x, 1.2, 4, dt);
+      ch.setPose('Jump_Idle', null, 0.3);
+      ch.model.rotation.x = damp(ch.model.rotation.x, 1.25, 4, dt);
       ch.model.position.y = damp(ch.model.position.y, 0.9, 4, dt);
     } else if (this.state === 'glide') {
       if (hspeed > 1) this.bodyYaw = dampAngle(this.bodyYaw, Math.atan2(this.vel.x, this.vel.z), 4, dt);
-      ch.model.rotation.x = damp(ch.model.rotation.x, 0.25, 4, dt);
-      ch.model.position.y = damp(ch.model.position.y, this.game.assets.footOffset, 4, dt);
+      ch.setPose('Jump_Idle', null, 0.3);
+      ch.model.rotation.x = damp(ch.model.rotation.x, 0.2, 4, dt);
+      ch.model.position.y = damp(ch.model.position.y, ch.footOffset, 4, dt);
       this.glider.rotation.z = Math.sin(this.game.time * 1.3) * 0.05;
     }
-    if (this.state === 'ground' || this.state === 'dead') ch.model.position.y = damp(ch.model.position.y, this.game.assets.footOffset, 10, dt);
+    if (this.state === 'ground' || this.state === 'dead') ch.model.position.y = damp(ch.model.position.y, ch.footOffset, 10, dt);
     this.root.rotation.y = this.bodyYaw;
 
     // Damage flash
@@ -189,7 +207,7 @@ export class Actor {
     const every = veryFar ? 0.1 : far ? 0.05 : 0;
     if (this._animAcc >= every) {
       const pitch = this.state === 'ground' ? this.aimPitch : 0;
-      ch.update(this._animAcc, pitch, armed, far);
+      ch.update(this._animAcc, pitch, armed);
       this._animAcc = 0;
     }
   }

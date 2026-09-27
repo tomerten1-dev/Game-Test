@@ -12,8 +12,8 @@ const _muzzle = new THREE.Vector3();
 
 // AI bot: a slow "think" picks goals/targets; a per-frame update steers, aims and shoots.
 export class Bot extends Actor {
-  constructor(game, name, color, skill) {
-    super(game, { name, color });
+  constructor(game, name, color, skill, type = 'Knight') {
+    super(game, { name, color, type });
     this.skill = skill; // 0..1
     this.thinkT = Math.random() * THINK;
     this.goal = new THREE.Vector3();

@@ -2,11 +2,19 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-// CC0 Kenney models (see public/models/env/CREDITS.md).
+// CC0 models: Kenney (env/) and KayKit by Kay Lousberg (kk/). See the CREDITS.md files.
+const KK = [
+  'home_A_blue', 'home_A_red', 'home_A_yellow', 'home_A_green', 'home_B_blue', 'home_B_red', 'home_B_yellow', 'home_B_green',
+  'tavern_red', 'tavern_blue', 'blacksmith_yellow', 'blacksmith_green', 'market_red', 'market_yellow', 'church_blue', 'church_red',
+  'windmill_yellow', 'windmill_green', 'tower_A_green', 'tower_A_red', 'lumbermill_red', 'castle_blue',
+  'tree_single_A', 'tree_single_B', 'rock_single_A', 'rock_single_B', 'rock_single_C', 'rock_single_D', 'rock_single_E',
+  'cloud_big', 'cloud_small', 'barrel', 'crate_A_big', 'sack', 'wheelbarrow', 'tent',
+  'flag_blue', 'flag_red', 'flag_yellow', 'flag_green', 'resource_lumber', 'weaponrack', 'bucket_water', 'chest_gold',
+].map((n) => `kk/${n}`);
 export const ENV_MODELS = [
-  'house1', 'house-3', 'house-4', 'house-5', 'house-7', 'tower',
-  'palm-long', 'palm-short', 'formation-large-stone', 'formation-stone', 'barrel',
+  'palm-long', 'palm-short', 'formation-large-stone', 'formation-stone',
   'blaster', 'blaster-repeater', 'blaster-a',
+  ...KK,
 ];
 
 // Loads GLBs and flattens each into "parts" (one merged geometry per material),
@@ -18,8 +26,10 @@ export class Models {
     const loader = new GLTFLoader();
     let done = 0;
     await Promise.all(names.map(async (n) => {
-      const gltf = await loader.loadAsync(`/models/env/${n}.glb`);
-      this.lib.set(n, this._flatten(gltf.scene));
+      const gltf = await loader.loadAsync(`/models/${n.includes('/') ? n : `env/${n}`}.glb`);
+      const flat = this._flatten(gltf.scene);
+      flat.scene = gltf.scene;
+      this.lib.set(n, flat);
       onProgress(++done / names.length);
     }));
   }

@@ -4,10 +4,10 @@ All models in this folder are by **Kenney** (https://kenney.nl), released under 
 
 | File | Source |
 | --- | --- |
-| house1, house-3, house-4, house-5, house-7, tower, palm-long, palm-short, formation-large-stone, formation-stone, barrel, blaster-a | Kenney models mirrored in pmndrs/market-assets (https://github.com/pmndrs/market-assets) |
+| palm-long, palm-short, formation-large-stone, formation-stone, blaster-a | Kenney models mirrored in pmndrs/market-assets (https://github.com/pmndrs/market-assets) |
 | blaster, blaster-repeater | Kenney Starter Kit FPS (https://github.com/KenneyNL/Starter-Kit-FPS), assets CC0 |
 
 They were converted from Draco-compressed glTF to plain GLB (no decoder needed at runtime).
 Colors are re-tinted in game.
 
-`../RobotExpressive.glb`: "RobotExpressive" by Tomás Laulhé, CC0, from the three.js examples.
+Characters, buildings, trees, rocks, clouds and props are KayKit (see `../kk/CREDITS.md`).

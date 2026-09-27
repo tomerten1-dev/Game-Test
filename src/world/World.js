@@ -39,7 +39,7 @@ export class World {
     this.lighting = new Lighting(scene);
     this.heightTex = this.terrain.buildDataTexture();
     this.water = new Water(scene, this.heightTex);
-    this.clouds = new Clouds(scene);
+    this.clouds = new Clouds(scene, 26, models);
     this.towns = new Towns(scene, this.terrain, this.colliders, models);
     this.foliage = new Foliage(scene, this.terrain, this.colliders, models, this.heightTex);
     const t0 = performance.now();

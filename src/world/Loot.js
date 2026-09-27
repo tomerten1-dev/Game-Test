@@ -90,14 +90,30 @@ export class Loot {
       const y = this.world.groundAt(s.x, s.z, 200, 0.6);
       if (y < 1) continue;
       const group = new THREE.Group();
-      const base = new THREE.Mesh(cg.base, this.chestMat);
-      const lidPivot = new THREE.Object3D();
-      lidPivot.position.set(0, 0.55, -0.35);
-      const lid = new THREE.Mesh(cg.lid, this.chestMat);
-      lid.position.set(0, 0, 0);
-      lidPivot.add(lid);
-      base.castShadow = lid.castShadow = true;
-      group.add(base, lidPivot);
+      let lidPivot;
+      const kk = this.game.models?.get('kk/chest_gold');
+      if (kk) {
+        // KayKit treasure chest, tinted gold; its lid node is already pivoted at the hinge
+        const model = kk.scene.clone(true);
+        const sc = 1.25 / kk.size.x;
+        model.scale.setScalar(sc);
+        model.traverse((o) => {
+          if (o.isMesh) { o.material = this.kkChestMat(o.material); o.castShadow = true; }
+          if (o.name.includes('lid')) lidPivot = o;
+        });
+        group.add(model);
+        if (!lidPivot) lidPivot = new THREE.Object3D();
+        lidPivot.userData.baseRot = lidPivot.rotation.x;
+      } else {
+        const base = new THREE.Mesh(cg.base, this.chestMat);
+        lidPivot = new THREE.Object3D();
+        lidPivot.position.set(0, 0.55, -0.35);
+        const lid = new THREE.Mesh(cg.lid, this.chestMat);
+        lidPivot.add(lid);
+        base.castShadow = lid.castShadow = true;
+        group.add(base, lidPivot);
+        lidPivot.userData.baseRot = 0;
+      }
       const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTex, color: '#ffd76a', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.7 }));
       glow.material.color.multiplyScalar(1.6);
       glow.scale.set(2.6, 2.6, 1);
@@ -111,13 +127,26 @@ export class Loot {
     this.spawnFloorLoot();
   }
 
+  kkChestMat(src) {
+    if (!this._kkMat) {
+      const m = src.clone();
+      m.color.set('#ffd257');
+      m.emissive = new THREE.Color('#7a4b00');
+      m.emissiveIntensity = 0.45;
+      m.roughness = 0.35;
+      m.metalness = 0.35;
+      this._kkMat = m;
+    }
+    return this._kkMat;
+  }
+
   reset() {
     for (const p of this.pickups) this._removePickup(p);
     this.pickups = [];
     for (const c of this.chests) {
       c.opened = false;
       c.openT = 0;
-      c.lidPivot.rotation.x = 0;
+      c.lidPivot.rotation.x = c.lidPivot.userData.baseRot || 0;
       c.glow.visible = true;
     }
     this.spawnFloorLoot();
@@ -147,6 +176,12 @@ export class Loot {
       mesh.scale.setScalar(1.5);
       mesh.position.y = 0.55;
       color = RARITIES[item.weapon.rarity].color;
+    } else if (item.type === 'wood' && this.game.models?.get('kk/resource_lumber')) {
+      const info = this.game.models.get('kk/resource_lumber');
+      mesh = this.game.models.instance('kk/resource_lumber');
+      mesh.scale.setScalar(0.9 / info.size.x);
+      mesh.position.y = 0.3;
+      color = '#c68b52';
     } else {
       mesh = new THREE.Mesh(item.type === 'shield' ? this.itemGeo.shield : item.type === 'medkit' ? this.itemGeo.med : this.itemGeo.wood, this.itemMat);
       mesh.position.y = 0.3;
@@ -307,10 +342,10 @@ export class Loot {
       if (c.opened && c.openT < 1) {
         c.openT = Math.min(1, c.openT + dt * 3);
         const k = 1 - Math.pow(1 - c.openT, 3);
-        c.lidPivot.rotation.x = -1.9 * k;
+        c.lidPivot.rotation.x = (c.lidPivot.userData.baseRot || 0) - 1.9 * k;
       } else if (!c.opened) {
         c.glow.material.opacity = 0.5 + Math.sin(t * 3 + c.x) * 0.2;
-        c.lidPivot.rotation.x = Math.max(-0.08, Math.sin(t * 5 + c.z) * 0.05) * (Math.sin(t * 1.3 + c.x) > 0.7 ? 1 : 0);
+        c.lidPivot.rotation.x = (c.lidPivot.userData.baseRot || 0) + Math.min(0, -Math.abs(Math.sin(t * 5 + c.z)) * 0.08) * (Math.sin(t * 1.3 + c.x) > 0.7 ? 1 : 0);
       }
     }
     for (const p of this.pickups) {

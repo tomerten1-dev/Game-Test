@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { World } from '../world/World.js';
 import { TOWNS } from '../world/Terrain.js';
-import { CharacterAssets } from '../player/Character.js';
+import { CharacterAssets, CHARACTER_TYPES } from '../player/Character.js';
 import { Player } from '../player/Player.js';
 import { CameraRig } from '../player/CameraRig.js';
 import { Input } from './Input.js';
@@ -52,8 +52,8 @@ export class Game {
   }
 
   async init(progress = () => {}) {
-    progress(0.1, 'Loading robots…');
-    this.assets = await CharacterAssets.load();
+    progress(0.05, 'Loading heroes…');
+    this.assets = await CharacterAssets.load((k) => progress(0.05 + k * 0.15));
     progress(0.2, 'Loading the island…');
     this.models = new Models();
     await this.models.load(undefined, (k) => progress(0.2 + k * 0.2));
@@ -156,7 +156,7 @@ export class Game {
     const colors = botColors(19);
     this.bots = [];
     for (let i = 0; i < 19; i++) {
-      const b = new Bot(this, BOT_NAMES[i], colors[i], Math.random());
+      const b = new Bot(this, BOT_NAMES[i], colors[i], Math.random(), CHARACTER_TYPES[i % CHARACTER_TYPES.length]);
       b.giveWeapon(new Weapon('pistol', 0));
       this.bots.push(b);
       this.actors.push(b);

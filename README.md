@@ -1,6 +1,6 @@
 # Stormbound
 
-A browser battle royale: **you vs 19 AI bots** on a bright, stylized island. Ride the flying Battle Bus, skydive, loot glowing chests, build walls and ramps, and be the last robot standing while the purple storm closes in.
+A browser battle royale: **you vs 19 AI heroes** on a bright, stylized island. Ride the flying Battle Bus, skydive, loot glowing chests, build walls and ramps, and be the last robot standing while the purple storm closes in.
 
 Built from scratch with **Vite + Three.js** (ES modules, plain JavaScript). No game engine.
 
@@ -70,7 +70,7 @@ src/
   weapons/   Weapon stats & rarities, weapon instances, procedural gun models, hitscan combat
   effects/   Pooled muzzle flashes, tracers, particles, damage numbers, elimination bursts
   ui/        HUD, minimap, menus, touch controls
-public/models/RobotExpressive.glb   CC0 animated robot (three.js examples)
+public/models/        CC0 models: chars/ (KayKit heroes), kk/ (KayKit world), env/ (Kenney)
 ```
 
 ## Tech notes
@@ -79,12 +79,16 @@ public/models/RobotExpressive.glb   CC0 animated robot (three.js examples)
   (three.js r186 folded `PCFSoftShadowMap` into `PCFShadowMap`. Soft edges come from `shadow.radius`.)
 - **Terrain:** a 460 m height grid from fbm noise. `heightAt(x, z)` is bilinear, and everything (movement, grass, bullets, camera) uses it. Towns are flattened plateaus.
 - **Foliage:** instanced trees (round, pine, some autumn), rocks and bushes. Grass is one instanced draw call with a wind-sway vertex shader that samples a height texture and wraps around the player.
-- **Characters:** every player/bot is a `SkeletonUtils.clone` of the robot, scaled to 1.8 m with its "Main" material tinted (player = teal). Animations crossfade over 0.2 s, running speed follows movement speed, and a small arm IK makes robots hold their gun.
+- **Characters:** KayKit Adventurers (Knight, Barbarian, Mage, Rogue, Hooded Rogue). Each player/bot is a `SkeletonUtils.clone` with a subtle color tint; you are the teal hooded rogue with a glowing backpack antenna. Animation runs on two layers: the legs play run / strafe / backpedal / jump while the upper body plays aim / shoot / reload. Crossfades take 0.2 s and running speed follows movement speed.
 - **Performance:** instancing, object pools for effects, bot "think" every ~0.3 s, animation LOD for far robots, and lower pixel ratio / shadows / grass on mobile.
 - **Post-processing:** [`postprocessing`](https://github.com/pmndrs/postprocessing) + [`n8ao`](https://github.com/N8python/n8ao): ambient occlusion, bloom on glowing things (loot beams, chests, muzzle flashes, sun), a warm/cool color grade and SMAA.
 - **Baked lighting:** at load the game traces sun rays from every terrain point against houses, tree canopies, rocks and the mountain. That gives soft shadows and ambient occlusion across the whole island. Near the player they fade into the real shadow map.
 - **Water:** depth-tinted from the terrain height (turquoise shallows, deep blue sea), animated shore foam, small waves.
 - **Life:** wind-swaying trees and palms, falling leaves, birds, fountain spray, chest sparkles, dust puffs, skydive speed lines, victory confetti.
-- **Assets:** houses, the castle tower, palms, rock spires, barrels and the pistol/SMG/AR blasters are **Kenney CC0** models (see `public/models/env/CREDITS.md`). Round/pine trees, the shotgun, the bus, chests, fences, fountains and lamps are built procedurally from low-poly shapes. All sounds are synthesized with Web Audio.
+- **Assets (all CC0):**
+  - **KayKit** by Kay Lousberg: characters and animations, medieval buildings (homes, tavern, blacksmith, market, church, towers, windmills, castle), pine trees, rocks, clouds, crates, barrels, sacks, tents, flags, lumber and the treasure chest. See `public/models/kk/CREDITS.md`.
+  - **Kenney:** palms, rock spires and the pistol/SMG/AR blasters. See `public/models/env/CREDITS.md`.
+  - **Procedural:** round/autumn trees, bushes, grass, the shotgun, the bus, fences, fountains and lamps are built from low-poly shapes.
+  - **Audio:** all sounds are synthesized with Web Audio.
 
 Robot model: "RobotExpressive" by Tomás Laulhé (CC0), from the three.js examples.

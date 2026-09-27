@@ -3,33 +3,12 @@ import { mulberry32 } from '../core/noise.js';
 import { part, merge, mat } from './geomUtils.js';
 import { TOWNS } from './Terrain.js';
 
-const WALLS = ['#ffd6e0', '#bde0fe', '#caffbf', '#fdffb6', '#ffc8dd', '#ffd8a8', '#d7c8ff', '#b9fbc0', '#fff1c1', '#ffe0cc'];
-const ROOFS = ['#e76f51', '#4f6bd8', '#d1495b', '#2a9d8f', '#8d6e63', '#ef8354', '#7b5ea7', '#3c9d5d'];
-const HOUSE_TYPES = ['house1', 'house-3', 'house-4', 'house-5', 'house-7'];
-
-export function makeCrateTexture() {
-  const cv = document.createElement('canvas');
-  cv.width = cv.height = 128;
-  const ctx = cv.getContext('2d');
-  ctx.fillStyle = '#c98b4b';
-  ctx.fillRect(0, 0, 128, 128);
-  for (let i = 0; i < 4; i++) {
-    ctx.fillStyle = i % 2 ? '#bf7f41' : '#d49656';
-    ctx.fillRect(0, i * 32, 128, 32);
-    ctx.fillStyle = 'rgba(90,50,20,0.5)';
-    ctx.fillRect(0, i * 32, 128, 2);
-  }
-  ctx.strokeStyle = '#8a5429';
-  ctx.lineWidth = 14;
-  ctx.strokeRect(7, 7, 114, 114);
-  ctx.beginPath();
-  ctx.moveTo(10, 10); ctx.lineTo(118, 118);
-  ctx.stroke();
-  const t = new THREE.CanvasTexture(cv);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
-  return t;
-}
+// KayKit Medieval buildings (CC0). Uniform world scale keeps proportions consistent.
+const KK_SCALE = 9.5;
+const HOMES = ['home_A_blue', 'home_A_red', 'home_A_yellow', 'home_A_green', 'home_B_blue', 'home_B_red', 'home_B_yellow', 'home_B_green'].map((n) => `kk/${n}`);
+const SPECIALS = ['tavern_red', 'tavern_blue', 'blacksmith_yellow', 'blacksmith_green', 'market_red', 'market_yellow', 'church_blue', 'church_red', 'tower_A_green', 'tower_A_red', 'lumbermill_red'].map((n) => `kk/${n}`);
+const WINDMILLS = ['kk/windmill_yellow', 'kk/windmill_green'];
+const FLAGS = ['kk/flag_blue', 'kk/flag_red', 'kk/flag_yellow', 'kk/flag_green'];
 
 export class Towns {
   constructor(scene, terrain, colliders, models) {
@@ -40,8 +19,7 @@ export class Towns {
     this.rand = mulberry32(2024);
     this.houses = [];
     this.chestSpots = [];
-    this.housePlacements = new Map(HOUSE_TYPES.map((t) => [t, []]));
-    this.barrels = [];
+    this.props = new Map();
     this.lanterns = [];
     const parts = [];
     const crates = [];
@@ -58,8 +36,8 @@ export class Towns {
     mesh.name = 'foundations';
     scene.add(mesh);
 
-    for (const [type, pl] of this.housePlacements) if (pl.length) scene.add(models.instanced(type, pl));
-    if (this.barrels.length) scene.add(models.instanced('barrel', this.barrels));
+    for (const c of crates) this._place(c.type, c.x, c.y, c.z, c.rot, c.scale);
+    for (const [type, pl] of this.props) if (pl.length) scene.add(models.instanced(type, pl));
     if (this.lanterns.length) {
       const lg = new THREE.BoxGeometry(0.42, 0.5, 0.42);
       const lm = new THREE.MeshStandardMaterial({ color: '#fff4d6', emissive: '#ffc766', emissiveIntensity: 1.6, roughness: 0.4 });
@@ -69,13 +47,23 @@ export class Towns {
       scene.add(li);
     }
 
-    const crateGeo = new THREE.BoxGeometry(1.2, 1.2, 1.2);
-    crateGeo.translate(0, 0.6, 0);
-    const crateMesh = new THREE.InstancedMesh(crateGeo, new THREE.MeshStandardMaterial({ map: makeCrateTexture(), roughness: 0.85 }), crates.length);
-    crates.forEach((c, i) => crateMesh.setMatrixAt(i, mat(c.x, c.y, c.z, 0, c.rot, 0)));
-    crateMesh.castShadow = crateMesh.receiveShadow = true;
-    crateMesh.computeBoundingSphere();
-    scene.add(crateMesh);
+  }
+
+  _place(type, x, y, z, rot = 0, scale = 1) {
+    if (!this.props.has(type)) this.props.set(type, []);
+    this.props.get(type).push({ x, y, z, rot, scale });
+  }
+
+  // Place a prop on the ground scaled to a target height (m), with an optional round collider.
+  _prop(type, x, z, height, rot = 0, colR = 0) {
+    const info = this.models.get(type);
+    if (!info) return;
+    const y = this.terrain.heightAt(x, z);
+    if (y < 1) return;
+    for (const h of this.houses) if (x > h.minX - 0.4 && x < h.maxX + 0.4 && z > h.minZ - 0.4 && z < h.maxZ + 0.4) return;
+    const s = height / info.size.y;
+    this._place(type, x, y - 0.02, z, rot, s);
+    if (colR) this.colliders.add({ kind: 'circle', x, z, r: colR, y0: y - 1, y1: y + height, crate: true });
   }
 
   // A castle tower on a hill as a landmark.
@@ -92,14 +80,19 @@ export class Towns {
       if (!best || h > best.h) best = { x, z, h };
     }
     if (!best) return;
-    const info = this.models.get('tower');
-    const s = 12 / info.size.y;
-    const y = Math.min(this.terrain.heightAt(best.x - 4, best.z - 4), this.terrain.heightAt(best.x + 4, best.z + 4), best.h) - 0.3;
-    this.scene.add(this.models.instanced('tower', [{ x: best.x, y, z: best.z, rot: r() * 6, scale: s }]));
-    const hw = info.size.x * s * 0.28;
-    this.colliders.add({ kind: 'box', minX: best.x - hw, maxX: best.x + hw, minZ: best.z - hw, maxZ: best.z + hw, y0: y - 2, y1: y + info.size.y * s, house: true });
-    this.chestSpots.push({ x: best.x + hw + 2, z: best.z, rot: Math.PI / 2 });
-    this.landmark = { x: best.x, z: best.z, name: 'Old Tower' };
+    const info = this.models.get('kk/castle_blue');
+    const s = 8;
+    const y = Math.min(this.terrain.heightAt(best.x - 7, best.z - 7), this.terrain.heightAt(best.x + 7, best.z + 7), this.terrain.heightAt(best.x - 7, best.z + 7), this.terrain.heightAt(best.x + 7, best.z - 7), best.h) - 0.4;
+    const rot = Math.round((r() * 4)) * (Math.PI / 2);
+    this._place('kk/castle_blue', best.x, y, best.z, rot, s);
+    const hx = info.size.x * s * 0.4, hz = info.size.z * s * 0.4;
+    const [bx, bz] = rot % Math.PI === 0 ? [hx, hz] : [hz, hx];
+    this.colliders.add({ kind: 'box', minX: best.x - bx, maxX: best.x + bx, minZ: best.z - bz, maxZ: best.z + bz, y0: y - 2, y1: y + info.size.y * s * 0.8, house: true });
+    this.houses.push({ minX: best.x - bx, maxX: best.x + bx, minZ: best.z - bz, maxZ: best.z + bz, x: best.x, z: best.z, y, h: info.size.y * s, rot });
+    const fx = Math.sin(rot), fz = Math.cos(rot);
+    this.chestSpots.push({ x: best.x + fx * (bz + 3), z: best.z + fz * (bz + 3), rot });
+    this.chestSpots.push({ x: best.x - fx * (bz + 3), z: best.z - fz * (bz + 3), rot: rot + Math.PI });
+    this.landmark = { x: best.x, z: best.z, name: 'Castle Hill' };
   }
 
   _overlaps(box, pad) {
@@ -114,6 +107,7 @@ export class Towns {
     this._fountain(town, parts);
     const count = 6 + Math.floor(r() * 3);
     let placed = 0;
+    const specials = [...SPECIALS].sort(() => r() - 0.5).slice(0, 2);
     for (let i = 0; i < count * 6 && placed < count; i++) {
       const a = (placed / count) * Math.PI * 2 + r() * 0.5 + i * 0.37;
       const dist = town.r * (0.5 + r() * 0.22);
@@ -122,17 +116,17 @@ export class Towns {
       const face = Math.atan2(town.x - x, town.z - z);
       const rotIdx = ((Math.round(face / (Math.PI / 2)) % 4) + 4) % 4;
       const rot = rotIdx * (Math.PI / 2);
-      const type = HOUSE_TYPES[Math.floor(r() * HOUSE_TYPES.length)];
+      const type = placed < specials.length ? specials[placed] : HOMES[Math.floor(r() * HOMES.length)];
       const info = this.models.get(type);
-      const scale = (8.5 + r() * 2.5) / info.size.x;
-      const w = info.size.x * scale, d = info.size.z * scale, h = info.size.y * scale;
+      const scale = KK_SCALE;
+      const w = info.size.x * scale * 0.86, d = info.size.z * scale * 0.86, h = info.size.y * scale;
       const sw = rotIdx % 2 ? d : w, sd = rotIdx % 2 ? w : d;
       const box = { minX: x - sw / 2, maxX: x + sw / 2, minZ: z - sd / 2, maxZ: z + sd / 2 };
       if (this._overlaps(box, 3)) continue;
       const y = this.terrain.heightAt(x, z);
       this._house(parts, type, scale, x, y, z, rot, w, d);
-      if (r() < 0.55) this._fence(parts, x, y, z, rot, w, d);
-      this._flowers(parts, x, y, z, rot, w, d);
+      if (r() < 0.4 && type.includes('home')) this._fence(parts, x, y, z, rot, w, d);
+      if (type.includes('home')) this._flowers(parts, x, y, z, rot, w, d);
       const col = { kind: 'box', ...box, y0: y - 3, y1: y + h, house: true };
       this.colliders.add(col);
       this.houses.push({ ...box, x, z, y, h, rot });
@@ -148,6 +142,36 @@ export class Towns {
         this._barrel(x - sideX * (w / 2 + 1), z - sideZ * (w / 2 + 1) + fz * 1.5);
       }
       if (r() < 0.6) this._barrel(x + sideX * (w / 2 + 1.2) + fx * 2.2, z + sideZ * (w / 2 + 1.2) + fz * 2.2);
+      // small props by the door
+      const px = x + fx * (d / 2 + 1.2) - sideX * (w / 2 - 0.8), pz = z + fz * (d / 2 + 1.2) - sideZ * (w / 2 - 0.8);
+      const pick = r();
+      if (pick < 0.3) this._prop('kk/sack', px, pz, 0.55, r() * 6, 0.4);
+      else if (pick < 0.5) this._prop('kk/bucket_water', px, pz, 0.6, r() * 6, 0.3);
+      else if (pick < 0.7) this._prop('kk/wheelbarrow', px, pz, 0.9, rot + Math.PI / 2, 0.6);
+      else if (pick < 0.8) this._prop('kk/weaponrack', px, pz, 1.4, rot, 0.5);
+    }
+    // windmill on the outskirts
+    {
+      const a = r() * Math.PI * 2, wx = town.x + Math.cos(a) * town.r * 1.12, wz = town.z + Math.sin(a) * town.r * 1.12;
+      const type = WINDMILLS[Math.floor(r() * WINDMILLS.length)];
+      const info = this.models.get(type);
+      const wy = this.terrain.heightAt(wx, wz);
+      const box = { minX: wx - 3.5, maxX: wx + 3.5, minZ: wz - 3.5, maxZ: wz + 3.5 };
+      if (wy > 2 && !this._overlaps(box, 2)) {
+        this._place(type, wx, wy - 0.2, wz, Math.atan2(town.x - wx, town.z - wz), KK_SCALE * 1.05);
+        this.colliders.add({ kind: 'circle', x: wx, z: wz, r: 3.2, y0: wy - 2, y1: wy + info.size.y * KK_SCALE, house: true });
+        this.houses.push({ ...box, x: wx, z: wz, y: wy, h: 14, rot: 0 });
+      }
+    }
+    // tents and flags around the plaza
+    for (let i = 0; i < 2; i++) {
+      const a = r() * Math.PI * 2, d2 = town.r * (0.28 + r() * 0.08);
+      this._prop('kk/tent', town.x + Math.cos(a) * d2, town.z + Math.sin(a) * d2, 2.6, Math.atan2(town.x - (town.x + Math.cos(a)), town.z - (town.z + Math.sin(a))) + Math.PI, 1.4);
+    }
+    const flag = FLAGS[Math.floor(r() * FLAGS.length)];
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + 1.2;
+      this._prop(flag, town.x + Math.cos(a) * town.r * 0.42, town.z + Math.sin(a) * town.r * 0.42, 4.2, a, 0.2);
     }
     // lamp posts around the plaza
     for (let i = 0; i < 4; i++) {
@@ -167,8 +191,12 @@ export class Towns {
     if (y < 1) return;
     for (const t of TOWNS) if (Math.hypot(x - t.x, z - t.z) < 4.2) return;
     for (const h of this.houses) if (x > h.minX - 0.8 && x < h.maxX + 0.8 && z > h.minZ - 0.8 && z < h.maxZ + 0.8) return;
-    const rot = 0;
-    for (let i = 0; i < n; i++) crates.push({ x, y: y + i * 1.2 - 0.02, z, rot });
+    const rot = Math.round(this.rand() * 4) * (Math.PI / 2);
+    for (let i = 0; i < n; i++) {
+      const type = 'kk/crate_A_big';
+      const sz = this.models.get(type).size;
+      crates.push({ type, x, y: y + i * 1.2 - 0.02, z, rot, scale: 1.2 / sz.y });
+    }
     this.colliders.add({ kind: 'box', minX: x - 0.6, maxX: x + 0.6, minZ: z - 0.6, maxZ: z + 0.6, y0: y - 1, y1: y + n * 1.2, crate: true });
   }
 
@@ -260,21 +288,14 @@ export class Towns {
   _barrel(x, z) {
     const y = this.terrain.heightAt(x, z);
     for (const h of this.houses) if (x > h.minX - 0.6 && x < h.maxX + 0.6 && z > h.minZ - 0.6 && z < h.maxZ + 0.6) return;
-    const s = 1.35;
-    this.barrels.push({ x, y: y + 0.38 * s - 0.02, z, rot: this.rand() * 6, rz: Math.PI / 2, scale: s });
-    this.colliders.add({ kind: 'circle', x, z, r: 0.5, y0: y - 1, y1: y + 0.76 * s, crate: true });
+    const info = this.models.get('kk/barrel');
+    const s = 1.1 / info.size.y;
+    this._place('kk/barrel', x, y - 0.02, z, this.rand() * 6, s);
+    this.colliders.add({ kind: 'circle', x, z, r: info.size.x * s * 0.5, y0: y - 1, y1: y + 1.1, crate: true });
   }
 
-  _house(parts, type, scale, x, y, z, rot, w, d) {
-    const r = this.rand;
-    const wall = new THREE.Color(WALLS[Math.floor(r() * WALLS.length)]);
-    const roof = new THREE.Color(ROOFS[Math.floor(r() * ROOFS.length)]);
-    this.housePlacements.get(type).push({
-      x, y: y - 0.05, z, rot, scale,
-      colors: { main: wall, _defaultMat: wall, roof, border: new THREE.Color('#f4efe6') },
-    });
-    const base = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rot), new THREE.Vector3(1, 1, 1));
-    parts.push(part(new THREE.BoxGeometry(w + 0.5, 3, d + 0.5), '#b9ab98', base.clone().multiply(mat(0, -1.45, 0))));
-    parts.push(part(new THREE.BoxGeometry(2.4, 0.2, 1.4), '#d6c7ad', base.clone().multiply(mat(0, 0.02, d / 2 + 0.7))));
+  _house(parts, type, scale, x, y, z, rot) {
+    this._place(type, x, y - 0.1, z, rot, scale);
   }
+
 }

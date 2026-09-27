@@ -3,159 +3,177 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { addRim } from '../effects/Shaders.js';
 
-// Shared robot asset; every player/bot gets its own SkeletonUtils clone.
+// KayKit "Adventurers" characters (CC0, Kay Lousberg). All share one rig + animation set.
+export const CHARACTER_TYPES = ['Knight', 'Barbarian', 'Mage', 'Rogue', 'Rogue_Hooded'];
+const HEIGHT = 1.95;
+
+// Bones driven by the upper-body layer (aiming / shooting / reloading).
+const UPPER = /^(spine|chest|upperarm|lowerarm|wrist|hand|handslot|head|elbowIK|handIK)/;
+const ONCE = new Set(['Death_A', 'Death_B', 'Jump_Start', 'Jump_Land', '2H_Ranged_Reload', '1H_Ranged_Reload', '2H_Ranged_Shoot', '1H_Ranged_Shoot', 'PickUp', 'Interact', 'Hit_A']);
+
+function splitClip(clip, upper) {
+  const tracks = clip.tracks.filter((t) => UPPER.test(t.name.split('.')[0]) === upper);
+  return new THREE.AnimationClip(`${clip.name}_${upper ? 'U' : 'L'}`, clip.duration, tracks);
+}
+
 export class CharacterAssets {
-  static async load(url = '/models/RobotExpressive.glb') {
-    const gltf = await new GLTFLoader().loadAsync(url);
+  static async load(onProgress = () => {}) {
+    const loader = new GLTFLoader();
     const a = new CharacterAssets();
-    a.scene = gltf.scene;
-    a.clips = {};
-    for (const c of gltf.animations) a.clips[c.name] = c;
-    gltf.scene.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(gltf.scene);
-    const h = box.max.y - box.min.y;
-    a.scale = 1.8 / h;
-    a.footOffset = -box.min.y * a.scale;
+    a.types = {};
+    let done = 0;
+    const total = CHARACTER_TYPES.length + 1;
+    const anims = loader.loadAsync('/models/chars/anims.glb').then((g) => { onProgress(++done / total); return g; });
+    await Promise.all(CHARACTER_TYPES.map(async (t) => {
+      const g = await loader.loadAsync(`/models/chars/${t}.glb`);
+      g.scene.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(g.scene);
+      const h = box.max.y - box.min.y;
+      a.types[t] = { scene: g.scene, scale: HEIGHT / h, footOffset: (-box.min.y * HEIGHT) / h };
+      onProgress(++done / total);
+    }));
+    const clips = (await anims).animations;
+    a.upper = {};
+    a.lower = {};
+    for (const c of clips) {
+      a.upper[c.name] = splitClip(c, true);
+      a.lower[c.name] = splitClip(c, false);
+    }
+    // legacy fields used elsewhere
+    const first = a.types[CHARACTER_TYPES[0]];
+    a.scale = first.scale;
+    a.footOffset = first.footOffset;
     return a;
   }
 }
 
-const LOOP_ONCE = new Set(['Death', 'Jump', 'Punch', 'WalkJump', 'Yes', 'No', 'ThumbsUp', 'Wave', 'Sitting', 'Standing']);
-
-const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
-const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
+const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _axis = new THREE.Vector3();
 
 export class Character {
-  constructor(assets, color = '#2ee6c9') {
+  constructor(assets, color = '#2ee6c9', type = 'Knight', tint = 0.28) {
+    this.assets = assets;
+    const src = assets.types[type] || assets.types.Knight;
     this.root = new THREE.Group();
-    const model = SkeletonUtils.clone(assets.scene);
-    model.scale.setScalar(assets.scale);
-    model.position.y = assets.footOffset;
+    const model = SkeletonUtils.clone(src.scene);
+    model.scale.setScalar(src.scale);
+    model.position.y = src.footOffset;
+    this.footOffset = src.footOffset;
     this.model = model;
     this.root.add(model);
     this.color = new THREE.Color(color);
 
     this.materials = [];
+    const tintColor = new THREE.Color(1, 1, 1).lerp(this.color, tint);
     model.traverse((o) => {
       if (o.isMesh) {
         o.castShadow = true;
         o.receiveShadow = false;
         o.frustumCulled = false;
-        const src = o.material;
-        const m = src.clone();
-        if (src.name === 'Main') {
-          m.color.copy(this.color);
-          m.roughness = 0.45;
-          m.metalness = 0.15;
-        } else if (src.name === 'Grey') {
-          m.color.set('#e8ecf2');
-          m.roughness = 0.5;
-        } else {
-          m.roughness = 0.4;
-        }
-        if (src.name !== 'Black') addRim(m, '#e6f4ff', src.name === 'Main' ? 0.55 : 0.35);
+        const m = o.material.clone();
+        m.color.copy(tintColor);
+        m.roughness = 0.6;
+        m.metalness = 0;
+        addRim(m, '#e6f4ff', 0.45);
         o.material = m;
         this.materials.push(m);
       }
       if (o.isBone) {
-        const n = o.name;
-        if (n === 'UpperArmR') this.upperArmR = o;
-        else if (n === 'LowerArmR') this.lowerArmR = o;
-        else if (n === 'UpperArmL') this.upperArmL = o;
-        else if (n === 'LowerArmL') this.lowerArmL = o;
-        else if (n === 'Palm2R') this.palmR = o;
-        else if (n === 'Palm2L') this.palmL = o;
-        else if (n === 'Head' && !this.head) this.head = o;
-        else if (n === 'Abdomen') this.spine = o;
+        if (o.name === 'handslotr') this.handR = o;
+        else if (o.name === 'chest') this.chestBone = o;
+        else if (o.name === 'spine') this.spine = o;
+        else if (o.name === 'head') this.head = o;
       }
     });
 
     this.mixer = new THREE.AnimationMixer(model);
-    this.actions = {};
-    for (const [name, clip] of Object.entries(assets.clips)) {
-      const act = this.mixer.clipAction(clip);
-      if (LOOP_ONCE.has(name)) { act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true; }
-      this.actions[name] = act;
+    this.upperActions = {};
+    this.lowerActions = {};
+    for (const name of Object.keys(assets.upper)) {
+      for (const [layer, store] of [[assets.upper, this.upperActions], [assets.lower, this.lowerActions]]) {
+        const act = this.mixer.clipAction(layer[name]);
+        if (ONCE.has(name)) { act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true; }
+        store[name] = act;
+      }
     }
-    this.current = null;
-    this.play('Idle', 0);
+    this.cur = { upper: null, lower: null };
+    this.curName = { upper: null, lower: null };
+    this.setPose('Idle', null, 0);
 
-    // Weapon pivot at shoulder height; rotates with aim pitch.
-    this.aimPivot = new THREE.Object3D();
-    this.aimPivot.position.set(0, 1.28, 0);
-    this.root.add(this.aimPivot);
     this.weaponHolder = new THREE.Object3D();
-    this.weaponHolder.position.set(-0.24, -0.05, 0.42);
-    this.aimPivot.add(this.weaponHolder);
+    this.root.add(this.weaponHolder);
     this.weaponMesh = null;
-    this.gripR = new THREE.Object3D();
-    this.gripL = new THREE.Object3D();
-    this.weaponHolder.add(this.gripR, this.gripL);
-    this.gripR.position.set(0, -0.02, -0.08);
-    this.gripL.position.set(0, -0.02, 0.35);
-    this.armsAiming = false;
     this.lodSkip = 0;
   }
 
-  play(name, fade = 0.2, timeScale = 1) {
-    const next = this.actions[name];
+  get currentName() { return this.curName.lower; }
+
+  _layer(layer, name, fade, timeScale) {
+    const store = layer === 'upper' ? this.upperActions : this.lowerActions;
+    const next = store[name];
     if (!next) return;
     next.timeScale = timeScale;
-    if (this.current === next) return;
+    const cur = this.cur[layer];
+    if (cur === next) return;
     next.reset();
     next.setEffectiveWeight(1);
     next.play();
-    if (this.current && fade > 0) this.current.crossFadeTo(next, fade, false);
-    else if (this.current) this.current.stop();
-    this.current = next;
-    this.currentName = name;
+    if (cur && fade > 0) cur.crossFadeTo(next, fade, false);
+    else if (cur) cur.stop();
+    this.cur[layer] = next;
+    this.curName[layer] = name;
   }
 
-  setTimeScale(s) { if (this.current) this.current.timeScale = s; }
+  // lower = legs/hips animation, upper = arms/torso (null -> same as lower)
+  setPose(lower, upper = null, fade = 0.2, timeScale = 1, upperTimeScale = 1) {
+    this._layer('lower', lower, fade, timeScale);
+    this._layer('upper', upper || lower, fade, upper ? upperTimeScale : timeScale);
+  }
+
+  // Legacy single-animation API.
+  play(name, fade = 0.2, timeScale = 1) { this.setPose(name, null, fade, timeScale); }
+  setTimeScale(s) { if (this.cur.lower) this.cur.lower.timeScale = s; }
 
   setWeapon(mesh) {
     if (this.weaponMesh) this.weaponHolder.remove(this.weaponMesh);
     this.weaponMesh = mesh;
     if (mesh) {
       this.weaponHolder.add(mesh);
-      this.gripL.position.z = mesh.userData.foregrip ?? 0.35;
+      // hold point ~ between the grip and the foregrip
+      mesh.scale.setScalar(1.55);
+      mesh.position.set(0, 0, -(mesh.userData.foregrip ?? 0.3) * 0.5);
     }
   }
 
-  // Rotate a bone so the direction bone->child points at a world target.
-  _aimBone(bone, child, target) {
-    if (!bone || !child) return;
-    bone.getWorldPosition(_v1);
-    child.getWorldPosition(_v2);
-    const cur = _v2.sub(_v1).normalize();
-    const want = _v3.copy(target).sub(_v1).normalize();
-    _q1.setFromUnitVectors(cur, want);
-    bone.getWorldQuaternion(_q2);
-    bone.parent.getWorldQuaternion(_q3);
-    _q2.premultiply(_q1);
-    bone.quaternion.copy(_q3.invert().multiply(_q2));
-    bone.updateMatrixWorld(true);
+  // Rotate a bone around a world-space axis (used to bend the torso with aim pitch).
+  _rotateBoneWorld(bone, axis, angle) {
+    bone.getWorldQuaternion(_q);
+    _q2.setFromAxisAngle(axis, angle);
+    _q.premultiply(_q2);
+    bone.parent.getWorldQuaternion(_q2);
+    bone.quaternion.copy(_q2.invert().multiply(_q));
   }
 
-  update(dt, pitch = 0, aimArms = false, skipIK = false) {
+  update(dt, pitch = 0, armed = false) {
     this.mixer.update(dt);
-    this.aimPivot.rotation.x = -pitch;
-    if (this.weaponMesh) this.weaponMesh.visible = aimArms;
-    if (aimArms && !skipIK && this.upperArmR) {
+    if (this.weaponMesh) this.weaponMesh.visible = armed;
+    if (armed && this.chestBone) {
       this.root.updateMatrixWorld(true);
-      const gR = this.gripR.getWorldPosition(_tR);
-      const gL = this.gripL.getWorldPosition(_tL);
-      this._aimBone(this.upperArmR, this.lowerArmR, gR);
-      this._aimBone(this.lowerArmR, this.palmR, _tmp.copy(gR).addScaledVector(_fwd.set(0, 0, 1).applyQuaternion(this.weaponHolder.getWorldQuaternion(_q1)), 0.25));
-      this._aimBone(this.upperArmL, this.lowerArmL, gL);
-      this._aimBone(this.lowerArmL, this.palmL, _tmp.copy(gL).addScaledVector(_fwd.set(0, 0, 1).applyQuaternion(this.weaponHolder.getWorldQuaternion(_q1)), 0.2));
+      // bend the torso toward the aim pitch
+      _axis.set(1, 0, 0).applyQuaternion(this.root.getWorldQuaternion(_q)).normalize();
+      this._rotateBoneWorld(this.chestBone, _axis, -pitch * 0.55);
+      this.chestBone.updateMatrixWorld(true);
+      // gun sits in the right hand but points where the character aims
+      if (this.handR) {
+        this.handR.getWorldPosition(_v);
+        this.root.worldToLocal(_v);
+        this.weaponHolder.position.copy(_v);
+      }
+      this.weaponHolder.rotation.set(-pitch, 0, 0);
     }
   }
 
   flash(amount) {
-    for (const m of this.materials) {
-      m.emissive.setRGB(amount, amount, amount);
-    }
+    for (const m of this.materials) m.emissive.setRGB(amount, amount, amount);
   }
 
   dispose() {
@@ -163,5 +181,3 @@ export class Character {
     for (const m of this.materials) m.dispose();
   }
 }
-
-const _tR = new THREE.Vector3(), _tL = new THREE.Vector3(), _tmp = new THREE.Vector3(), _fwd = new THREE.Vector3();

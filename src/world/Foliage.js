@@ -98,12 +98,14 @@ export class Foliage {
     const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
     const rounds = new THREE.InstancedMesh(roundCanopyGeo(r), canopyMat, count);
     const pines = new THREE.InstancedMesh(pineCanopyGeo(), pineMat, count);
-    let nT = 0, nR = 0, nP = 0;
+    let nT = 0, nR = 0, nP = 0, nK = 0;
+    const kkPines = { 'kk/tree_single_A': [], 'kk/tree_single_B': [] };
+    const useKK = !!this.models?.get('kk/tree_single_A');
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
     const up = new THREE.Vector3(0, 1, 0);
     const col = new THREE.Color();
     const forest = this.terrain.noise;
-    for (let i = 0; i < count * 4 && nT < count; i++) {
+    for (let i = 0; i < count * 4 && nT + nK < count; i++) {
       const c = this._candidate(2.6, 34, 0.8);
       if (!c) continue;
       // cluster trees into forests
@@ -114,6 +116,18 @@ export class Foliage {
       const sc = (pine ? 1.0 : 0.9) + r() * 0.7;
       const trunkH = (pine ? 1.4 : 2.1) * sc;
       const yaw = r() * Math.PI * 2;
+      if (pine && useKK) {
+        const type = r() < 0.5 ? 'kk/tree_single_A' : 'kk/tree_single_B';
+        const info = this.models.get(type);
+        const H = 7 + sc * 3.5;
+        const ks = H / info.size.y;
+        const shade = 0.85 + r() * 0.25;
+        kkPines[type].push({ x: c.x, y: c.h - 0.2, z: c.z, rot: yaw, scale: ks, colors: { hexagons_medieval: new THREE.Color(shade, shade * (0.95 + r() * 0.1), shade) } });
+        this.colliders.add({ kind: 'circle', x: c.x, z: c.z, r: 0.45, y0: c.h - 2, y1: c.h + H, tree: true });
+        this.occluders.push({ x: c.x, y: c.h + H * 0.45, z: c.z, r: info.size.x * ks * 0.42 });
+        nK++;
+        continue;
+      }
       q.setFromAxisAngle(up, yaw);
       m.compose(p.set(c.x, c.h - 0.3, c.z), q, s.set(sc, trunkH + 0.3, sc));
       trunks.setMatrixAt(nT, m);
@@ -147,9 +161,14 @@ export class Foliage {
       this.scene.add(im);
     }
     this.treeCount = nT;
+    if (useKK) {
+      const mat = (part) => { const mm = part.material.clone(); mm.roughness = 0.8; addWind(mm, { amount: 0.04, pivot: 0.15, speed: 1.1 }); return mm; };
+      for (const [type, list] of Object.entries(kkPines)) if (list.length) this.scene.add(this.models.instanced(type, list, { material: mat }));
+    }
   }
 
   _rocks() {
+    if (this.models?.get('kk/rock_single_A')) return this._kkRocks();
     const r = this.rand;
     const count = 150;
     let geo = new THREE.DodecahedronGeometry(1, 1);
@@ -183,6 +202,30 @@ export class Foliage {
     im.receiveShadow = true;
     im.computeBoundingSphere();
     this.scene.add(im);
+  }
+
+  // KayKit boulders: mostly on the mountain, some scattered and on beaches.
+  _kkRocks() {
+    const r = this.rand;
+    const types = ['kk/rock_single_A', 'kk/rock_single_B', 'kk/rock_single_C', 'kk/rock_single_D', 'kk/rock_single_E'];
+    const pl = Object.fromEntries(types.map((t) => [t, []]));
+    let n = 0;
+    for (let i = 0; i < 1200 && n < 160; i++) {
+      const mountainBias = r() < 0.4;
+      const c = mountainBias ? this._candidate(12, 48, 0.4) : this._candidate(0.5, 30, 0.6);
+      if (!c) continue;
+      if (!this._free(c.x, c.z, 5)) continue;
+      const type = types[Math.floor(r() * types.length)];
+      const info = this.models.get(type);
+      const W = r() < 0.25 ? 3.5 + r() * 3 : 1.2 + r() * 1.8;
+      const s = W / info.size.x;
+      const H = info.size.y * s;
+      const g = 0.85 + r() * 0.25;
+      pl[type].push({ x: c.x, y: c.h - 0.15, z: c.z, rot: r() * Math.PI * 2, scale: s, colors: { hexagons_medieval: new THREE.Color(g, g, g * 1.02) } });
+      this.colliders.add({ kind: 'circle', x: c.x, z: c.z, r: W * 0.42, y0: c.h - 3, y1: c.h + H, rock: true });
+      n++;
+    }
+    for (const [type, list] of Object.entries(pl)) if (list.length) this.scene.add(this.models.instanced(type, list));
   }
 
   // Kenney palms along the beaches.

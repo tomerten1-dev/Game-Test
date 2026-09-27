@@ -4,7 +4,7 @@ import { Actor } from './Actor.js';
 // The human-controlled actor: turns input into movement intent relative to the camera.
 export class Player extends Actor {
   constructor(game) {
-    super(game, { name: 'You', color: '#20d6c0', isPlayer: true });
+    super(game, { name: 'You', color: '#20d6c0', isPlayer: true, type: 'Rogue_Hooded' });
     this._addBackpack();
   }
 
@@ -21,10 +21,10 @@ export class Player extends Actor {
     const tip = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), new THREE.MeshStandardMaterial({ color: '#8ffff0', emissive: '#2ee6c9', emissiveIntensity: 2.5 }));
     tip.position.set(0.12, 1.15, -0.02);
     for (const m of [pack, lid, ant, tip]) { m.castShadow = true; g.add(m); }
-    g.position.set(0, 0.98, -0.2);
+    g.position.set(0, 0.78, -0.24);
     this.character.root.add(g);
     this.character.root.updateMatrixWorld(true);
-    const torso = this.character.spine;
+    const torso = this.character.chestBone || this.character.spine;
     if (torso) torso.attach(g);
     this.backpack = g;
   }
