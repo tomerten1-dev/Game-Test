@@ -116,6 +116,11 @@ export class Sound {
   }
 
   play(name, pos = null, opts = {}) {
+    // visual sound cues work even when muted or before audio is unlocked
+    if (pos && this.onPositional) {
+      const vv = this._vol(pos, opts.range || 110) * (opts.vol ?? 1);
+      if (vv > 0.02) this.onPositional(name, pos, vv);
+    }
     if (this.muted || !this.ctx || this.ctx.state !== 'running') return;
     const ctx = this.ctx;
     const t = ctx.currentTime;
@@ -255,6 +260,10 @@ export class Sound {
         break;
       case 'use':
         this._noise(t, 0.3, { type: 'bandpass', freq: 1500, q: 2, gain: 0.15, attack: 0.05 });
+        break;
+      case 'ping':
+        this._tone(t, 0.12, { type: 'sine', freq: 1320, gain: 0.14 });
+        this._tone(t + 0.1, 0.2, { type: 'sine', freq: 1760, gain: 0.12 });
         break;
       case 'phase':
         this._tone(t, 0.9, { type: 'sine', freq: 220, freqEnd: 440, gain: 0.2, attack: 0.2 });

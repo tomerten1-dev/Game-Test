@@ -14,7 +14,7 @@ const KEYMAP = {
   ShiftLeft: 'sprint', ShiftRight: 'sprint',
   KeyC: 'crouch', ControlLeft: 'crouch',
   Escape: 'pause',
-  KeyM: 'mute',
+  KeyM: 'map', KeyN: 'mute',
 };
 
 export class Input {
@@ -48,6 +48,7 @@ export class Input {
       if (document.pointerLockElement !== canvas) { this.requestLock(); return; }
       if (e.button === 0) { this.held.add('fire'); this.pressedSet.add('fire'); }
       if (e.button === 2) { this.held.add('aim'); this.pressedSet.add('aim'); }
+      if (e.button === 1) { e.preventDefault(); this.pressedSet.add('ping'); }
     });
     window.addEventListener('mouseup', (e) => {
       if (e.button === 0) this.held.delete('fire');

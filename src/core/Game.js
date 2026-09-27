@@ -23,6 +23,9 @@ import { HUD } from '../ui/HUD.js';
 import { Ambient } from '../effects/Ambient.js';
 import { Menus } from '../ui/Menus.js';
 import { TouchControls } from '../ui/TouchControls.js';
+import { MapScreen } from '../ui/MapScreen.js';
+import { Pings } from '../ui/Pings.js';
+import { StormFX } from '../effects/StormFX.js';
 import { isTouch } from './device.js';
 
 export class Game {
@@ -80,6 +83,10 @@ export class Game {
     this.quality.apply();
     this.rig = new CameraRig(this.camera, this.world);
     this.focus = new THREE.Vector3();
+    this.pings = new Pings(this, ui);
+    this.map = new MapScreen(ui, this);
+    this.stormFX = new StormFX(this.scene);
+    this.sound.onPositional = (name, pos, v) => this.hud.soundViz(name, pos, v);
     this.menus = new Menus(ui, this);
     if (isTouch) {
       document.body.classList.add('touch');
@@ -93,6 +100,7 @@ export class Game {
 
   // Menu "Play" / end screen "Play Again": new match without reloading the page.
   play() {
+    this.map.show(false);
     this.menus.showMenu(false);
     this.menus.hideEnd();
     this.menus.showPause(false);
@@ -110,8 +118,21 @@ export class Game {
     if (!isTouch) this.input.requestLock();
   }
 
+  // Full-screen map: frees the mouse without pausing (the match keeps going).
+  toggleMap(v = !this.map.open) {
+    if (this.state !== 'playing' && v) return;
+    this.map.show(v);
+    this.input.reset();
+    if (!isTouch) {
+      if (v && document.pointerLockElement) { this._mapUnlock = true; document.exitPointerLock(); }
+      else if (!v && this.state === 'playing') this.input.requestLock();
+    }
+  }
+
   onPointerLockChange() {
     if (isTouch) return;
+    if (this._mapUnlock) { this._mapUnlock = false; return; }
+    if (this.map?.open) return;
     if (this.input.locked) {
       this.paused = false;
       this.menus.showPause(false);
@@ -122,17 +143,21 @@ export class Game {
     }
   }
 
-  endMatch(victory, place, killer) {
+  endMatch(victory, place, killer, delay = victory ? 2600 : 2200) {
     if (this.state !== 'playing') return;
     this.state = 'ending';
+    this.spectating = null;
+    this.hud.showSpectate(null);
+    if (this.map.open) this.toggleMap(false);
     const p = this.player;
     setTimeout(() => {
       this.state = 'ended';
       this.touch?.show(false);
       if (document.pointerLockElement) document.exitPointerLock();
-      this.menus.showEnd({ victory, place, killer: killer?.name, cause: p.deathCause, kills: p.kills, time: Math.max(0, this.time - this.matchStart) });
+      const alive = (this.deathInfo?.time ?? this.time) - this.matchStart;
+      this.menus.showEnd({ victory, place, killer: killer?.name, cause: p.deathCause, kills: p.kills, time: Math.max(0, alive) });
       this.sound.play(victory ? 'victory' : 'defeat');
-    }, victory ? 2600 : 2200);
+    }, delay);
   }
 
   startMatch() {
@@ -145,6 +170,10 @@ export class Game {
     this.bus.launch();
     this.storm.reset();
     this.building.reset();
+    this.pings.reset();
+    this.spectating = null;
+    this.deathInfo = null;
+    this.hud.showSpectate(null);
     if (!this._firstMatch) this.loot.reset();
     this._firstMatch = false;
 
@@ -223,11 +252,15 @@ export class Game {
     this.time += dt;
     if (this.input.pressed('mute')) this.hud.toast(this.sound.toggleMute() ? 'Sound off' : 'Sound on');
     const p = this.player;
+    if (this.input.pressed('map')) this.toggleMap();
+    else if (this.map.open && this.input.pressed('pause')) this.toggleMap(false);
+    if (this.spectating) this.updateSpectate(dt);
     if (p.alive) {
       p.readInput(dt, this.input, this.rig);
       this.updatePlayerCombat(dt);
     } else {
       p.intent.mx = p.intent.mz = 0;
+      p.setBuildMode(null);
       const look = this.input.consumeLook();
       this.rig.addLook(look.x, look.y);
     }
@@ -255,10 +288,21 @@ export class Game {
     }
     this.sound.updateListener?.(this.camera);
     this.sound.chestHum?.(p.alive && p.state === 'ground' ? this.loot.nearestChest(p.pos, 18) : null, p.pos);
-    const mode = !p.alive || p.victory ? 'dead' : p.state === 'ground' ? (p.aiming ? 'aim' : 'ground') : p.state;
-    this.rig.update(dt, p.state === 'bus' ? this.bus.mesh.position : p.pos, mode);
+    const view = this.spectating || p;
+    const mode = this.spectating ? (view.state === 'ground' ? 'ground' : view.state) : !p.alive || p.victory ? 'dead' : p.state === 'ground' ? (p.aiming ? 'aim' : 'ground') : p.state;
+    this.rig.update(dt, view.state === 'bus' ? this.bus.mesh.position : view.pos, mode);
     for (const a of this.actors) a.updateVisual(dt, this.camera.position);
-    this.focus.copy(p.pos);
+    this.focus.copy(view.pos);
+    this.pings.update(dt);
+    const cam = this.camera.position;
+    this.stormFX.update(dt, this.camera, this.state === 'playing' && view.state !== 'bus' && !this.storm.isInside(cam.x, cam.z) ? 1 : 0);
+    this.map.draw();
+    this._humVizT = (this._humVizT || 0) - dt;
+    if (this._humVizT <= 0 && p.alive && p.state === 'ground') {
+      this._humVizT = 1;
+      const c = this.loot.nearestChest(p.pos, 18);
+      if (c) this.hud.soundViz('chest', _origin.set(c.x, c.y, c.z), 1 - Math.hypot(c.x - p.pos.x, c.z - p.pos.z) / 18);
+    }
     this.world.update(dt, this.time, this.focus, this.camera);
     this.effects.update(dt);
     this.hud.update(dt);
@@ -280,6 +324,10 @@ export class Game {
       }
     }
     if (input.pressed('reload') && !p.buildMode) this.combat.reload(p);
+    if (input.pressed('ping') && p.state !== 'bus') {
+      const dir = this.camera.getWorldDirection(_dir);
+      this.pings.ping(_origin.copy(this.camera.position).addScaledVector(dir, this.rig.curDist), dir);
+    }
     if (this.updateBuild(dt)) return;
     if (p.state === 'ground') {
       const near = this.loot.nearestInteractable(p.pos);
@@ -384,9 +432,23 @@ export class Game {
     if (it.count > 0 && p.held === it && this.input.down('fire')) p.startUse();
   }
 
+  startSpectate(actor) {
+    this.spectating = actor;
+    this.hud.showSpectate(actor);
+  }
+
+  updateSpectate() {
+    if (this.input.pressed('jump') || this.input.pressed('interact')) this.finishSpectate();
+  }
+
+  finishSpectate() {
+    if (this.state !== 'playing' || !this.deathInfo) return;
+    this.endMatch(false, this.deathInfo.place, this.deathInfo.killer, 300);
+  }
+
   updateStorm(dt) {
     const ev = this.storm.update(dt, this.time);
-    if (ev === 'shrink') { this.hud.banner?.('The storm is closing in!', 3); this.sound.play('phase'); }
+    if (ev === 'shrink') { this.hud.banner?.(this.storm.moving ? 'The storm is moving!' : 'The storm is closing in!', 3); this.sound.play('phase'); }
     else if (ev === 'phase') this.hud.banner?.('Storm shrinks again soon', 3);
     this.stormTick += dt;
     const outside = this.player.alive && this.player.state !== 'bus' && !this.storm.isInside(this.player.pos.x, this.player.pos.z);
@@ -418,7 +480,23 @@ export class Game {
     if (actor === p) {
       this.hud.hurt();
       this.hud.prompt(null);
-      this.endMatch(false, this.aliveCount + 1, killer && killer !== p ? killer : null);
+      this.deathInfo = { place: this.aliveCount + 1, killer: killer && killer !== p ? killer : null, time: this.time };
+      // watch whoever got you (after a beat), like the real thing
+      const k = this.deathInfo.killer;
+      if (k && k.alive && this.aliveCount > 1) {
+        setTimeout(() => { if (this.state === 'playing' && !p.alive) this.startSpectate(k); }, 1600);
+      } else this.endMatch(false, this.deathInfo.place, this.deathInfo.killer);
+    } else if (actor === this.spectating) {
+      // the one we watch went down: follow their killer, or the closest survivor
+      const next = killer && killer.alive && killer !== actor ? killer : this.actors.filter((a) => a.alive).sort((a, b) => a.pos.distanceTo(actor.pos) - b.pos.distanceTo(actor.pos))[0];
+      if (this.aliveCount <= 1) {
+        this.hud.banner(`${next ? next.name : 'Someone'} wins!`, 3);
+        setTimeout(() => this.finishSpectate(), 2500);
+      }
+      if (next) this.startSpectate(next);
+    } else if (!p.alive && this.spectating && this.aliveCount === 1) {
+      this.hud.banner(`${this.spectating.name} wins!`, 3);
+      setTimeout(() => this.finishSpectate(), 2500);
     } else if (p.alive && this.aliveCount === 1) {
       p.victory = true;
       this.hud.banner('#1 VICTORY!', 3);

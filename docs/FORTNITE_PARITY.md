@@ -159,9 +159,9 @@ Each phase ends with a playable build, a screenshot check and a git commit (same
 4. Simple edit mode (door/window cut-outs on walls).
 5. Bots: box-fight behaviour (build walls/ramps when shot at, high ground).
 
-### Phase C — Map & information · ~2 days
+### Phase C — Map & information · ✅ done
 1. Full-screen map (M): POIs, storm circles, bus route, zoom/pan, markers.
-2. Pings (middle mouse) + compass bar.
+2. Pings (middle mouse) + compass bar. (Mute moved from M to N.)
 3. Moving storm zones for last 2 phases, rain/fog inside storm.
 4. Spectate your killer after elimination.
 5. Visualized sound effects (accessibility option).

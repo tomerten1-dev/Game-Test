@@ -1,13 +1,14 @@
 import { isTouch } from '../core/device.js';
 
 const DESKTOP_CONTROLS = [
-  ['WASD', 'Move'], ['Mouse', 'Aim'], ['Left Click', 'Shoot'], ['Right Click', 'Zoom'],
-  ['Space', 'Jump / Drop'], ['R', 'Reload'], ['E', 'Open / Pick up'], ['Q', 'Build Wall'],
-  ['V', 'Build Ramp'], ['1-3 / Wheel', 'Weapons'], ['M', 'Mute'], ['Esc', 'Pause'],
+  ['WASD', 'Move'], ['Shift', 'Sprint'], ['C', 'Crouch / Slide'], ['Space', 'Jump / Drop'],
+  ['Left Click', 'Shoot / Use'], ['Right Click', 'Zoom'], ['R', 'Reload'], ['E', 'Open / Pick up'],
+  ['1-6 / Wheel', 'Inventory'], ['Q Z V X', 'Build pieces'], ['B', 'Build mode'], ['G', 'Edit wall'],
+  ['M', 'Map'], ['Middle Click', 'Ping'], ['N', 'Mute'], ['Esc', 'Pause'],
 ];
 const TOUCH_CONTROLS = [
-  ['Left stick', 'Move'], ['Drag right side', 'Look'], ['FIRE', 'Hold to shoot'], ['JUMP', 'Jump / Drop'],
-  ['WALL / RAMP', 'Build (10 wood)'], ['USE', 'Open / Pick up'], ['Slots', 'Tap to switch'],
+  ['Left stick', 'Move (push to sprint)'], ['Drag right side', 'Look'], ['FIRE', 'Shoot / Swing / Use'], ['JUMP', 'Jump / Drop'],
+  ['WALL · FLOOR · RAMP · CONE', 'Quick build'], ['MAT', 'Switch material'], ['USE', 'Open / Pick up'], ['Minimap', 'Tap for the full map'],
 ];
 
 // Start screen, pause overlay and end-of-match screens.
@@ -16,7 +17,8 @@ export class Menus {
     this.game = game;
     const controls = (isTouch ? TOUCH_CONTROLS : DESKTOP_CONTROLS)
       .map(([k, v]) => `<div class="ctl"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
-    const gfx = `<div class="gfx"><span>Graphics</span>${['auto', 'low', 'medium', 'high'].map((q) => `<button class="gfx-btn" data-q="${q}">${q[0].toUpperCase() + q.slice(1)}</button>`).join('')}</div>`;
+    const gfx = `<div class="gfx"><span>Graphics</span>${['auto', 'low', 'medium', 'high'].map((q) => `<button class="gfx-btn" data-q="${q}">${q[0].toUpperCase() + q.slice(1)}</button>`).join('')}</div>
+      <div class="gfx"><span>Visualize sound</span><button class="sv-btn" data-v="0">Off</button><button class="sv-btn" data-v="1">On</button></div>`;
     root.insertAdjacentHTML('beforeend', `
       <div id="menu" class="screen">
         <div class="menu-inner">
@@ -64,10 +66,19 @@ export class Menus {
         this.syncGfx();
       });
     }
+    this.svBtns = [...root.querySelectorAll('.sv-btn')];
+    for (const b of this.svBtns) {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        game.hud.setSoundViz(b.dataset.v === '1');
+        this.syncGfx();
+      });
+    }
     this.syncGfx();
   }
 
   syncGfx() {
+    for (const b of this.svBtns || []) b.classList.toggle('active', (b.dataset.v === '1') === !!this.game.hud?.soundVizOn);
     const q = this.game.quality?.setting || 'auto';
     for (const b of this.gfxBtns) b.classList.toggle('active', b.dataset.q === q);
   }

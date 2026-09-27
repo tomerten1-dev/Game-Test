@@ -81,11 +81,16 @@ export class Storm {
     this.fromCenter.copy(this.center);
     this.fromRadius = this.radius;
     this.nextRadius = ph.radius;
-    const maxOff = Math.max(0, this.radius - ph.radius) * (this.phase === 0 ? 0.35 : 0.9);
+    // the last two circles can drift out of the current one ("moving zones")
+    this.moving = this.phase >= STORM_PHASES.length - 2;
+    const maxOff = this.moving
+      ? this.radius * 0.9 + ph.radius + 6
+      : Math.max(0, this.radius - ph.radius) * (this.phase === 0 ? 0.35 : 0.9);
     for (let i = 0; i < 40; i++) {
       const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * maxOff;
       const x = this.center.x + Math.cos(a) * r, z = this.center.y + Math.sin(a) * r;
-      if (this.terrain.heightAt(x, z) > 2.2 && Math.hypot(x, z) < 140) { this.nextCenter.set(x, z); return; }
+      const nearCenter = this.moving && Math.hypot(x - this.center.x, z - this.center.y) < this.radius * 0.6;
+      if (this.terrain.heightAt(x, z) > 2.2 && Math.hypot(x, z) < 140 && !nearCenter) { this.nextCenter.set(x, z); return; }
     }
     this.nextCenter.copy(this.center);
   }

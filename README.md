@@ -39,10 +39,12 @@ Production build: `npm run build` (output in `dist/`), preview it with `npm run 
 | B | Toggle build mode |
 | G | Edit the wall you look at: door → window → plain |
 | 1 – 6 / mouse wheel | Switch slot (1 = harvesting axe) · leaves build mode |
-| M | Mute |
+| M | Full-screen map (click: marker, right-click: clear, wheel: zoom, drag: pan) |
+| Middle click | Ping what you're looking at |
+| N | Mute |
 | Esc | Pause |
 
-**Touch devices** get a floating joystick on the left, drag-to-look on the right, and buttons for Fire (hold), Jump, Crouch, Reload, Use and quick-build (Wall, Floor, Ramp, Cone, MAT to switch material). Push the stick all the way to sprint. Tap the inventory slots to switch.
+**Touch devices** get a floating joystick on the left, drag-to-look on the right, and buttons for Fire (hold), Jump, Crouch, Reload, Use and quick-build (Wall, Floor, Ramp, Cone, MAT to switch material). Push the stick all the way to sprint. Tap the inventory slots to switch, and tap the minimap for the full map.
 
 ## Inventory & survival
 
@@ -50,6 +52,13 @@ Production build: `npm run build` (output in `dist/`), preview it with `npm run 
 - **Slots 2–6** hold guns or stacks of heals: Bandages (+15 up to 75), Medkit (full health), Small Shield (+25 up to 50), Shield Potion (+50). Hold still-ish while the ring fills.
 - Guns use **light / medium / shells** ammo; reserve shows after the slash. Green **ammo boxes** near houses and anything dropped on the ground are picked up by walking over it.
 - Sprinting is fast but inaccurate; standing still gives a perfectly accurate first shot. Falls from high up hurt.
+
+## Map, storm & spectating
+
+- The compass at the top shows your heading plus your marker, pings and (when you're outside) the direction of the safe zone.
+- The last two storm circles move instead of just shrinking. Inside the storm the world goes purple, foggy and rainy.
+- When you're eliminated you spectate whoever got you (then whoever gets them). Press Space or click **See results** to continue.
+- **Visualize sound** (menu/pause) shows icons around the crosshair for gunshots, footsteps, building and nearby chests. It also works with sound muted.
 
 ## Building
 

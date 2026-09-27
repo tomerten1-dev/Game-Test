@@ -3,6 +3,8 @@ import { Minimap } from './Minimap.js';
 import { TOWNS } from '../world/Terrain.js';
 import { AMMO } from '../weapons/Items.js';
 
+const angleDelta = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
+
 const fmtTime = (s) => {
   s = Math.max(0, Math.ceil(s));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -23,6 +25,14 @@ export class HUD {
         <div id="crosshair">
           <i class="ch t"></i><i class="ch b"></i><i class="ch l"></i><i class="ch r"></i><i class="dot"></i>
           <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
+        </div>
+        <canvas id="compass"></canvas>
+        <div id="soundviz"></div>
+        <div id="spectate" class="hidden">
+          <div class="sp-label">SPECTATING</div>
+          <div class="sp-name" id="sp-name"></div>
+          <div class="sp-info" id="sp-info"></div>
+          <button class="btn" id="sp-skip">SEE RESULTS <span class="kbd">SPACE</span></button>
         </div>
         <div id="banner"></div>
         <div id="prompt" class="hidden"><span class="key">E</span><span id="prompt-text"></span></div>
@@ -88,6 +98,13 @@ export class HUD {
     this.matEls.forEach((el) => el.addEventListener('pointerdown', (e) => { e.stopPropagation(); if (this.game.player) this.game.player.buildMat = el.dataset.m; }));
     this.slotEls.forEach((s) => s.addEventListener('pointerdown', (e) => { e.stopPropagation(); this.game.player?.switchSlot(+s.dataset.slot); }));
     this.minimap = new Minimap($('#minimap'), game);
+    $('#minimap-wrap').addEventListener('pointerdown', (e) => { e.stopPropagation(); if (game.state === 'playing') game.toggleMap(true); });
+    this.compass = $('#compass');
+    this.compassCtx = this.compass.getContext('2d');
+    this.sv = { root: $('#soundviz'), items: [] };
+    this.spect = { el: $('#spectate'), name: $('#sp-name'), info: $('#sp-info') };
+    $('#sp-skip').addEventListener('click', (e) => { e.stopPropagation(); game.finishSpectate(); });
+    try { this.soundVizOn = localStorage.getItem('sb.soundviz') === '1'; } catch { this.soundVizOn = false; }
     window.addEventListener('resize', () => this.minimap.resize());
     this.cache = {};
     this.hitT = 0;
@@ -159,6 +176,117 @@ export class HUD {
     t.classList.add('show');
   }
 
+  setSoundViz(on) {
+    this.soundVizOn = on;
+    try { localStorage.setItem('sb.soundviz', on ? '1' : '0'); } catch { /* private mode */ }
+    if (!on) for (const it of this.sv.items) it.el.style.opacity = '0';
+  }
+
+  // Accessibility: show where sounds come from as icons around the crosshair.
+  soundViz(name, pos, vol = 1) {
+    if (!this.soundVizOn || !pos) return;
+    const kind = { pistol: 'shot', ar: 'shot', smg: 'shot', shotgun: 'shot', step: 'step', chest: 'chest', build: 'build', break: 'build', harvest_wood: 'build', harvest_stone: 'build', harvest_metal: 'build', glider: 'step', slide: 'step' }[name];
+    if (!kind) return;
+    const g = this.game, cam = g.camera.position;
+    const dx = pos.x - cam.x, dz = pos.z - cam.z;
+    if (dx * dx + dz * dz < 4) return;
+    // reuse an indicator of the same kind pointing roughly the same way
+    const world = Math.atan2(dx, dz);
+    let it = this.sv.items.find((i) => i.kind === kind && Math.abs(angleDelta(i.world, world)) < 0.35 && i.t > 0);
+    if (!it) it = this.sv.items.find((i) => i.t <= 0);
+    if (!it) {
+      if (this.sv.items.length >= 10) it = this.sv.items.reduce((a, b) => (a.t < b.t ? a : b));
+      else {
+        const el = document.createElement('div');
+        el.className = 'sv';
+        el.innerHTML = '<i></i>';
+        this.sv.root.appendChild(el);
+        it = { el };
+        this.sv.items.push(it);
+      }
+    }
+    it.kind = kind;
+    it.world = world;
+    it.t = kind === 'step' ? 0.7 : 1.3;
+    it.vol = Math.min(1, 0.35 + vol);
+    it.el.className = `sv ${kind}`;
+  }
+
+  _updateSoundViz(dt) {
+    if (!this.soundVizOn) return;
+    const yaw = this.game.rig.yaw;
+    for (const it of this.sv.items) {
+      if (it.t <= 0) continue;
+      it.t -= dt;
+      // camera looks along (-sin yaw, -cos yaw); 0 rad = straight ahead
+      const rel = angleDelta(yaw + Math.PI, it.world);
+      it.el.style.transform = `rotate(${-rel}rad) translateY(-150px)`;
+      it.el.style.opacity = String(Math.max(0, Math.min(1, it.t * 2)) * it.vol);
+    }
+  }
+
+  // Heading strip at the top: N/E/S/W, degrees, your marker, pings and the safe zone.
+  _drawCompass() {
+    const cv = this.compass, ctx = this.compassCtx, g = this.game;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const cw = cv.clientWidth, ch = cv.clientHeight;
+    if (cv.width !== Math.round(cw * dpr)) { cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); }
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H);
+    const yaw = g.rig.yaw;
+    const heading = ((Math.atan2(-Math.sin(yaw), Math.cos(yaw)) * 180) / Math.PI + 360) % 360;
+    const span = 150, ppd = W / span;
+    const xOf = (deg) => W / 2 + ((((deg - heading) % 360) + 540) % 360 - 180) * ppd;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const names = { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
+    for (let d = 0; d < 360; d += 5) {
+      const x = xOf(d);
+      if (x < -10 || x > W + 10) continue;
+      const fade = 1 - Math.abs(x - W / 2) / (W / 2);
+      ctx.globalAlpha = Math.max(0, fade) * 0.95;
+      ctx.fillStyle = '#fff';
+      if (names[d] !== undefined) {
+        ctx.font = `800 ${Math.round(H * 0.42)}px "Barlow Condensed", sans-serif`;
+        ctx.fillStyle = d === 0 ? '#ffd23f' : '#fff';
+        ctx.fillText(names[d], x, H * 0.36);
+      } else if (d % 15 === 0) {
+        ctx.font = `600 ${Math.round(H * 0.28)}px "Barlow Condensed", sans-serif`;
+        ctx.fillText(String(d), x, H * 0.36);
+      } else ctx.fillRect(x - dpr * 0.5, H * 0.3, dpr, H * 0.14);
+    }
+    ctx.globalAlpha = 1;
+    const p = g.player;
+    const icon = (wx, wz, color, shape) => {
+      const b = ((Math.atan2(wx - p.pos.x, -(wz - p.pos.z)) * 180) / Math.PI + 360) % 360;
+      let x = xOf(b);
+      x = Math.max(8 * dpr, Math.min(W - 8 * dpr, x));
+      const y = H * 0.78, r = H * 0.13;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      if (shape === 'diamond') { ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); }
+      else ctx.arc(x, y, r * 0.85, 0, Math.PI * 2);
+      ctx.fill();
+    };
+    if (p) {
+      const storm = g.storm;
+      if (p.alive && storm.stage !== 'done' && !storm.isSafe(p.pos.x, p.pos.z)) icon(storm.nextCenter.x, storm.nextCenter.y, '#ffffff', 'circle');
+      for (const pg of g.pings.pings) icon(pg.pos.x, pg.pos.z, pg.label === 'Enemy!' ? '#ff6b6b' : '#5fd4ff', 'diamond');
+      if (g.pings.marker) icon(g.pings.marker.x, g.pings.marker.z, '#ffd23f', 'diamond');
+    }
+    // center notch + heading
+    ctx.fillStyle = '#ffd23f';
+    ctx.beginPath(); ctx.moveTo(W / 2 - 5 * dpr, 0); ctx.lineTo(W / 2 + 5 * dpr, 0); ctx.lineTo(W / 2, 6 * dpr); ctx.fill();
+  }
+
+  showSpectate(actor) {
+    this.spect.el.classList.toggle('hidden', !actor);
+    if (!actor) return;
+    this.spect.name.textContent = actor.name;
+    this.spect.name.style.color = '#' + actor.color.getHexString();
+    this.spectating = actor;
+  }
+
   // Small stacked notes for auto-picked ammo / materials.
   pickupNote(text, color = '#fff') {
     const n = document.createElement('div');
@@ -199,6 +327,10 @@ export class HUD {
     const p = g.player;
     if (!p) return;
     if (this.hitT > 0) { this.hitT -= dt; if (this.hitT <= 0) this.el.hitmarker.className = ''; }
+    this._drawCompass();
+    this._updateSoundViz(dt);
+    const sp = g.spectating;
+    if (sp) this.set('spinfo', this.spect.info, `${sp.kills} eliminations · ${Math.ceil(sp.health)} HP${sp.shield > 0 ? ` · ${Math.ceil(sp.shield)} shield` : ''}`);
     const w = p.weapon;
 
     // crosshair gap follows current spread
@@ -260,7 +392,8 @@ export class HUD {
     if (this.cache.sl !== slq) { this.cache.sl = slq; this.el.speed.style.opacity = String(slq); }
 
     // health / shield
-    const hp = Math.ceil(p.health), sh = Math.ceil(p.shield);
+    const view = g.spectating || p;
+    const hp = Math.ceil(view.health), sh = Math.ceil(view.shield);
     this.set('hpw', this.el.healthFill.style, `${Math.min(100, hp)}%`, 'width');
     this.set('hpn', this.el.healthNum, String(hp));
     this.set('shw', this.el.shieldFill.style, `${Math.min(100, sh)}%`, 'width');
