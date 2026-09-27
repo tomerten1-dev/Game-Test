@@ -4,7 +4,7 @@ import { TOWNS } from './Terrain.js';
 import { Weapon } from '../weapons/Weapon.js';
 import { RARITIES, rollRarity, rollWeaponType } from '../weapons/WeaponDefs.js';
 import { itemGeometry } from '../weapons/WeaponModels.js';
-import { makeWeaponMesh } from '../weapons/WeaponModels.js';
+import { makeWeaponMesh, makeAmmoBoxMesh } from '../weapons/WeaponModels.js';
 import { mulberry32 } from '../core/noise.js';
 import { AMMO, MATS, CONSUMABLES } from '../weapons/Items.js';
 
@@ -160,6 +160,7 @@ export class Loot {
   // Green ammo boxes (E to open): next to houses and around the island.
   _createAmmoBoxes(chestSpots, r) {
     this.ammoBoxes = [];
+    const ammoInfo = this.game.models?.get('guns/ammobox');
     const info = this.game.models?.get('kk/crate_A_big');
     const mat = new THREE.MeshStandardMaterial({ color: '#5f7d43', roughness: 0.7 });
     const trim = new THREE.MeshStandardMaterial({ color: '#e9e2c8', roughness: 0.6 });
@@ -171,6 +172,16 @@ export class Loot {
       if (y < 1.5) continue;
       if (chestSpots.some((c) => Math.hypot(c.x - sp.x, c.z - sp.z) < 3)) continue;
       const g = new THREE.Group();
+      if (ammoInfo) {
+        // the Styloo ammo box, scaled up to a crate you can open
+        const box = makeAmmoBoxMesh(0.95 / Math.max(ammoInfo.size.x, ammoInfo.size.z));
+        g.add(box);
+        g.position.set(sp.x, y, sp.z);
+        g.rotation.y = r() * Math.PI;
+        this.scene.add(g);
+        this.ammoBoxes.push({ x: sp.x, z: sp.z, y, group: g, opened: false });
+        continue;
+      }
       const box = info ? new THREE.Mesh(info.parts[0].geometry, mat) : new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
       if (info) box.scale.set(0.95 / info.size.x, 0.55 / info.size.y, 0.6 / info.size.z);
       const band = new THREE.Mesh(new THREE.BoxGeometry(0.97, 0.1, 0.62), trim);
@@ -289,7 +300,7 @@ export class Loot {
       mesh.position.y = 0.3;
       color = MATS[item.matType].color;
     } else if (item.type === 'ammo') {
-      mesh = new THREE.Mesh(this.itemGeo.ammo, this.itemMat);
+      mesh = makeAmmoBoxMesh(2.2) || new THREE.Mesh(this.itemGeo.ammo, this.itemMat);
       mesh.position.y = 0.3;
       color = AMMO[item.ammoType].color;
     } else {

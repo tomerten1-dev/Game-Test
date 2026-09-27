@@ -87,13 +87,15 @@ function build(type, rarity) {
   return { geo, muzzle, foregrip };
 }
 
-// Kenney CC0 blasters for pistol / SMG / AR; the shotgun stays procedural.
+// Kenney CC0 blasters for pistol / SMG, Styloo rifles for AR / burst / sniper; shotguns and the rocket stay procedural.
 let models = null;
 export function setWeaponModels(m) { models = m; }
 const KENNEY = {
   pistol: { name: 'blaster', length: 0.42, rotY: Math.PI },
   smg: { name: 'blaster-repeater', length: 0.52, rotY: Math.PI },
-  ar: { name: 'blaster-a', length: 0.9, rotY: -Math.PI / 2 },
+  ar: { name: 'guns/ak47', length: 0.95, rotY: -Math.PI / 2, textured: true },
+  burst: { name: 'guns/ak47variant', length: 0.95, rotY: -Math.PI / 2, textured: true },
+  sniper: { name: 'guns/awp', length: 1.25, rotY: -Math.PI / 2, textured: true },
 };
 const kenneyMats = new Map();
 const stripeCache = new Map();
@@ -101,6 +103,7 @@ const stripeCache = new Map();
 function buildKenney(type, rarity) {
   const cfg = KENNEY[type];
   const info = models.get(cfg.name);
+  if (!info) return null;
   const along = cfg.rotY % Math.PI === 0 ? info.size.z : info.size.x;
   const s = cfg.length / along;
   const group = new THREE.Group();
@@ -110,7 +113,12 @@ function buildKenney(type, rarity) {
   inner.position.set(0, -info.size.y * s * 0.45, cfg.length * 0.3);
   for (const p of info.parts) {
     let m = kenneyMats.get(p.material);
-    if (!m) { m = p.material.clone(); m.roughness = 0.45; m.metalness = Math.min(0.3, m.metalness ?? 0); kenneyMats.set(p.material, m); }
+    if (!m) {
+      m = p.material.clone();
+      m.roughness = cfg.textured ? 0.55 : 0.45;
+      m.metalness = Math.min(0.3, m.metalness ?? 0);
+      kenneyMats.set(p.material, m);
+    }
     const mesh = new THREE.Mesh(p.geometry, m);
     mesh.castShadow = true;
     inner.add(mesh);
@@ -120,7 +128,7 @@ function buildKenney(type, rarity) {
   const key = type + rarity;
   if (!stripeCache.has(key)) stripeCache.set(key, [new THREE.BoxGeometry(0.035, 0.03, cfg.length * 0.55), new THREE.MeshStandardMaterial({ color: RARITIES[rarity].color, emissive: RARITIES[rarity].color, emissiveIntensity: 0.9, roughness: 0.4 })]);
   const stripe = new THREE.Mesh(...stripeCache.get(key));
-  stripe.position.set(0, info.size.y * s * 0.55 + 0.01, cfg.length * 0.3);
+  stripe.position.set(0, info.size.y * s * (cfg.textured ? 0.42 : 0.55) + 0.01, cfg.length * 0.3);
   group.add(stripe);
   group.userData.muzzle = new THREE.Vector3(0, 0.02, cfg.length * 0.85);
   group.userData.foregrip = cfg.length * 0.45;
@@ -156,6 +164,18 @@ export function makeItemMesh(kind) {
   return m;
 }
 
+// Styloo ammo box for ammo pickups (null if not loaded).
+let ammoMat = null;
+export function makeAmmoBoxMesh(scale = 1) {
+  const info = models?.get('guns/ammobox');
+  if (!info) return null;
+  // the texture is quite dark; brighten it so boxes read at a distance
+  if (!ammoMat) { ammoMat = info.parts[0].material.clone(); ammoMat.color.setRGB(1.7, 2.0, 1.6); }
+  const m = models.instance('guns/ammobox', () => ammoMat);
+  m.scale.setScalar(scale);
+  return m;
+}
+
 // KayKit axe used as the harvesting tool; keeps its original units so it fits the hand slot.
 export function makePickaxeMesh() {
   const info = models?.get('kk/axe_1handed');
@@ -166,7 +186,8 @@ export function makePickaxeMesh() {
 }
 
 export function makeWeaponMesh(type, rarity) {
-  if (models && KENNEY[type]) return buildKenney(type, rarity);
+  const k = models && KENNEY[type] ? buildKenney(type, rarity) : null;
+  if (k) return k;
   const key = `${type}:${rarity}`;
   let g = cache.get(key);
   if (!g) { g = build(type, rarity); cache.set(key, g); }

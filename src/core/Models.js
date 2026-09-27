@@ -18,7 +18,9 @@ const KK = [
 ].map((n) => `kk/${n}`);
 export const ENV_MODELS = [
   'palm-long', 'palm-short', 'formation-large-stone', 'formation-stone',
-  'blaster', 'blaster-repeater', 'blaster-a',
+  'blaster', 'blaster-repeater',
+  // Styloo "Guns Asset Pack" (user-provided), see public/models/guns/CREDITS.md
+  'guns/ak47', 'guns/ak47variant', 'guns/awp', 'guns/ammobox',
   ...KK,
   // Quaternius "Stylized Nature" (CC0), textures assigned in world/Nature.js
   'nature/CommonTree_1', 'nature/CommonTree_3', 'nature/Bush_Common_Flowers', 'nature/Clover_1', 'nature/Clover_2',

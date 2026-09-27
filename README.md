@@ -134,7 +134,7 @@ src/
   weapons/   Weapon stats & rarities, weapon instances, procedural gun models, hitscan combat
   effects/   Pooled muzzle flashes, tracers, particles, damage numbers, elimination bursts
   ui/        HUD, minimap, menus, touch controls
-public/models/        CC0 models: chars/ (KayKit heroes), kk/ (KayKit world), env/ (Kenney)
+public/models/        models: chars/ (KayKit heroes), kk/ (KayKit world), env/ (Kenney), nature/ (Quaternius), guns/ (Styloo)
 ```
 
 ## Tech notes
@@ -149,10 +149,11 @@ public/models/        CC0 models: chars/ (KayKit heroes), kk/ (KayKit world), en
 - **Baked lighting:** at load the game traces sun rays from every terrain point against houses, tree canopies, rocks and the mountain. That gives soft shadows and ambient occlusion across the whole island. Near the player they fade into the real shadow map.
 - **Water:** depth-tinted from the terrain height (turquoise shallows, deep blue sea), animated shore foam, small waves.
 - **Life:** wind-swaying trees and palms, falling leaves, birds, fountain spray, chest sparkles, dust puffs, skydive speed lines, victory confetti.
-- **Assets (all CC0):**
+- **Assets (CC0 unless noted):**
   - **KayKit** by Kay Lousberg: characters and animations, medieval buildings (homes, tavern, blacksmith, market, church, towers, windmills, castle), the modern downtown of Pebble City (City Builder Bits: buildings, roads, parked cars, street lights), café and porch furniture (Furniture Bits), pine trees, rocks, clouds, crates, barrels, sacks, tents, flags, lumber and the treasure chest. See `public/models/kk/CREDITS.md`.
-  - **Kenney:** palms, rock spires and the pistol/SMG/AR blasters. See `public/models/env/CREDITS.md`.
+  - **Kenney:** palms, rock spires and the pistol/SMG blasters. See `public/models/env/CREDITS.md`.
+  - **Styloo Guns Asset Pack** (provided by the project owner; see its itch.io page for the license): the assault rifle, burst rifle, sniper rifle and the ammo boxes. See `public/models/guns/CREDITS.md`.
   - **Quaternius Stylized Nature:** painted leafy trees (shown near the camera; cheaper trees stand in far away), flowering bushes and clover. See `public/models/nature/CREDITS.md`.
-  - **Procedural:** round/autumn trees, bushes, grass, the shotgun, the bus, fences, fountains and lamps are built from low-poly shapes.
+  - **Procedural:** round/autumn trees, bushes, grass, the shotguns, the rocket launcher, the bus, fences, fountains and lamps are built from low-poly shapes.
   - **Audio:** all sounds are synthesized with Web Audio.
 
