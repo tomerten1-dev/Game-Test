@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Simplex2D, smoothstep, lerp, clamp } from '../core/noise.js';
+import { SHADOW } from './Bake.js';
 
 // Smooth fbm island. Heights live in a grid; heightAt() is bilinear so gameplay
 // and the rendered mesh always agree.
@@ -224,15 +225,20 @@ export class Terrain {
       town[j * n + i] = w;
     }
     geo.setAttribute('aTown', new THREE.BufferAttribute(town, 1));
+    geo.setAttribute('aShade', new THREE.BufferAttribute(new Float32Array(n * n), 1));
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
     mat.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, SHADOW);
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nattribute float aTown;\nvarying vec3 vWPos;\nvarying float vTown;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(position, 1.0)).xyz;\nvTown = aTown;');
+        .replace('#include <common>', '#include <common>\nattribute float aTown;\nattribute float aShade;\nvarying vec3 vWPos;\nvarying float vTown;\nvarying float vShade;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(position, 1.0)).xyz;\nvTown = aTown;\nvShade = aShade;');
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>
           varying vec3 vWPos;
           varying float vTown;
+          varying float vShade;
+          uniform vec3 uFocus;
+          uniform float uRange;
           float tHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
           float tNoise(vec2 p) {
             vec2 i = floor(p), f = fract(p);
@@ -243,6 +249,9 @@ export class Terrain {
           vec2 wp = vWPos.xz;
           float dn = tNoise(wp * 0.35) * 0.6 + tNoise(wp * 1.3) * 0.4;
           diffuseColor.rgb *= 0.9 + dn * 0.2;
+          // baked distant shadows (real shadow maps take over near the player)
+          float bakeFade = smoothstep(uRange * 0.55, uRange * 0.92, length(vWPos.xz - uFocus.xz));
+          diffuseColor.rgb *= 1.0 - vShade * 0.55 * bakeFade;
           // paved plaza: offset stone tiles with dark grout
           if (vTown > 0.01) {
             vec2 tp = wp * vec2(0.9, 1.3);
@@ -260,6 +269,18 @@ export class Terrain {
     mesh.name = 'terrain';
     this.mesh = mesh;
     return mesh;
+  }
+
+  applyBake(shade, ao) {
+    const g = this.mesh.geometry;
+    g.attributes.aShade.array.set(shade);
+    g.attributes.aShade.needsUpdate = true;
+    const col = g.attributes.color;
+    for (let k = 0; k < shade.length; k++) {
+      const f = 1 - ao[k];
+      col.array[k * 3] *= f; col.array[k * 3 + 1] *= f; col.array[k * 3 + 2] *= f;
+    }
+    col.needsUpdate = true;
   }
 
   // RGBA half-float texture: R = height, G = grass density, B = color variation.

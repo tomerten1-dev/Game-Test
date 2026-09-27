@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { SUN_DIR } from './Sky.js';
 import { quality } from '../core/device.js';
+import { SHADOW } from './Bake.js';
 
 export class Lighting {
   constructor(scene) {
@@ -32,6 +33,7 @@ export class Lighting {
     sh.camera.updateProjectionMatrix();
     this.range = range;
     this._texel = (range * 2) / size;
+    SHADOW.uRange.value = range;
   }
 
   // Shadow camera follows the focus point, snapped to shadow texels to avoid shimmering.
@@ -43,5 +45,6 @@ export class Lighting {
     this.sun.target.position.set(x, y, z);
     this.sun.position.set(x + SUN_DIR.x * 200, y + SUN_DIR.y * 200, z + SUN_DIR.z * 200);
     this.sun.target.updateMatrixWorld();
+    SHADOW.uFocus.value.copy(focus);
   }
 }

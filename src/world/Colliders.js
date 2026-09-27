@@ -15,7 +15,7 @@ export class Colliders {
   _key(ix, iz) { return ix * 73856093 + iz * 19349663; }
 
   _bounds(c) {
-    if (c.kind === 'circle') return [c.x - c.r, c.x + c.r, c.z - c.r, c.z + c.r];
+    if (c.kind === 'circle' || c.kind === 'sphere') return [c.x - c.r, c.x + c.r, c.z - c.r, c.z + c.r];
     return [c.minX, c.maxX, c.minZ, c.maxZ];
   }
 

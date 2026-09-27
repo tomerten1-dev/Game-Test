@@ -49,6 +49,7 @@ export class Foliage {
     this.terrain = terrain;
     this.colliders = colliders;
     this.rand = mulberry32(4242);
+    this.occluders = [];
     this.occupied = new Set();
     this._trees();
     this._rocks();
@@ -122,11 +123,13 @@ export class Foliage {
         m.compose(p.set(c.x, c.h + trunkH * 0.75, c.z), q, s.set(sc, sc * (1 + r() * 0.3), sc));
         pines.setMatrixAt(nP, m);
         pines.setColorAt(nP, col.copy(PINE_GREENS[Math.floor(r() * PINE_GREENS.length)]));
+        this.occluders.push({ x: c.x, y: c.h + trunkH * 0.75 + 1.4 * sc, z: c.z, r: 1.45 * sc });
         nP++;
       } else {
         const cs = sc * (1.1 + r() * 0.3);
         m.compose(p.set(c.x, c.h + trunkH + cs * 0.7, c.z), q, s.set(cs * 1.3, cs * 1.15, cs * 1.3));
         rounds.setMatrixAt(nR, m);
+        this.occluders.push({ x: c.x, y: c.h + trunkH + cs * 0.75, z: c.z, r: cs * 1.55 });
         const autumn = r() < 0.13;
         const base = autumn ? AUTUMN[Math.floor(r() * AUTUMN.length)] : TREE_GREENS[Math.floor(r() * TREE_GREENS.length)];
         rounds.setColorAt(nR, col.copy(base).multiplyScalar(0.9 + r() * 0.2));
@@ -196,6 +199,7 @@ export class Foliage {
       const s = (7 + r() * 4) / this.models.get(type).size.y;
       pl[type].push({ x, y: h - 0.2, z, rot: r() * Math.PI * 2, scale: s });
       this.colliders.add({ kind: 'circle', x, z, r: 0.35, y0: h - 2, y1: h + 8, tree: true });
+      this.occluders.push({ x, y: h + (7 + 2) * 0.8, z, r: 2.6 });
     }
     const palmMat = (p) => { const m = p.material.clone(); m.roughness = 0.8; addWind(m, { amount: 0.035, pivot: 0.5, speed: 1.2 }); return m; };
     for (const [type, list] of Object.entries(pl)) if (list.length) this.scene.add(this.models.instanced(type, list, { material: palmMat }));
@@ -247,6 +251,7 @@ export class Foliage {
       m.compose(p.set(c.x, c.h + sc * 0.25, c.z), q, s.set(sc * 1.2, sc * 0.8, sc * 1.2));
       im.setMatrixAt(n, m);
       const flower = r() < 0.12;
+      this.occluders.push({ x: c.x, y: c.h + sc * 0.3, z: c.z, r: sc * 0.9 });
       im.setColorAt(n, flower ? col.set(['#ff8fb1', '#ffd166', '#c792ea'][Math.floor(r() * 3)]) : col.copy(TREE_GREENS[Math.floor(r() * TREE_GREENS.length)]).multiplyScalar(0.95));
       n++;
     }
@@ -300,6 +305,7 @@ export class Foliage {
       uHeightTex: { value: this.heightTex || this.terrain.buildDataTexture() },
       uGrassA: { value: PALETTE.grassA.clone() },
       uGrassB: { value: PALETTE.grassB.clone() },
+      uBakeTex: { value: null },
     };
     this.grassUniforms = uniforms;
     const mat = new THREE.MeshLambertMaterial({ side: THREE.DoubleSide });
@@ -312,8 +318,10 @@ export class Foliage {
           uniform float uTime, uSize, uRadius, uHalf;
           uniform vec2 uCenter;
           uniform sampler2D uHeightTex;
+          uniform sampler2D uBakeTex;
           varying float vTip;
-          varying float vVar;`)
+          varying float vVar;
+          varying float vAO;`)
         .replace('#include <begin_vertex>', `
           vec2 base = uCenter + mod(aOffset.xy - uCenter + uSize * 0.5, uSize) - uSize * 0.5;
           vec2 tuv = (base + uHalf) / (uHalf * 2.0);
@@ -328,15 +336,17 @@ export class Foliage {
           p.z += w * aTip * 0.1 * sc;
           vec3 transformed = vec3(base.x, hd.r - 0.04, base.y) + p;
           vTip = aTip;
-          vVar = hd.b;`);
+          vVar = hd.b;
+          vAO = texture2D(uBakeTex, tuv).g;`);
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>
           uniform vec3 uGrassA, uGrassB;
           varying float vTip;
-          varying float vVar;`)
+          varying float vVar;
+          varying float vAO;`)
         .replace('#include <color_fragment>', `#include <color_fragment>
           vec3 gcol = mix(uGrassA, uGrassB, vVar);
-          diffuseColor.rgb = mix(gcol * 0.6, gcol * 1.25 + vec3(0.03, 0.04, 0.0), vTip);`);
+          diffuseColor.rgb = mix(gcol * 0.6, gcol * 1.25 + vec3(0.03, 0.04, 0.0), vTip) * (1.0 - vAO);`);
     };
     const mesh = new THREE.Mesh(geo, mat);
     mesh.frustumCulled = false;
@@ -345,6 +355,8 @@ export class Foliage {
     this.scene.add(mesh);
     this.grassMesh = mesh;
   }
+
+  setBakeTexture(tex) { if (this.grassUniforms) this.grassUniforms.uBakeTex.value = tex; }
 
   setGrassDensity(k) {
     if (this.grassMesh) this.grassMesh.geometry.instanceCount = Math.max(200, Math.round(quality.grassCount * k));

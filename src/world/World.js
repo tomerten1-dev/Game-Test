@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Terrain, WATER_LEVEL } from './Terrain.js';
-import { createSkyMesh, Clouds, SKY_HORIZON } from './Sky.js';
+import { createSkyMesh, Clouds, SKY_HORIZON, SUN_DIR } from './Sky.js';
+import { bakeLighting, bakeTexture } from './Bake.js';
 import { Water } from './Water.js';
 import { Lighting } from './Lighting.js';
 import { Foliage } from './Foliage.js';
@@ -41,6 +42,11 @@ export class World {
     this.clouds = new Clouds(scene);
     this.towns = new Towns(scene, this.terrain, this.colliders, models);
     this.foliage = new Foliage(scene, this.terrain, this.colliders, models, this.heightTex);
+    const t0 = performance.now();
+    const { shade, ao } = bakeLighting(this.terrain, this.colliders, this.foliage.occluders, SUN_DIR);
+    this.terrain.applyBake(shade, ao);
+    this.foliage.setBakeTexture(bakeTexture(this.terrain.n, shade, ao));
+    this.bakeMs = performance.now() - t0;
   }
 
   update(dt, t, focus, camera) {
