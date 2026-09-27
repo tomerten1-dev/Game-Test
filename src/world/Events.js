@@ -54,6 +54,8 @@ export class Events {
     this._createBenches();
     this._createHides();
     this._createForage();
+    this.llamas = [];
+    this._placeLlamas();
   }
 
   // ---------- helpers ----------
@@ -295,6 +297,67 @@ export class Events {
         this.hides.push({ kind: urban ? 'dumpster' : 'hay', x: spot.x, z: spot.z, y, group, col, occupant: null });
       }
     }
+  }
+
+  // ---------- loot llamas: a few rare piñata-like stashes hidden away from the towns ----------
+  _llamaMesh() {
+    const g = new THREE.Group();
+    const body = new THREE.MeshStandardMaterial({ color: '#c77dff', roughness: 0.55 });
+    const stripe = new THREE.MeshStandardMaterial({ color: '#ffd23f', roughness: 0.5 });
+    const light = new THREE.MeshStandardMaterial({ color: '#7ee8fa', roughness: 0.5 });
+    const dark = new THREE.MeshStandardMaterial({ color: '#2a1f3d', roughness: 0.4 });
+    const add = (geo, m, x, y, z, rx = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.rotation.x = rx; o.castShadow = true; g.add(o); return o; };
+    add(new THREE.BoxGeometry(0.7, 0.62, 1.3), body, 0, 1.05, 0);
+    for (const z of [-0.35, 0, 0.35]) add(new THREE.BoxGeometry(0.72, 0.64, 0.1), z === 0 ? light : stripe, 0, 1.05, z);
+    for (const [x, z] of [[-0.24, -0.48], [0.24, -0.48], [-0.24, 0.48], [0.24, 0.48]]) add(new THREE.BoxGeometry(0.18, 0.8, 0.18), body, x, 0.4, z);
+    add(new THREE.BoxGeometry(0.34, 0.9, 0.34), body, 0, 1.65, 0.55);
+    add(new THREE.BoxGeometry(0.4, 0.36, 0.56), body, 0, 2.15, 0.66);
+    add(new THREE.BoxGeometry(0.22, 0.2, 0.12), light, 0, 2.08, 0.97);
+    for (const x of [-0.12, 0.12]) {
+      add(new THREE.BoxGeometry(0.09, 0.28, 0.09), stripe, x, 2.44, 0.55);
+      add(new THREE.BoxGeometry(0.07, 0.09, 0.03), dark, x * 1.4, 2.22, 0.95);
+    }
+    add(new THREE.BoxGeometry(0.2, 0.2, 0.34), stripe, 0, 1.18, -0.78, -0.6); // tail
+    return g;
+  }
+
+  _placeLlamas() {
+    for (const l of this.llamas) { this.scene.remove(l.group); this.world.colliders.remove(l.col); }
+    this.llamas = [];
+    for (let tries = 0; tries < 400 && this.llamas.length < 3; tries++) {
+      const x = (Math.random() - 0.5) * WORLD_HALF * 1.7, z = (Math.random() - 0.5) * WORLD_HALF * 1.7;
+      if (TOWNS.some((t) => Math.hypot(t.x - x, t.z - z) < t.r + 25)) continue;
+      if (this.llamas.some((l) => Math.hypot(l.x - x, l.z - z) < 150) || !this._clearSpot(x, z, 2, 0.85)) continue;
+      const y = this.world.heightAt(x, z);
+      const group = this._llamaMesh();
+      group.position.set(x, y, z);
+      group.rotation.y = Math.random() * Math.PI * 2;
+      this.scene.add(group);
+      const col = { kind: 'circle', x, z, r: 0.7, y0: y - 0.5, y1: y + 2.3, crate: true };
+      this.world.colliders.add(col);
+      this.llamas.push({ x, y, z, group, col, opened: false });
+    }
+  }
+
+  openLlama(l, actor) {
+    if (l.opened) return;
+    l.opened = true;
+    const items = [];
+    for (const m of ['wood', 'stone', 'metal']) items.push({ type: 'mat', matType: m, amount: 200 });
+    for (const [a, n] of [['light', 60], ['medium', 60], ['heavy', 12], ['shells', 15]]) items.push({ type: 'ammo', ammoType: a, amount: n });
+    const heal = ['chug', 'slurp', 'bigshield', 'medkit'][Math.floor(Math.random() * 4)];
+    items.push({ type: 'consumable', ctype: heal, count: CONSUMABLES[heal].stack });
+    const util = ['grenade', 'impulse', 'launchpad', 'shockwave'][Math.floor(Math.random() * 4)];
+    items.push({ type: 'consumable', ctype: util, count: CONSUMABLES[util].stack });
+    items.forEach((it, i) => {
+      const a = (i / items.length) * Math.PI * 2;
+      this.game.loot.spawnPickup(it, _v.set(l.x, l.y + 1.4, l.z), new THREE.Vector3(Math.cos(a) * 2.8, 5.5, Math.sin(a) * 2.8));
+    });
+    this.scene.remove(l.group);
+    this.world.colliders.remove(l.col);
+    this.game.effects.confetti?.(_v.set(l.x, l.y - 4, l.z));
+    this.game.sound.play('chest', actor.isPlayer ? null : _v.set(l.x, l.y, l.z));
+    if (actor.isPlayer) this.game.hud?.banner?.('Loot Llama!', 1.5);
   }
 
   // ---------- foraged food: apples under trees (+5 health), mushrooms in the woods (+5 shield) ----------
@@ -561,6 +624,11 @@ export class Events {
       const d = Math.hypot(h.x - pos.x, h.z - pos.z);
       if (d < bd + 0.8 && Math.abs(h.y - pos.y) < 2.5) { bd = d; best = { kind: 'hide', hide: h, text: `Hide in ${h.kind === 'hay' ? 'Haystack' : 'Dumpster'}` }; }
     }
+    for (const l of this.llamas) {
+      if (l.opened) continue;
+      const d = Math.hypot(l.x - pos.x, l.z - pos.z);
+      if (d < bd + 0.6 && Math.abs(l.y - pos.y) < 2.5) { bd = d; best = { kind: 'llama', llama: l, text: 'Open Loot Llama', rarity: 4 }; }
+    }
     for (const f of this.forage || []) {
       if (f.eaten || Math.abs(f.x - pos.x) > bd || Math.abs(f.z - pos.z) > bd) continue;
       const d = Math.hypot(f.x - pos.x, f.z - pos.z);
@@ -615,6 +683,7 @@ export class Events {
     for (const z of this.zones) this.scene.remove(z.group);
     this.zones = [];
     for (const h of this.hides) if (h.occupant) this.unhide(h.occupant);
+    this._placeLlamas();
     for (const f of this.forage || []) if (f.eaten) { f.eaten = false; this._setForage(f, f.kind, true); }
   }
 
