@@ -69,7 +69,7 @@ export class Combat {
     }
     const hs = Math.hypot(shooter.vel.x, shooter.vel.z);
     const moving = hs > 1.5;
-    const spread = w.spread(moving, !shooter.onGround, { crouched: shooter.crouched, still: hs < 0.4, now: g.time, scoped: shooter.aiming && w.def.scope }) * (shooter.accuracyMult ?? 1);
+    const spread = w.spread(moving, !shooter.onGround, { crouched: shooter.crouched, still: hs < 0.4, now: g.time, scoped: shooter.aiming && w.def.scope, aiming: shooter.aiming }) * (shooter.accuracyMult ?? 1);
     w.onFire(g.time);
     shooter.lastFireTime = g.time;
     if (shooter.isPlayer) g.meta?.track('shot');
@@ -109,13 +109,15 @@ export class Combat {
       _end.copy(origin).addScaledVector(_dir, r.t);
       if (i % 2 === 0 || def.pellets === 1) g.effects.tracer(muzzle, _end, shooter.isPlayer ? '#fff2b0' : '#ffd08a', def.pellets > 1 ? 0.03 : 0.045);
       if (r.actor) {
-        const fall = 1 - 0.4 * Math.min(1, Math.max(0, (r.t - def.falloffStart) / (def.range - def.falloffStart)));
+        const fall = def.pellets > 1 ? w.shotgunFalloff(r.t) : 1 - 0.4 * Math.min(1, Math.max(0, (r.t - def.falloffStart) / (def.range - def.falloffStart)));
         // bots trade damage a bit slower with each other so matches last longer
         const botVsBot = !shooter.isPlayer && !r.actor.isPlayer ? 0.45 : 1;
         const dmg = w.damage * fall * (r.head ? def.headMult || 1.5 : 1) * botVsBot;
         let e = perTarget.get(r.actor);
-        if (!e) { e = { dmg: 0, head: false, point: _end.clone() }; perTarget.set(r.actor, e); }
+        if (!e) { e = { dmg: 0, head: false, heads: 0, bodyDmg: 0, point: _end.clone() }; perTarget.set(r.actor, e); }
         e.dmg += dmg;
+        e.bodyDmg += dmg / (r.head ? def.headMult || 1.5 : 1);
+        if (r.head) e.heads++;
         e.head = e.head || r.head;
       } else if (r.hit) {
         const kind = r.collider ? (r.collider.structure ? (r.collider.structure.mat === 'wood' ? 'wood' : 'stone') : r.collider.house ? (r.collider.mat === 'wood' ? 'wood' : 'stone') : r.collider.crate ? 'wood' : r.collider.tree ? 'wood' : r.collider.rock ? 'stone' : 'stone') : 'terrain';
@@ -134,6 +136,11 @@ export class Combat {
     if (buildHits) g.effects.buildNumber(buildHits.pos, buildHits.dmg);
     if (shooter.isPlayer && perTarget.size) g.meta?.track('hit', 1, [...perTarget.values()].some((e) => e.head));
     for (const [target, e] of perTarget) {
+      if (def.pellets > 1) {
+        // shotguns: a headshot needs at least 3 pellets on the head, and one blast has a damage cap
+        if (e.heads < 3) { e.dmg = e.bodyDmg; e.head = false; }
+        e.dmg = Math.min(e.dmg, w.damageCap);
+      }
       const shieldBefore = target.shield;
       const dealt = target.takeDamage(e.dmg, shooter, e.head);
       g.effects.hitSparks(e.point, e.head ? '#ffd23f' : shieldBefore > 0 ? '#6cc4ff' : '#ffffff');
@@ -215,7 +222,7 @@ export class Combat {
     }
     const c = r.collider;
     if (actor.isPlayer && c) g.hud?.objHp?.(c, _end);
-    if (c?.structure) { const m = c.structure.mat || 'wood'; c.structure.damage(50, actor); g.effects.impact(_end, m === 'wood' ? 'wood' : 'stone'); g.sound.play(`harvest_${m}`, actor.isPlayer ? null : _end); return true; }
+    if (c?.structure) { const m = c.structure.mat || 'wood'; c.structure.damage(c.structure.owner && c.structure.owner !== actor ? 75 : 50, actor); g.effects.impact(_end, m === 'wood' ? 'wood' : 'stone'); g.sound.play(`harvest_${m}`, actor.isPlayer ? null : _end); return true; }
     if (c?.breakable) this.damageProp(c, 35);
     if (c?.part) c.part.damage(c.mat === 'glass' ? 1 : 55, actor); // house walls break after a few swings
     const mat = r.terrain ? null : c?.mat === 'glass' ? null : c?.mat || (c?.tree || c?.crate ? 'wood' : c?.rock || c?.stone ? 'stone' : c?.house ? 'wood' : null);

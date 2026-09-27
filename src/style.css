@@ -48,6 +48,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1830; col
 #hitmarker.kill i { background: #ff4d4d; width: 18px; }
 
 #reload-ring { position: absolute; left: calc(50% + 64px); top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; gap: 3px; }
+#reload-hint { position: absolute; left: 50%; top: calc(50% + 48px); transform: translateX(-50%); font-family: var(--title); font-weight: 900; font-style: italic; font-size: 15px; color: #fff; letter-spacing: 1px; text-shadow: 0 1px 4px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 6px; animation: reloadPulse 0.9s ease-in-out infinite alternate; }
+#reload-hint kbd { font: inherit; font-style: normal; font-size: 12px; background: rgba(255,255,255,0.92); color: #111; border-radius: 4px; padding: 1px 6px; }
+@keyframes reloadPulse { from { opacity: 0.55; } to { opacity: 1; } }
 #reload-ring .rr-dial { position: relative; width: 52px; height: 52px; }
 #reload-ring svg { width: 52px; height: 52px; transform: rotate(-90deg); }
 #reload-ring #ring-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--title); font-size: 24px; font-weight: 900; font-style: italic; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.75); }

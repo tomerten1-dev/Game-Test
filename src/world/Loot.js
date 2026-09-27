@@ -581,7 +581,8 @@ export class Loot {
       else if (it.isConsumable) items.push({ type: 'consumable', ctype: it.type, count: it.count });
     });
     if (!actor.infiniteAmmo) for (const [t, n] of Object.entries(actor.ammo)) if (n > 0) items.push({ type: 'ammo', ammoType: t, amount: n });
-    for (const [t, n] of Object.entries(actor.mats)) if (n > 0) items.push({ type: 'mat', matType: t, amount: n });
+    // eliminated players always drop at least 50 of each material (Fortnite)
+    for (const [t, n] of Object.entries(actor.mats)) if (n > 0 || !actor.npc) items.push({ type: 'mat', matType: t, amount: actor.npc ? n : Math.max(50, n) });
     if (actor.gold > 0) items.push({ type: 'gold', amount: actor.gold });
     if (actor.keycard) { items.push({ type: 'consumable', ctype: 'keycard', count: 1 }); actor.keycard = false; }
     for (const k of actor.medallions || []) items.push({ type: 'medallion', key: k });

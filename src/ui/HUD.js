@@ -52,6 +52,7 @@ export class HUD {
         <div id="obj-hp" class="hidden"><div class="oh-bar"><div class="oh-fill"></div></div><span class="oh-num"></span></div>
         <div id="toast"></div>
         <div id="reload-ring" class="hidden"><div class="rr-dial"><svg viewBox="0 0 40 40"><circle class="rr-bg" cx="20" cy="20" r="16"/><circle class="rr-fg" cx="20" cy="20" r="16"/></svg><b id="ring-num"></b></div><span id="ring-label">RELOADING</span></div>
+        <div id="reload-hint" class="hidden"><kbd></kbd> RELOAD</div>
         <div id="pickup-notes"></div>
 
         <div id="killfeed"></div>
@@ -297,10 +298,10 @@ export class HUD {
     const stats = (x) => {
       const d = x.def;
       return [
-        ['Damage', Math.round(x.damage) * d.pellets, 1],
+        ['Damage', Math.round(Math.min(x.damageCap, x.damage * d.pellets)), 1],
         ['Fire rate', +d.rate.toFixed(1), 1],
         ['Magazine', d.mag, 1],
-        ['Reload', +(d.shellReload ? d.shellReload * d.mag : d.reload).toFixed(1), -1],
+        ['Reload', +(x.reloadTime * (d.shellReload ? d.mag : 1)).toFixed(1), -1],
       ];
     };
     const mine = cmp && stats(cmp);
@@ -641,7 +642,7 @@ export class HUD {
 
     // crosshair gap follows current spread
     const moving = Math.hypot(p.vel.x, p.vel.z) > 1.5;
-    const spread = w ? w.spread(moving, !p.onGround, { crouched: p.crouched, still: !moving, now: g.time }) : 0.02;
+    const spread = w ? w.spread(moving, !p.onGround, { crouched: p.crouched, still: !moving, now: g.time, aiming: p.aiming }) : 0.02;
     const px = Math.min(90, Math.round(6 + (spread / Math.tan((g.camera.fov * Math.PI) / 360)) * window.innerHeight * 0.5));
     if (this.cache.gap !== px) { this.cache.gap = px; this.el.crosshair.style.setProperty('--gap', `${px}px`); }
     this.set('chVis', this.el.crosshair.style, p.state === 'ground' && p.alive && !p.victory ? 'block' : 'none', 'display');
@@ -714,10 +715,18 @@ export class HUD {
       this.matEls.forEach((el) => el.classList.toggle('sel', el.dataset.m === p.buildMat));
     }
     const rl = w?.reloading, using = p.useT > 0 && p.useItem;
+    // low-ammo hint: mag at a quarter or less and spare ammo to load
+    const lowAmmo = !!w?.isGun && !rl && !using && w.def.mag > 1 && w.ammo <= Math.floor(w.def.mag / 4) && p.ammoFor(w.def.ammoType) > 0;
+    if (this.cache.lowAmmo !== lowAmmo) {
+      this.cache.lowAmmo = lowAmmo;
+      const h = document.getElementById('reload-hint');
+      h.classList.toggle('hidden', !lowAmmo);
+      if (lowAmmo) h.querySelector('kbd').textContent = keyLabel(this.game.input?.keyFor?.('reload') || 'KeyR').replace('Mouse ', 'M');
+    }
     this.el.reload.classList.toggle('hidden', !rl && !using);
     // countdown dial: seconds left in the middle, the ring fills as it goes
     if (rl || using) {
-      const left = rl ? w.reloadT : p.useT, total = rl ? w.def.reload : p.useItem.def.time;
+      const left = rl ? w.reloadT : p.useT, total = rl ? w.reloadTime : p.useItem.def.time;
       this.set('ring', this.el.ringLabel, rl ? 'RELOADING' : p.useItem.def.name.toUpperCase());
       this.el.reloadCircle.style.strokeDashoffset = String(100.5 * Math.max(0, Math.min(1, left / total)));
       this.set('ringNum', this.el.ringNum, String(Math.max(1, Math.ceil(left - 0.05))));

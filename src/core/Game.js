@@ -606,7 +606,7 @@ export class Game {
         if (ev === 'reloaded') { a.finishReload(w); if (a.isPlayer) this.sound.play('reloaded'); }
         else if (ev === 'shell') {
           a.finishReload(w, 1);
-          if (w.ammo < w.def.mag && a.ammoFor(w.def.ammoType) > 0) { w.reloadT = w.def.shellReload; if (a.isPlayer) this.sound.play('reload'); }
+          if (w.ammo < w.def.mag && a.ammoFor(w.def.ammoType) > 0) { w.reloadT = w.reloadTime; if (a.isPlayer) this.sound.play('reload'); }
           else { w.reloading = false; if (a.isPlayer) this.sound.play('reloaded'); }
         }
       }
@@ -1042,29 +1042,29 @@ export class Game {
   }
 
   // Storm surge: from the third circle on, while more players are alive than the circle allows,
-  // whoever has dealt the least damage takes a hit every 10 s. Deal damage to stay safe.
+  // whoever has dealt the least damage takes 25 every 5 s. Deal damage to stay safe.
   _updateSurge(dt) {
     const st = this.storm, limits = [0, 0, 60, 40, 26, 15, 8];
     const scale = (this.actors.filter((a) => !a.npc).length) / 100;
     const limit = Math.max(3, Math.round((limits[st.phase] || 0) * scale));
     const alive = this.actors.filter((a) => a.alive && !a.npc && a.state !== 'bus');
     this.surge = st.phase >= 2 && limit > 3 && alive.length > limit ? { limit, over: alive.length - limit } : null;
-    if (!this.surge) { this._surgeT = 10; return; }
+    if (!this.surge) { this._surgeT = 5; return; }
     const sorted = alive.sort((a, b) => (a.dmgDealt || 0) - (b.dmgDealt || 0));
     this.surge.need = Math.round((sorted[this.surge.over]?.dmgDealt || 0) + 1);
     if (!this._surgeWarned || this._surgeWarned !== st.phase) {
       this._surgeWarned = st.phase;
       this.hud.banner?.(`STORM SURGE · deal ${this.surge.need}+ damage to stay safe`, 3.5);
     }
-    this._surgeT = (this._surgeT ?? 10) - dt;
+    this._surgeT = (this._surgeT ?? 5) - dt;
     if (this._surgeT > 0) return;
-    this._surgeT = 10;
+    this._surgeT = 5;
     for (const a of sorted.slice(0, this.surge.over)) {
-      a.health -= 20;
+      a.health -= 25;
       a.lastHurtTime = this.time;
       if (a.isPlayer) {
         this.sound.play('storm');
-        this.effects.damageNumber(a.chest(_origin), 20, false, false);
+        this.effects.damageNumber(a.chest(_origin), 25, false, false);
         this.hud.banner?.(`Storm Surge! Deal ${this.surge.need}+ damage to stay safe`, 2.5);
       }
       if (a.health <= 0) { a.health = 0; a.deathCause = 'storm'; a.die(null); }
@@ -1100,12 +1100,17 @@ export class Game {
       if (killer.crowned) this.meta.track('crownKill');
     }
     if (killer && killer !== actor) this._firstBlood = true;
-    // arena siphon: +50 health / shield for the eliminator
-    if (this.mode === 'arena' && killer && killer !== actor && killer.alive) {
-      let give = 50;
-      const h = Math.min(give, 100 - killer.health); killer.health += h; give -= h;
-      killer.shield = Math.min(100, killer.shield + give);
-      if (killer.isPlayer) this.hud.pickupNote?.('+50 Siphon', '#7dff8a');
+    // siphon: the eliminator regains 75 health, then shield, over 5 s (arena: an instant +50)
+    if (killer && killer !== actor && killer.alive) {
+      if (this.mode === 'arena') {
+        let give = 50;
+        const h = Math.min(give, 100 - killer.health); killer.health += h; give -= h;
+        killer.shield = Math.min(100, killer.shield + give);
+        if (killer.isPlayer) this.hud.pickupNote?.('+50 Siphon', '#7dff8a');
+      } else {
+        killer.regen = { rate: 15, left: 75 + (killer.regen?.left || 0), acc: 0 };
+        if (killer.isPlayer) this.hud.pickupNote?.('+75 Siphon', '#7dff8a');
+      }
     }
     if (killer && killer !== actor) killer.kills++;
     this.hud.killFeed?.(killer, actor);
