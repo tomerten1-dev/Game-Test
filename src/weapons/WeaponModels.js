@@ -96,9 +96,9 @@ const KENNEY = {
   ar: { name: 'guns/ak47', length: 0.95, rotY: -Math.PI / 2, textured: true },
   burst: { name: 'guns/ak47variant', length: 0.95, rotY: -Math.PI / 2, textured: true },
   sniper: { name: 'guns/awp', length: 1.25, rotY: -Math.PI / 2, textured: true },
-  pump: { name: 'guns/shotgun', length: 0.95, rotY: Math.PI / 2, textured: true },
-  shotgun: { name: 'guns/shotgun', length: 0.88, rotY: Math.PI / 2, textured: true },
-  rocket: { name: 'guns/rocket', length: 1.15, rotY: Math.PI / 2, textured: true },
+  pump: { name: 'guns/shotgun', length: 0.95, rotY: -Math.PI / 2, textured: true },
+  shotgun: { name: 'guns/shotgun', length: 0.88, rotY: -Math.PI / 2, textured: true },
+  rocket: { name: 'guns/rocket', length: 1.15, rotY: -Math.PI / 2, textured: true },
 };
 // Higher-rarity launchers get the fancier models.
 const RARITY_MODEL = { rocket: { 4: { name: 'guns/rocketvariant' }, 5: { name: 'guns/quadrocket', rotY: -Math.PI / 2, length: 1.05 } } };

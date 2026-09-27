@@ -140,12 +140,13 @@ export class Loot {
     // chest spots: next to houses, town centers, crate piles, plus random spots
     const spots = [...this.world.towns.chestSpots];
     const r = mulberry32(555);
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 20; i++) {
       const a = r() * Math.PI * 2, d = 25 + r() * 250;
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
       if (this.world.heightAt(x, z) > 2.5 && this.world.terrain.normalAt(x, z).y > 0.85) spots.push({ x, z, rot: r() * 6 });
     }
     for (const s of spots) {
+      if (r() > 0.68) continue; // not every spot gets a chest (less loot overall)
       const y = this.world.groundAt(s.x, s.z, 200, 0.6);
       if (y < 1) continue;
       const group = new THREE.Group();
@@ -199,6 +200,7 @@ export class Loot {
     for (const h of this.world.towns.houses) spots.push({ x: h.x + (r() < 0.5 ? -1 : 1) * ((h.maxX - h.minX) / 2 + 1.6), z: h.z + (r() - 0.5) * 3 });
     for (let i = 0; i < 45; i++) { const a = r() * Math.PI * 2, d = 20 + r() * 260; spots.push({ x: Math.cos(a) * d, z: Math.sin(a) * d }); }
     for (const sp of spots) {
+      if (r() > 0.55) continue;
       const y = this.world.groundAt(sp.x, sp.z, 200, 0.5);
       if (y < 1.5) continue;
       if (chestSpots.some((c) => Math.hypot(c.x - sp.x, c.z - sp.z) < 3)) continue;
@@ -301,12 +303,12 @@ export class Loot {
   spawnFloorLoot() {
     // weapons (with ammo), heals and ammo lying around town plazas
     for (const t of TOWNS) {
-      for (let i = 0; i < Math.round(t.r / 6); i++) {
+      for (let i = 0; i < Math.round(t.r / 10); i++) {
         const a = Math.random() * Math.PI * 2, d = 4 + Math.random() * t.r * 0.45;
         const x = t.x + Math.cos(a) * d, z = t.z + Math.sin(a) * d;
         const y = this.world.groundAt(x, z, 200) + 0.2;
         const roll = Math.random();
-        if (roll < 0.55) {
+        if (roll < 0.38) {
           const w = new Weapon(rollWeaponType('floor'), rollRarity(Math.random, 0));
           this.spawnPickup({ type: 'weapon', weapon: w }, _v.set(x, y, z));
           this.spawnPickup(Loot.ammoFor(w), _v.set(x + 0.9, y, z + 0.4));
@@ -354,12 +356,12 @@ export class Loot {
     mesh.castShadow = true;
     g.add(mesh);
     // rarity light beam + base ring
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.32, 3.2, 10, 1, true), new THREE.MeshBasicMaterial({ map: beamTexture(), color, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-    beam.material.color.multiplyScalar(1.6);
-    beam.position.y = 1.6;
+    // soft rarity light: thin and faint (it only has to catch your eye, not light up the area)
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.2, 2.4, 10, 1, true), new THREE.MeshBasicMaterial({ map: beamTexture(), color, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    beam.position.y = 1.2;
     g.add(beam);
     const ring = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTex, color, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
-    ring.material.color.multiplyScalar(1.8);
+    ring.material.opacity = 0.3;
     ring.scale.set(1.4, 1.4, 1);
     ring.position.y = 0.35;
     g.add(ring);
@@ -399,9 +401,10 @@ export class Loot {
     if (c.rare) {
       const w2 = new Weapon(rollWeaponType('chest'), rollRarity(Math.random, 1.5));
       out.push({ type: 'weapon', weapon: w2 }, Loot.ammoFor(w2));
-      out.push({ type: 'consumable', ctype: 'grenade', count: 3 });
+      if (Math.random() < 0.5) out.push({ type: 'consumable', ctype: 'grenade', count: 2 });
     }
-    out.push(Loot.randomConsumable());
+    // like Fortnite: a weapon + ammo + materials, and sometimes a heal / utility item
+    if (c.rare || Math.random() < 0.6) out.push(Loot.randomConsumable());
     out.push({ type: 'mat', matType: ['wood', 'wood', 'stone', 'metal'][Math.floor(Math.random() * 4)], amount: 30 });
     const fwd = c.group.rotation.y;
     out.forEach((it, i) => {
