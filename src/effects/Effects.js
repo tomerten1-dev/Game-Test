@@ -52,6 +52,7 @@ class Particles {
     this.maxLife = new Float32Array(max);
     this.grav = new Float32Array(max);
     this.baseSize = new Float32Array(max);
+    this.baseAlpha = new Float32Array(max).fill(1);
     this.cursor = 0;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
@@ -94,7 +95,8 @@ class Particles {
     this.mat = mat;
   }
 
-  emit(x, y, z, vx, vy, vz, color, life, size, gravity) {
+  emit(x, y, z, vx, vy, vz, color, life, size, gravity, alpha = 1) {
+    this.baseAlpha[this.cursor] = alpha;
     const i = this.cursor;
     this.cursor = (this.cursor + 1) % this.max;
     this.pos[i * 3] = x; this.pos[i * 3 + 1] = y; this.pos[i * 3 + 2] = z;
@@ -118,8 +120,8 @@ class Particles {
       this.pos[k + 1] += this.vel[k + 1] * dt;
       this.pos[k + 2] += this.vel[k + 2] * dt;
       const t = this.life[i] / this.maxLife[i];
-      this.col[i * 4 + 3] = Math.min(1, t * 2);
-      this.size[i] = this.baseSize[i] * (0.4 + 0.6 * t);
+      this.col[i * 4 + 3] = Math.min(1, t * 2) * this.baseAlpha[i];
+      this.size[i] = this.grav[i] < 0 ? this.baseSize[i] * (1.6 - 0.6 * t) : this.baseSize[i] * (0.4 + 0.6 * t);
     }
     this.geo.attributes.position.needsUpdate = true;
     this.geo.attributes.color.needsUpdate = true;
@@ -286,6 +288,23 @@ export class Effects {
     r.mesh.material.color.copy(c).lerp(new THREE.Color('#ffffff'), 0.3).multiplyScalar(2);
     r.life = 0.6;
     r.mesh.visible = true;
+  }
+
+  dust(pos, amount = 4, strength = 1) {
+    for (let i = 0; i < amount; i++) {
+      const a = Math.random() * Math.PI * 2, sp = (0.6 + Math.random()) * strength;
+      _c.set('#e3d6bd').multiplyScalar(0.9 + Math.random() * 0.15);
+      this.debris.emit(pos.x + Math.cos(a) * 0.3, pos.y + 0.1, pos.z + Math.sin(a) * 0.3, Math.cos(a) * sp, 0.4 + Math.random() * 0.6, Math.sin(a) * sp, _c, 0.6 + Math.random() * 0.4, 0.35 + Math.random() * 0.25, -0.6, 0.55);
+    }
+  }
+
+  confetti(pos) {
+    const cols = ['#ff5d73', '#ffd23f', '#2ee6c9', '#6c8cff', '#b64cff', '#ffffff'];
+    for (let i = 0; i < 90; i++) {
+      _c.set(cols[i % cols.length]);
+      this.debris.emit(pos.x + (Math.random() - 0.5) * 6, pos.y + 6 + Math.random() * 3, pos.z + (Math.random() - 0.5) * 6,
+        (Math.random() - 0.5) * 4, Math.random() * 2, (Math.random() - 0.5) * 4, _c, 2.2 + Math.random(), 0.12, 2.5);
+    }
   }
 
   damageNumber(pos, amount, headshot = false, shield = false) {

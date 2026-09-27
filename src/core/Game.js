@@ -21,6 +21,7 @@ import { Bus } from '../world/Bus.js';
 import { Loot } from '../world/Loot.js';
 import { Building } from '../world/Building.js';
 import { HUD } from '../ui/HUD.js';
+import { Ambient } from '../effects/Ambient.js';
 import { Menus } from '../ui/Menus.js';
 import { TouchControls } from '../ui/TouchControls.js';
 import { isTouch } from './device.js';
@@ -73,6 +74,7 @@ export class Game {
     this.bus = new Bus(this.scene);
     this.loot = new Loot(this);
     this.building = new Building(this);
+    this.ambient = new Ambient(this);
     this._firstMatch = true;
     this.post = new Post(this.renderer, this.scene, this.camera);
     this.quality = new Quality(this);
@@ -216,6 +218,7 @@ export class Game {
     this.focus.set(0, 0, 0);
     this.world.update(dt, this.time, this.focus, this.camera);
     this.loot.update(dt, this.time);
+    this.ambient.update(dt, this.time);
     this.effects.update(dt);
   }
 
@@ -245,6 +248,7 @@ export class Game {
     this.updateStorm(dt);
     this.loot.update(dt, this.time);
     this.building.update(dt);
+    this.ambient.update(dt, this.time);
     for (const a of this.actors) {
       a.updateMovement(dt);
       for (const w of a.weapons) if (w && w.update(dt) === 'reloaded' && a.isPlayer) this.sound.play('reloaded');
@@ -333,6 +337,8 @@ export class Game {
     } else if (p.alive && this.aliveCount === 1) {
       p.victory = true;
       this.hud.banner('#1 VICTORY!', 3);
+      this.effects.confetti(p.pos);
+      setTimeout(() => this.effects.confetti(p.pos), 700);
       this.endMatch(true, 1, null);
     }
   }

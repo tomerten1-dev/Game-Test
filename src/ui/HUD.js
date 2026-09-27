@@ -15,6 +15,7 @@ export class HUD {
     root.insertAdjacentHTML('beforeend', `
       <div id="hud" class="hidden">
         <div class="vignette"></div>
+        <div id="speedlines"></div>
         <div id="storm-tint"></div>
         <div id="hurt-flash"></div>
         <div id="dmg-dir"><i></i></div>
@@ -60,6 +61,7 @@ export class HUD {
       killfeed: $('#killfeed'), alive: $('#st-alive'), kills: $('#st-kills'), storm: $('#st-storm'), stormLabel: $('#storm-label'),
       shieldFill: $('#shield-fill'), shieldNum: $('#shield-num'), healthFill: $('#health-fill'), healthNum: $('#health-num'),
       dmgDir: $('#dmg-dir'),
+      speed: $('#speedlines'),
     };
     this.el.slots.innerHTML = [0, 1, 2].map((i) => `<div class="slot" data-slot="${i}"><span class="key">${i + 1}</span><span class="icon"></span></div>`).join('');
     this.slotEls = [...this.el.slots.querySelectorAll('.slot')];
@@ -195,6 +197,11 @@ export class HUD {
     const rl = w?.reloading;
     this.el.reload.classList.toggle('hidden', !rl);
     if (rl) this.el.reloadCircle.style.strokeDashoffset = String(100.5 * (w.reloadT / w.def.reload));
+
+    // speed lines while skydiving
+    const sl = p.state === 'skydive' ? Math.min(1, -p.vel.y / 30) : p.state === 'glide' ? 0.25 : 0;
+    const slq = Math.round(sl * 20) / 20;
+    if (this.cache.sl !== slq) { this.cache.sl = slq; this.el.speed.style.opacity = String(slq); }
 
     // health / shield
     const hp = Math.ceil(p.health), sh = Math.ceil(p.shield);

@@ -38,6 +38,17 @@ Production build: `npm run build` (output in `dist/`), preview it with `npm run 
 
 **Touch devices** get a floating joystick on the left, drag-to-look on the right, and buttons for Fire (hold), Jump, Wall, Ramp, Reload and Use. Tap the weapon slots to switch.
 
+## Graphics settings
+
+The start menu and pause screen have a **Graphics** selector:
+
+| Setting | What you get |
+| --- | --- |
+| **Auto** (default) | High on desktop, Low on phones. Drops a level automatically if the frame rate stays under ~42 fps. |
+| **High** | Ambient occlusion (N8AO), bloom, color grading, SMAA, 2048 shadow map, full grass |
+| **Medium** | Bloom + color grading + SMAA, no ambient occlusion, less grass |
+| **Low** | No post-processing, 1024 shadows, sparse grass, pixel ratio 1 |
+
 ## How a match works
 
 1. The Battle Bus flies across the island at 110 m. Jump when you like (it drops you at the end otherwise).
@@ -70,6 +81,10 @@ public/models/RobotExpressive.glb   CC0 animated robot (three.js examples)
 - **Foliage:** instanced trees (round, pine, some autumn), rocks and bushes. Grass is one instanced draw call with a wind-sway vertex shader that samples a height texture and wraps around the player.
 - **Characters:** every player/bot is a `SkeletonUtils.clone` of the robot, scaled to 1.8 m with its "Main" material tinted (player = teal). Animations crossfade over 0.2 s, running speed follows movement speed, and a small arm IK makes robots hold their gun.
 - **Performance:** instancing, object pools for effects, bot "think" every ~0.3 s, animation LOD for far robots, and lower pixel ratio / shadows / grass on mobile.
-- **Assets:** trees, rocks, houses, weapons, the bus and loot are built procedurally from low-poly primitives, so no extra asset packs are needed. All sounds are synthesized with Web Audio.
+- **Post-processing:** [`postprocessing`](https://github.com/pmndrs/postprocessing) + [`n8ao`](https://github.com/N8python/n8ao): ambient occlusion, bloom on glowing things (loot beams, chests, muzzle flashes, sun), a warm/cool color grade and SMAA.
+- **Baked lighting:** at load the game traces sun rays from every terrain point against houses, tree canopies, rocks and the mountain. That gives soft shadows and ambient occlusion across the whole island. Near the player they fade into the real shadow map.
+- **Water:** depth-tinted from the terrain height (turquoise shallows, deep blue sea), animated shore foam, small waves.
+- **Life:** wind-swaying trees and palms, falling leaves, birds, fountain spray, chest sparkles, dust puffs, skydive speed lines, victory confetti.
+- **Assets:** houses, the castle tower, palms, rock spires, barrels and the pistol/SMG/AR blasters are **Kenney CC0** models (see `public/models/env/CREDITS.md`). Round/pine trees, the shotgun, the bus, chests, fences, fountains and lamps are built procedurally from low-poly shapes. All sounds are synthesized with Web Audio.
 
 Robot model: "RobotExpressive" by Tomás Laulhé (CC0), from the three.js examples.

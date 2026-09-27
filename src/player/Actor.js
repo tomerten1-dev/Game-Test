@@ -97,7 +97,14 @@ export class Actor {
         this.jumpT = 0;
         this.game.sound?.play('jump', this.pos);
       }
+      const wasGround = this.onGround;
       world.moveBody(this, dt);
+      if (this.onGround && !wasGround && this.landSpeed > 7) this.onHardLanding?.(this.landSpeed);
+      // dust puffs while running (only near the camera)
+      if (this.onGround && this.distToCam < 35 && Math.hypot(this.vel.x, this.vel.z) > 4.5) {
+        this._dustT = (this._dustT || 0) - dt;
+        if (this._dustT <= 0) { this._dustT = 0.22; this.game.effects.dust(this.pos, 1, 0.6); }
+      }
     } else if (this.state === 'skydive') {
       const hs = 17;
       this.vel.x = damp(this.vel.x, it.mx * hs, 2.2, dt);
@@ -118,7 +125,13 @@ export class Actor {
     }
   }
 
+  onHardLanding(speed) {
+    if (this.distToCam < 50) this.game.effects.dust(this.pos, Math.min(14, Math.round(speed * 0.8)), 1.8);
+    if (this.isPlayer) this.game.rig.bob = Math.min(0.55, speed * 0.03);
+  }
+
   land() {
+    this.onHardLanding(12);
     this.setState('ground');
     this.vel.y = 0;
     this.character.play('Idle', 0.2);

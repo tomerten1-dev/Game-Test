@@ -21,6 +21,7 @@ export class CameraRig {
     this.curDist = 3.6;
     this.recoil = 0;
     this.shake = 0;
+    this.bob = 0;
     this.fov = 70;
     this.mode = 'ground';
   }
@@ -71,6 +72,10 @@ export class CameraRig {
     const g = this.world.heightAt(cam.x, cam.z) + 0.4;
     if (cam.y < g) cam.y = g;
     if (cam.y < 0.35) cam.y = 0.35; // stay above the water surface
+    if (this.bob > 0.001) {
+      cam.y -= Math.sin(Math.min(1, this.bob) * Math.PI * 0.5) * this.bob;
+      this.bob = damp(this.bob, 0, 5, dt);
+    }
     if (this.shake > 0) {
       this.shake = Math.max(0, this.shake - dt * 2.5);
       const s = this.shake * this.shake * 0.35;
