@@ -1,7 +1,9 @@
+import { keyLabel } from '../core/Input.js';
 import { DEFAULT_SETTINGS } from '../meta/Profile.js';
 import { VARIANT_KEY } from '../world/Variant.js';
 
 const BINDABLE = [
+  ['fire', 'Shoot / use'], ['aim', 'Aim / zoom'],
   ['forward', 'Move forward'], ['back', 'Move back'], ['left', 'Move left'], ['right', 'Move right'],
   ['jump', 'Jump'], ['sprint', 'Sprint'], ['crouch', 'Crouch / slide'], ['reload', 'Reload'], ['interact', 'Interact'],
   ['wall', 'Wall'], ['floor', 'Floor'], ['ramp', 'Ramp'], ['cone', 'Cone'], ['build', 'Build mode'], ['edit', 'Edit'], ['ninety', 'Quick 90s'],
@@ -16,7 +18,7 @@ const SLIDERS = [
   ['music', 'Music volume', 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`],
   ['hudScale', 'HUD scale', 0.75, 1.3, 0.05, (v) => `${Math.round(v * 100)}%`],
 ];
-const keyName = (code) => code ? code.replace(/^Key/, '').replace(/^Digit/, '').replace('Left', ' L').replace('Right', ' R') : '—';
+const keyName = keyLabel;
 
 // Apply saved settings to the running game.
 export function applySettings(game) {
@@ -61,7 +63,7 @@ export function renderSettings(el, game, { compact = false } = {}) {
   el.querySelectorAll('[data-sv]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); s.soundViz = b.dataset.sv === '1'; save(); sync(); }));
   el.querySelectorAll('[data-bind]').forEach((b) => b.addEventListener('click', (e) => {
     e.stopPropagation();
-    b.textContent = 'press a key…';
+    b.textContent = 'press a key or mouse button…';
     b.classList.add('wait');
     game.input.capture = (code) => {
       if (code !== 'Escape') {

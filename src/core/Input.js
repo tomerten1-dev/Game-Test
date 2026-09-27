@@ -16,7 +16,17 @@ export const DEFAULT_KEYMAP = {
   Escape: 'pause',
   KeyM: 'map', KeyN: 'mute',
   KeyP: 'ping', KeyJ: 'drop', Tab: 'inventory', KeyY: 'shoulder',
+  // mouse buttons are bindable like keys: Mouse0 left, Mouse1 middle, Mouse2 right, Mouse3/4 side buttons
+  Mouse0: 'fire', Mouse2: 'aim', Mouse1: 'ping',
 };
+
+// Human-readable name for a key / mouse button code.
+export function keyLabel(code) {
+  if (!code) return '—';
+  const mouse = { Mouse0: 'Left Mouse', Mouse1: 'Middle Mouse', Mouse2: 'Right Mouse', Mouse3: 'Mouse 4', Mouse4: 'Mouse 5' };
+  if (mouse[code]) return mouse[code];
+  return code.replace(/^Key/, '').replace(/^Digit/, '').replace('Left', ' L').replace('Right', ' R');
+}
 
 export class Input {
   constructor(canvas) {
@@ -47,16 +57,28 @@ export class Input {
       if (a) this.held.delete(a);
     });
     window.addEventListener('blur', () => { this.held.clear(); this.touchHeld.clear(); });
+    // the settings screen is waiting for a binding: take the mouse button instead of clicking
+    window.addEventListener('mousedown', (e) => {
+      if (!this.capture) return;
+      e.preventDefault(); e.stopPropagation();
+      const cb = this.capture; this.capture = null;
+      this._noMenuUntil = performance.now() + 600;
+      cb(`Mouse${e.button}`);
+    }, true);
+    window.addEventListener('contextmenu', (e) => { if (performance.now() < (this._noMenuUntil || 0)) e.preventDefault(); });
     canvas.addEventListener('mousedown', (e) => {
       if (!this.enabled) return;
       if (document.pointerLockElement !== canvas) { this.requestLock(); return; }
-      if (e.button === 0) { this.held.add('fire'); this.pressedSet.add('fire'); }
-      if (e.button === 2) { this.held.add('aim'); this.pressedSet.add('aim'); }
-      if (e.button === 1) { e.preventDefault(); this.pressedSet.add('ping'); }
+      if (e.button !== 0) e.preventDefault();
+      const a = this.keymap[`Mouse${e.button}`];
+      if (!a) return;
+      if (!this.held.has(a)) this.pressedSet.add(a);
+      this.held.add(a);
     });
     window.addEventListener('mouseup', (e) => {
-      if (e.button === 0) this.held.delete('fire');
-      if (e.button === 2) this.held.delete('aim');
+      const a = this.keymap[`Mouse${e.button}`];
+      if (a) this.held.delete(a);
+      if (e.button > 2 && document.pointerLockElement === canvas) e.preventDefault(); // side buttons: no browser back/forward
     });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('mousemove', (e) => {

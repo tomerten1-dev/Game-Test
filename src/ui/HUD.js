@@ -1,3 +1,4 @@
+import { keyLabel } from '../core/Input.js';
 import { RARITIES } from '../weapons/WeaponDefs.js';
 import { Minimap } from './Minimap.js';
 import { TOWNS } from '../world/Terrain.js';
@@ -440,7 +441,8 @@ export class HUD {
     }
     this.slotEls.forEach((s, i) => {
       const it = p.items[i];
-      const key = (this.game.input.keyFor('slot' + (i + 1)) || '').replace(/^Key/, '').replace(/^Digit/, '');
+      const code = this.game.input.keyFor('slot' + (i + 1));
+      const key = code ? keyLabel(code).replace(' Mouse', '').replace('Mouse ', 'M') : '';
       const sig = `${it ? it.type + (it.rarity ?? '') + (it.count ?? '') : ''}|${i === p.slot}|${key}`;
       if (this.cache['slot' + i] === sig) return;
       this.cache['slot' + i] = sig;

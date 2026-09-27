@@ -1,3 +1,4 @@
+import { keyLabel } from '../core/Input.js';
 import { RARITIES } from '../weapons/WeaponDefs.js';
 import { AMMO, MATS } from '../weapons/Items.js';
 
@@ -78,7 +79,7 @@ export class Inventory {
   render() {
     const p = this.game.player;
     if (!p) return;
-    const keyName = (c) => (c || '—').replace(/^Key/, '').replace(/^Digit/, '');
+    const keyName = (c) => keyLabel(c).replace(' Mouse', '').replace('Mouse ', 'M');
     this.el.querySelector('#inv-key').textContent = keyName(this.game.input.keyFor('inventory'));
     this.slotsEl.innerHTML = p.items.map((it, i) => {
       const col = !it ? 'rgba(255,255,255,0.15)' : it.isGun ? RARITIES[it.rarity].color : it.isConsumable ? it.def.color : '#e8d7b0';
