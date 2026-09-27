@@ -10,7 +10,7 @@ export class Player extends Actor {
     const hero = prof?.equippedItem('hero');
     // skins bring their own colours unless you picked an outfit colour
     const outfit = look('tint') || hero?.tint || null;
-    super(game, { name: 'You', color: '#20d6c0', isPlayer: true, type: hero?.value || 'Rogue_Hooded', glider: look('glider'), tint: outfit ? 0.1 : 0.3, outfit });
+    super(game, { name: 'You', color: '#20d6c0', isPlayer: true, type: hero?.value || 'Male_Ranger', glider: look('glider'), tint: outfit ? 0.1 : 0.3, outfit });
     this.trail = look('trail') || null;
     this.wrap = look('wrap') || null;
     this.emoteClip = look('emote') || 'Cheer';

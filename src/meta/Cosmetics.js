@@ -15,6 +15,11 @@ export const SLOTS = [
 export const PRICES = [200, 300, 600, 1000, 1500];
 
 const items = [
+  // heroes: Quaternius outfit characters (the default look for you and the bots)
+  { id: 'hero_ranger_m', type: 'hero', name: 'Trail Ranger', rarity: 1, value: 'Male_Ranger', starter: true },
+  { id: 'hero_ranger_f', type: 'hero', name: 'Forest Ranger', rarity: 1, value: 'Female_Ranger', starter: true },
+  { id: 'hero_peasant_m', type: 'hero', name: 'Village Hand', rarity: 1, value: 'Male_Peasant', starter: true },
+  { id: 'hero_peasant_f', type: 'hero', name: 'Harvest Keeper', rarity: 1, value: 'Female_Peasant', starter: true },
   // heroes (KayKit adventurers)
   { id: 'hero_rogue_hooded', type: 'hero', name: 'Hooded Scout', rarity: 1, value: 'Rogue_Hooded', starter: true },
   { id: 'hero_knight', type: 'hero', name: 'Sir Bolt', rarity: 1, value: 'Knight', starter: true },
@@ -104,7 +109,7 @@ const items = [
 export const COSMETICS = Object.fromEntries(items.map((i) => [i.id, { ...i, price: PRICES[i.rarity] }]));
 export const COSMETIC_LIST = items.map((i) => COSMETICS[i.id]);
 export const STARTERS = items.filter((i) => i.starter).map((i) => i.id);
-export const DEFAULT_EQUIPPED = { hero: 'hero_rogue_hooded', tint: 'tint_teal', backbling: 'bb_antenna', pickaxe: 'pick_default', glider: 'glider_teal', trail: 'trail_none', emote: 'emote_cheer', wrap: 'wrap_none' };
+export const DEFAULT_EQUIPPED = { hero: 'hero_ranger_m', tint: 'tint_teal', backbling: 'bb_antenna', pickaxe: 'pick_default', glider: 'glider_teal', trail: 'trail_none', emote: 'emote_cheer', wrap: 'wrap_none' };
 // emote clip -> particle effect played with it
 export const EMOTE_FX = Object.fromEntries(items.filter((i) => i.type === 'emote' && i.fx).map((i) => [i.value, i.fx]));
 

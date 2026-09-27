@@ -52,7 +52,7 @@ export class BossEvent {
       if (cfg.keycard) this.boss = boss;
       this.npcs.push(boss);
       cfg.guards.forEach((wt, i) => {
-        const gd = new Bot(g, `${cfg.town.split(' ')[0]} Guard ${i + 1}`, '#8a96a3', 0.55, 'Knight');
+        const gd = new Bot(g, `${cfg.town.split(' ')[0]} Guard ${i + 1}`, '#8a96a3', 0.55, i % 2 ? 'Male_Ranger' : 'Male_Peasant');
         gd.npc = 'guard';
         gd.health = 150; gd.maxHealth = 150;
         gd.items[1] = new Weapon(wt, 2);

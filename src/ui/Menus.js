@@ -3,7 +3,7 @@ import { RARITIES } from '../weapons/WeaponDefs.js';
 import { TRACK, SEASON, xpForLevel, QUEST_REWARD, WEEKLY_REWARD, milestoneReward, arenaDivision } from '../meta/Progression.js';
 import { renderSettings } from './Settings.js';
 
-const HERO_ICON = { Knight: '🛡️', Barbarian: '🪓', Mage: '🔮', Rogue: '🗡️', Rogue_Hooded: '🏹' };
+const HERO_ICON = { Knight: '🛡️', Barbarian: '🪓', Mage: '🔮', Rogue: '🗡️', Rogue_Hooded: '🏹', Male_Ranger: '🏹', Female_Ranger: '🏹', Male_Peasant: '🌾', Female_Peasant: '🌾' };
 const HAT_ICON = { party: '🥳', cowboy: '🤠', ice_horns: '❄️', pumpkin: '🎃', pirate: '🏴‍☠️', ninja: '🥷', astro: '🧑‍🚀', halo: '😇' };
 const BACK_ICON = { antenna: '📡', quiver: '🏹', shield: '🛡️', llama: '🦙', guitar: '🎸', cape: '🧣', sword: '⚔️', jetpack: '🚀', wings: '🪽', crystal: '💎' };
 const TOOL_ICON = { pan: '🍳', wrench: '🔧', candy: '🍬', hammer: '🔨', crystal: '❄️', neon: '⚡', gold: '🪙' };

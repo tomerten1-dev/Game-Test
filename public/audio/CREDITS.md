@@ -12,3 +12,10 @@ taken from Kenney's open-source Godot starter kits on GitHub:
 
 Each kit's README states: "Assets included in this package (2D sprites, 3D models and sound
 effects) are CC0 licensed". Music and any sound not listed here are synthesised in code.
+
+## User-provided
+
+| File | Source | Notes |
+| --- | --- | --- |
+| chest_hum.ogg | Supplied by the project owner (`fortnite_chest.mp3`) | A clip of Fortnite's chest sound (Epic Games), looped near closed chests. **Not CC0**: it is used on the owner's responsibility, and redistributing it needs Epic's permission. Re-encoded MP3 to Ogg Vorbis (q5), tags stripped. |
+| chest_open.ogg | Supplied by the project owner (`fortnite_chest_open.mp3`) | A clip of Fortnite's chest-opening sound (Epic Games). **Not CC0**: it is used on the owner's responsibility, and redistributing it needs Epic's permission. Re-encoded MP3 to Ogg Vorbis (q5), tags stripped. |

@@ -4,9 +4,10 @@
 // Music (public/audio/music, see CREDITS.md). Loops fade in and out; jingles play once; a playlist
 // plays its files one after another (a different one each time it starts).
 const MUSIC_TRACKS = { lobby: { playlist: ['menu', 'title', 'title_alt'], gain: 0.75 }, bus: { file: 'battle', loop: true, gain: 0.75 }, endgame: { loop: true, gain: 0.7 }, victory: { loop: false, gain: 1 }, defeat: { loop: false, gain: 1 } };
-const SAMPLE_FILES = ['blaster', 'blaster_repeater', 'enemy_destroy', 'enemy_hurt', 'jump_a', 'jump_b', 'jump_c', 'land', 'walking', 'weapon_change', 'coin', 'break', 'fall', 'impact', 'engine', 'ui-tap', 'build'];
+const SAMPLE_FILES = ['blaster', 'blaster_repeater', 'enemy_destroy', 'enemy_hurt', 'jump_a', 'jump_b', 'jump_c', 'land', 'walking', 'weapon_change', 'coin', 'break', 'fall', 'impact', 'engine', 'ui-tap', 'build', 'chest_open', 'chest_hum'];
 // sound name -> [sample, playbackRate, gain, (optional) synth layer too]
 const SAMPLE_MAP = {
+  chest: ['chest_open', 1, 0.9],
   pistol: ['blaster', 1.05, 0.8],
   smg: ['blaster_repeater', 1.2, 0.6],
   ar: ['blaster_repeater', 0.88, 0.75, true],
@@ -83,6 +84,17 @@ export class Sound {
   // Soft shimmering loop that swells as you get close to an unopened chest.
   chestHum(chest, pos) {
     if (!this.ctx || this.ctx.state !== 'running') return;
+    if (!this._hum && !this._samplesDone) return;
+    if (!this._hum && this.buffers?.chest_hum) {
+      // recorded hum (user-provided), looped
+      const ctx = this.ctx, g = ctx.createGain();
+      g.gain.value = 0;
+      const src = ctx.createBufferSource();
+      src.buffer = this.buffers.chest_hum; src.loop = true;
+      const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
+      src.connect(g); g.connect(pan); pan.connect(this.master); src.start();
+      this._hum = { g, pan, level: 0.55 };
+    }
     if (!this._hum) {
       const ctx = this.ctx;
       const g = ctx.createGain();
@@ -100,13 +112,13 @@ export class Sound {
       }
       lfo.start();
       g.connect(pan); pan.connect(this.master);
-      this._hum = { g, pan };
+      this._hum = { g, pan, level: 0.05 };
     }
     let target = 0;
     if (chest && !this.muted) {
       const dx = chest.x - pos.x, dz = chest.z - pos.z;
       const d = Math.hypot(dx, dz);
-      target = Math.max(0, 1 - d / 18) ** 1.5 * 0.05;
+      target = Math.max(0, 1 - d / 18) ** 1.5 * this._hum.level;
       if (this._hum.pan.pan) this._hum.pan.pan.value = Math.max(-1, Math.min(1, (dx * this.right.x + dz * this.right.z) / (d || 1))) * 0.8;
     }
     this._hum.g.gain.setTargetAtTime(target, this.ctx.currentTime, 0.2);
@@ -123,6 +135,7 @@ export class Sound {
         this.buffers[n] = await this.ctx.decodeAudioData(await res.arrayBuffer());
       } catch { /* keep the synth version */ }
     }));
+    this._samplesDone = true;
   }
 
   _sample(name, t, { rate = 1, gain = 1, offset = 0, dur } = {}) {
@@ -130,7 +143,7 @@ export class Sound {
     if (!buf) return false;
     const src = this.ctx.createBufferSource();
     src.buffer = buf;
-    src.playbackRate.value = rate * (0.94 + Math.random() * 0.12);
+    src.playbackRate.value = rate * (name.startsWith('chest') ? 1 : 0.94 + Math.random() * 0.12);
     const g = this.ctx.createGain();
     g.gain.value = gain;
     src.connect(g); g.connect(this._out || this.master);

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { World } from '../world/World.js';
 import { TOWNS } from '../world/Terrain.js';
-import { CharacterAssets, CHARACTER_TYPES } from '../player/Character.js';
+import { CharacterAssets, Q_TYPES } from '../player/Character.js';
 import { Player } from '../player/Player.js';
 import { CameraRig } from '../player/CameraRig.js';
 import { Input, keyLabel } from './Input.js';
@@ -359,7 +359,7 @@ export class Game {
     for (let i = 0; i < n; i++) {
       // arena bots get sharper as you climb the divisions
       const boost = this.mode === 'arena' ? 0.15 + arenaDivision(this.meta.profile.d.arena?.points || 0).skill : 0;
-      const b = new Bot(this, BOT_NAMES[i], colors[i], Math.min(1, Math.random() * (1 - boost * 0.5) + boost), CHARACTER_TYPES[i % CHARACTER_TYPES.length]);
+      const b = new Bot(this, BOT_NAMES[i], colors[i], Math.min(1, Math.random() * (1 - boost * 0.5) + boost), Q_TYPES[i % Q_TYPES.length]);
       // bots show off random gear too
       const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
       if (Math.random() < 0.35) b.pickaxeSkin = pick(TOOL_IDS);

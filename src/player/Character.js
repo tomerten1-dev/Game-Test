@@ -4,14 +4,36 @@ import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { addRim, addHueSwap } from '../effects/Shaders.js';
 
 // KayKit "Adventurers" characters (CC0, Kay Lousberg). All share one rig + animation set.
-export const CHARACTER_TYPES = ['Knight', 'Barbarian', 'Mage', 'Rogue', 'Rogue_Hooded'];
+export const KK_TYPES = ['Knight', 'Barbarian', 'Mage', 'Rogue', 'Rogue_Hooded'];
+// Quaternius "Modular Character Outfits - Fantasy" (CC0) on the Universal Animation Library rig
+// (CC0). The outfits come without heads, so the library's mannequin supplies one.
+export const Q_TYPES = ['Male_Ranger', 'Female_Ranger', 'Male_Peasant', 'Female_Peasant'];
+export const CHARACTER_TYPES = [...KK_TYPES, ...Q_TYPES];
+// The game asks for KayKit clip names; these are the Universal Animation Library equivalents.
+const Q_ANIM = {
+  Idle: 'Idle_Loop', Unarmed_Idle: 'Idle_Loop', Walking_A: 'Walk_Loop', Walking_C: 'Walk_Formal_Loop', Walking_Backwards: 'Walk_Loop',
+  Running_A: 'Jog_Fwd_Loop', Running_B: 'Sprint_Loop', Running_Strafe_Left: 'Jog_Fwd_Loop', Running_Strafe_Right: 'Jog_Fwd_Loop',
+  Jump_Start: 'Jump_Start', Jump_Idle: 'Jump_Loop', Jump_Land: 'Jump_Land', Jump_Full_Short: 'Jump_Start',
+  Dodge_Forward: 'Roll', Dodge_Left: 'Roll', Hit_A: 'Hit_Chest', Death_A: 'Death01', Death_B: 'Death01',
+  '1H_Ranged_Aiming': 'Pistol_Aim_Neutral', '1H_Ranged_Shoot': 'Pistol_Shoot', '1H_Ranged_Shooting': 'Pistol_Shoot', '1H_Ranged_Reload': 'Pistol_Reload',
+  '2H_Ranged_Aiming': 'Pistol_Aim_Neutral', '2H_Ranged_Shoot': 'Pistol_Shoot', '2H_Ranged_Shooting': 'Pistol_Shoot', '2H_Ranged_Reload': 'Pistol_Reload',
+  '1H_Melee_Attack_Chop': 'Sword_Regular_A', '1H_Melee_Attack_Slice_Diagonal': 'Sword_Regular_B', '2H_Melee_Attack_Spinning': 'Sword_Heavy_Combo',
+  Unarmed_Melee_Attack_Kick: 'Punch_Cross', Block: 'Sword_Block', Use_Item: 'Consume', Throw: 'OverhandThrow', PickUp: 'PickUp_Table', Interact: 'Interact',
+  Cheer: 'Yes', Spellcasting: 'Spell_Simple_Idle_Loop', Spellcast_Raise: 'Spell_Simple_Idle_Loop', Spellcast_Long: 'Spell_Simple_Shoot',
+  Sit_Floor_Idle: 'Sitting_Idle_Loop', Lie_Idle: 'Idle_No_Loop',
+};
+const Q_SKIN = ['#e8b894', '#c68e67', '#8d5a3b', '#f1c9a5', '#b07650'];
+// hand slot on the UAL right-hand bone (bone-local, before the model scale), tuned so held tools
+// sit like they do in the KayKit hand slot
+// (measured against the KayKit slot in the idle and aiming poses)
+const Q_SLOT = { pos: [0, 0.08, 0], quat: [-0.399, -0.615, -0.396, -0.554], scale: 0.761 };
 const HEIGHT = 1.95;
 // Main outfit hue band per hero (0..1), used by outfit colours.
 const OUTFIT_HUE = { Knight: [0.95, 0.05], Barbarian: [0.5, 0.06], Mage: [0.93, 0.06], Rogue: [0.43, 0.07], Rogue_Hooded: [0.43, 0.07] };
 
 // Bones driven by the upper-body layer (aiming / shooting / reloading).
-const UPPER = /^(spine|chest|upperarm|lowerarm|wrist|hand|handslot|head|elbowIK|handIK)/;
-const ONCE = new Set(['Death_A', 'Death_B', 'Jump_Start', 'Jump_Land', '2H_Ranged_Reload', '1H_Ranged_Reload', '2H_Ranged_Shoot', '1H_Ranged_Shoot', 'PickUp', 'Interact', 'Hit_A']);
+const UPPER = /^(spine|chest|upperarm|lowerarm|wrist|hand|handslot|head|elbowIK|handIK|clavicle|neck|index|middle|pinky|ring|thumb)/i;
+const ONCE = new Set(['Death_A', 'Death_B', 'Jump_Start', 'Jump_Land', '2H_Ranged_Reload', '1H_Ranged_Reload', '2H_Ranged_Shoot', '1H_Ranged_Shoot', 'PickUp', 'Interact', 'Hit_A', 'Death01', 'Roll', 'Consume', 'OverhandThrow', 'Hit_Chest', 'Punch_Cross', 'Sword_Regular_A', 'Sword_Regular_B']);
 
 function splitClip(clip, upper) {
   const tracks = clip.tracks.filter((t) => UPPER.test(t.name.split('.')[0]) === upper);
@@ -19,14 +41,40 @@ function splitClip(clip, upper) {
 }
 
 export class CharacterAssets {
+  // The mannequin's body, bound to the outfit's skeleton, with everything below the neck cut away in
+  // the shader (in bind-pose space), so it only shows as the head.
+  static _head(src, outfitScene) {
+    if (!src) return null;
+    let man = null, skel = null;
+    src.scene.traverse((o) => { if (o.isSkinnedMesh && /Main/.test(o.material.name)) man = o; });
+    outfitScene.traverse((o) => { if (o.isSkinnedMesh && !skel) skel = o.skeleton; });
+    if (!man || !skel) return null;
+    const bones = man.skeleton.bones.map((b) => skel.bones.find((x) => x.name === b.name));
+    if (bones.some((b) => !b)) return null;
+    const neckIdx = man.skeleton.bones.findIndex((b) => b.name === 'neck_01');
+    const neckY = new THREE.Matrix4().copy(man.skeleton.boneInverses[neckIdx]).invert().elements[13];
+    const mat = new THREE.MeshStandardMaterial({ color: '#e8b894', roughness: 0.55 });
+    mat.name = 'MI_QHead';
+    mat.userData.cut = neckY + 0.05;
+    const mesh = new THREE.SkinnedMesh(man.geometry, mat);
+    mesh.name = 'QHead';
+    const parent = skel.bones[0].parent;
+    parent.add(mesh);
+    mesh.bind(new THREE.Skeleton(bones, man.skeleton.boneInverses), new THREE.Matrix4());
+    return mesh;
+  }
+
   static async load(onProgress = () => {}) {
     const loader = new GLTFLoader();
     const a = new CharacterAssets();
     a.types = {};
     let done = 0;
-    const total = CHARACTER_TYPES.length + 1;
-    const anims = loader.loadAsync('/models/chars/anims.glb').then((g) => { onProgress(++done / total); return g; });
-    await Promise.all(CHARACTER_TYPES.map(async (t) => {
+    const total = CHARACTER_TYPES.length + 4;
+    const tick = (g) => { onProgress(++done / total); return g; };
+    const anims = loader.loadAsync('/models/chars/anims.glb').then(tick);
+    const ual = ['UAL1_Standard', 'UAL2_Standard', 'Mannequin_F'].map((n) => loader.loadAsync(`/models/anims/${n}.glb`).then(tick).catch(() => null));
+    const qScenes = Promise.all(Q_TYPES.map((t) => loader.loadAsync(`/models/outfits/${t}.gltf`).then(tick).catch(() => null)));
+    await Promise.all(KK_TYPES.map(async (t) => {
       const g = await loader.loadAsync(`/models/chars/${t}.glb`);
       g.scene.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(g.scene);
@@ -40,6 +88,26 @@ export class CharacterAssets {
     for (const c of clips) {
       a.upper[c.name] = splitClip(c, true);
       a.lower[c.name] = splitClip(c, false);
+    }
+    // Quaternius characters: outfit + mannequin head, UAL clips under KayKit names
+    const [ual1, ual2, manF] = await Promise.all(ual);
+    const outfits = await qScenes;
+    if (ual1 && ual2) {
+      const byName = {};
+      for (const c of [...ual1.animations, ...ual2.animations]) byName[c.name] = c;
+      a.q = { upper: {}, lower: {} };
+      const addClip = (name, clip) => { a.q.upper[name] = splitClip(clip, true); a.q.lower[name] = splitClip(clip, false); };
+      for (const [kk, qn] of Object.entries(Q_ANIM)) if (byName[qn]) addClip(kk, byName[qn]);
+      for (const [qn, clip] of Object.entries(byName)) if (!a.q.upper[qn]) addClip(qn, clip);
+      Q_TYPES.forEach((t, i) => {
+        const g = outfits[i];
+        if (!g) return;
+        const head = CharacterAssets._head((t.startsWith('Female') ? manF : ual1) || ual1, g.scene);
+        g.scene.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(g.scene);
+        const h = Math.max(1.75, box.max.y - box.min.y);
+        a.types[t] = { scene: g.scene, scale: HEIGHT / h, footOffset: (-box.min.y * HEIGHT) / h, q: true, head };
+      });
     }
     // legacy fields used elsewhere
     const first = a.types[CHARACTER_TYPES[0]];
@@ -65,39 +133,59 @@ export class Character {
     this.color = new THREE.Color(color);
 
     this.materials = [];
+    this.q = !!src.q;
+    this.clips = this.q ? assets.q : assets;
     const tintColor = new THREE.Color(1, 1, 1).lerp(this.color, tint);
+    const skin = new THREE.Color(Q_SKIN[Math.floor(Math.random() * Q_SKIN.length)]);
     model.traverse((o) => {
       if (o.isMesh) {
         o.castShadow = true;
         o.receiveShadow = false;
         o.frustumCulled = false;
         const m = o.material.clone();
-        m.color.copy(tintColor);
-        m.roughness = 0.6;
-        m.metalness = 0;
-        if (outfit) { const [h, r] = OUTFIT_HUE[type] || OUTFIT_HUE.Knight; addHueSwap(m, h, r, outfit); }
-        addRim(m, '#e6f4ff', 0.45);
+        if (m.name === 'MI_QHead') {
+          // skin-toned head from the mannequin: drop everything below the neck
+          m.color.copy(skin).multiply(tintColor);
+          const cut = o.material.userData.cut;
+          m.onBeforeCompile = (sh) => {
+            sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vBindY;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvBindY = position.y;');
+            sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vBindY;').replace('#include <clipping_planes_fragment>', `if (vBindY < ${cut.toFixed(3)}) discard;\n#include <clipping_planes_fragment>`);
+          };
+          m.customProgramCacheKey = () => `qhead${cut.toFixed(3)}`;
+          o.castShadow = false;
+        } else {
+          m.color.copy(tintColor);
+          m.roughness = this.q ? Math.max(0.55, m.roughness) : 0.6;
+          m.metalness = 0;
+          if (outfit && !this.q) { const [h, r] = OUTFIT_HUE[type] || OUTFIT_HUE.Knight; addHueSwap(m, h, r, outfit); }
+          else if (outfit) m.color.lerp(new THREE.Color(outfit), 0.35);
+          addRim(m, '#e6f4ff', 0.45);
+        }
         o.material = m;
         this.materials.push(m);
       }
       if (o.isBone) {
-        if (o.name === 'handslotr') this.handR = o;
-        else if (o.name === 'chest') this.chestBone = o;
-        else if (o.name === 'spine') this.spine = o;
-        else if (o.name === 'head') this.head = o;
+        const n = o.name;
+        if (n === 'handslotr' || n === 'hand_r') this.handBone = o;
+        else if (n === 'chest' || n === 'spine_03') this.chestBone = o;
+        else if (n === 'spine' || n === 'spine_01') this.spine = o;
+        else if (n === 'head' || n === 'Head') this.head = o;
       }
     });
+    // held items attach to a slot on the right hand (the UAL hand bone points along the fingers)
+    this.handR = this.handBone;
+    if (this.q && this.handBone) {
+      this.handR = new THREE.Object3D();
+      this.handR.name = 'handslot_q';
+      this.handR.position.fromArray(Q_SLOT.pos);
+      this.handR.quaternion.fromArray(Q_SLOT.quat).normalize();
+      this.handR.scale.setScalar(Q_SLOT.scale);
+      this.handBone.add(this.handR);
+    }
 
     this.mixer = new THREE.AnimationMixer(model);
     this.upperActions = {};
     this.lowerActions = {};
-    for (const name of Object.keys(assets.upper)) {
-      for (const [layer, store] of [[assets.upper, this.upperActions], [assets.lower, this.lowerActions]]) {
-        const act = this.mixer.clipAction(layer[name]);
-        if (ONCE.has(name)) { act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true; }
-        store[name] = act;
-      }
-    }
     this.cur = { upper: null, lower: null };
     this.curName = { upper: null, lower: null };
     this.setPose('Idle', null, 0);
@@ -110,9 +198,21 @@ export class Character {
 
   get currentName() { return this.curName.lower; }
 
-  _layer(layer, name, fade, timeScale) {
+  // Actions are made the first time a clip is asked for.
+  _action(layer, name) {
     const store = layer === 'upper' ? this.upperActions : this.lowerActions;
-    const next = store[name];
+    if (!store[name]) {
+      const clip = this.clips[layer][name];
+      if (!clip) return null;
+      const act = this.mixer.clipAction(clip);
+      if (ONCE.has(name)) { act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true; }
+      store[name] = act;
+    }
+    return store[name];
+  }
+
+  _layer(layer, name, fade, timeScale) {
+    const next = this._action(layer, name);
     if (!next) return;
     next.timeScale = timeScale;
     const cur = this.cur[layer];

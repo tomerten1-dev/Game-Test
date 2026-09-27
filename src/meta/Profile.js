@@ -35,6 +35,8 @@ export class Profile {
       owned: [...new Set([...(d.owned || []), ...STARTERS])].filter((id) => COSMETICS[id]),
       quests: d.quests || base.quests,
     };
+    // one-time switch to the new outfit characters
+    if (!this.data.qHeroes) { this.data.qHeroes = true; this.data.equipped.hero = DEFAULT_EQUIPPED.hero; }
     // drop equipped items that no longer exist / aren't owned
     for (const [slot, id] of Object.entries(this.data.equipped)) if (!this.owns(id)) this.data.equipped[slot] = DEFAULT_EQUIPPED[slot];
   }
