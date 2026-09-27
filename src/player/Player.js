@@ -76,5 +76,7 @@ export class Player extends Actor {
       this.aimYaw = rig.yaw + Math.PI;
     } else this.autoRun = null;
     this.intent.deploy = this.state === 'skydive' && input.pressed('jump');
+    // glider redeploy: jump while falling from high up
+    this.intent.redeploy = this.state === 'ground' && !this.onGround && input.pressed('jump');
   }
 }

@@ -120,7 +120,9 @@ function beamTexture() {
 }
 
 const _v = new THREE.Vector3();
-function g_toastPickup(game, p) {
+function g_toastPickup(game, p, count = p.count) {
+  if (p.type === 'weapon') { game.hud?.pickupNote?.(`+ ${p.weapon.name}`, RARITIES[p.weapon.rarity].color); return; }
+  if (p.type === 'consumable') { game.hud?.pickupNote?.(`+${count - (p.alive ? p.count : 0)} ${CONSUMABLES[p.ctype].name}`, CONSUMABLES[p.ctype].color); return; }
   game.hud?.pickupNote?.(`+${p.amount} ${p.type === 'ammo' ? AMMO[p.ammoType].name : MATS[p.matType].name}`, p.type === 'ammo' ? AMMO[p.ammoType].color : MATS[p.matType].color);
 }
 
@@ -484,22 +486,35 @@ export class Loot {
     if (item.isGun) p = this.spawnPickup({ type: 'weapon', weapon: item }, pos, vel);
     else if (item.isConsumable) p = this.spawnPickup({ type: 'consumable', ctype: item.type, count }, pos, vel);
     else if (item.type === 'mat' || item.type === 'ammo') p = this.spawnPickup(item, pos, vel);
-    if (p && forward) p.droppedBy = actor; // don't walk straight back over it and re-collect
+    if (p) { p.droppedBy = actor; p.thrown = forward; } // don't walk straight back over it and re-collect
   }
 
-  // Auto-pickup of ammo and materials when walking over them.
+  // Auto-pickup of ammo and materials when walking over them; for the player also weapons and
+  // consumables that fit without swapping anything out (option in settings).
   autoPickup(actor) {
     if (!actor.alive || actor.state !== 'ground') return;
+    const items = actor.isPlayer && this.game.meta?.profile?.d?.settings?.autoPickup !== false;
     for (const p of this.pickups) {
-      if (!p.alive || !p.settled || (p.type !== 'ammo' && p.type !== 'mat')) continue;
+      if (!p.alive || !p.settled) continue;
+      if (p.type !== 'ammo' && p.type !== 'mat' && !(items && this._fits(p, actor))) continue;
       if (!actor.isPlayer && p.type === 'ammo') continue;
-      if (p.droppedBy === actor && p.age < 2.5) continue;
+      // your own drops: ammo/mats come back after a moment, items you threw away never auto-return
+      if (p.droppedBy === actor && (p.thrown && p.age < 2.5 || p.type === 'weapon' || p.type === 'consumable')) continue;
       const dx = p.pos.x - actor.pos.x, dz = p.pos.z - actor.pos.z;
       if (dx * dx + dz * dz < 2.6 && Math.abs(p.pos.y - actor.pos.y) < 2) {
-        this.collect(p, actor);
-        if (actor.isPlayer) g_toastPickup(this.game, p);
+        const before = p.count;
+        if (this.collect(p, actor)) continue;
+        if (actor.isPlayer) g_toastPickup(this.game, p, before);
       }
     }
+  }
+
+  // Would this pickup go into the inventory without replacing anything?
+  _fits(p, actor) {
+    if (p.type === 'weapon') return actor.items.some((it, i) => i > 0 && !it);
+    if (p.type !== 'consumable') return false;
+    const max = CONSUMABLES[p.ctype].max;
+    return actor.items.some((it, i) => i > 0 && (!it || (it.isConsumable && it.type === p.ctype && it.count < max)));
   }
 
   dropInventory(actor) {

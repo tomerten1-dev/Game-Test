@@ -4,7 +4,7 @@ import { TOWNS } from '../world/Terrain.js';
 import { CharacterAssets, CHARACTER_TYPES } from '../player/Character.js';
 import { Player } from '../player/Player.js';
 import { CameraRig } from '../player/CameraRig.js';
-import { Input } from './Input.js';
+import { Input, keyLabel } from './Input.js';
 import { Models } from './Models.js';
 import { Post } from './Post.js';
 import { Quality } from './Quality.js';
@@ -614,7 +614,7 @@ export class Game {
     if (p.state === 'ground') {
       const near = this.events.nearestInteractable(p.pos) || this.boss.nearestInteractable(p) || this.loot.nearestInteractable(p.pos);
       const text = !near ? null : near.text || (near.kind === 'chest' ? (near.chest.rare ? 'Open Rare Chest' : 'Open Chest') : near.kind === 'ammobox' ? 'Open Ammo Box' : `Pick up ${this.loot.label(near.pickup)}`);
-      this.hud.prompt?.(text, near?.pickup?.weapon?.rarity ?? near?.rarity);
+      this.hud.prompt?.(text || (p.canRedeploy() ? `Deploy glider · ${keyLabel(this.input.keyFor('jump'))}` : null), near?.pickup?.weapon?.rarity ?? near?.rarity, near?.pickup?.weapon || null);
       if (near && input.pressed('interact') && this.warmup > 0) this.hud.toast?.('Loot unlocks when the match starts');
       else if (near && input.pressed('interact')) {
         if (near.kind === 'supply') this.events.openSupply(near.supply, p);
@@ -628,6 +628,7 @@ export class Game {
       }
     } else this.hud.prompt?.(p.state === 'bus' && !this._thanked && this.bus.active ? 'Thank the bus driver' : null);
     this.updateConsumable(dt);
+    this.combat.updateWeak(p);
     if (input.down('fire')) p.emote = null;
     const held = p.held;
     if (!held || p.state !== 'ground') return;

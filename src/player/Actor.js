@@ -15,6 +15,7 @@ const SLIDE_TIME = 0.85;
 const FALL_SAFE = 17; // landing speed (m/s) before fall damage
 const JUMP_VEL = 8.2;
 const GLIDE_HEIGHT = 35;
+const REDEPLOY_HEIGHT = 14;
 
 // Shared body for the player and bots: state machine, physics, animation, health.
 const _tc = new THREE.Color();
@@ -125,7 +126,9 @@ export class Actor {
       }
     }
     if (count > 0) {
-      const free = this.items.findIndex((it, i) => i > 0 && !it);
+      // consumables fill from the right (weapons fill from the left), unless auto sort is off
+      const right = !this.isPlayer || this.game.meta?.profile?.d?.settings?.autoSort !== false;
+      const free = right ? this.items.findLastIndex((it, i) => i > 0 && !it) : this.items.findIndex((it, i) => i > 0 && !it);
       if (free > 0) { this.items[free] = new Consumable(type, Math.min(count, def.max)); count -= Math.min(count, def.max); if (free === this.slot) this._equip(); }
     }
     return count;
@@ -355,6 +358,9 @@ export class Actor {
     this.setState('skydive');
   }
 
+  // falling from high enough (a cliff, a tall build, a launch) to open the glider again
+  canRedeploy() { return this.state === 'ground' && !this.onGround && !this.swimming && this.vel.y < -4 && this.heightAboveGround() > REDEPLOY_HEIGHT; }
+
   heightAboveGround() { return this.pos.y - this.game.world.groundAt(this.pos.x, this.pos.z, this.pos.y); }
 
   // Slurp-style regeneration: health first, then shield.
@@ -430,6 +436,7 @@ export class Actor {
         this.jumpT = 0;
         this.game.sound?.play('jump', this.pos);
       }
+      if (it.redeploy && this.canRedeploy()) { this.setState('glide'); this.game.sound?.play('glider', this.isPlayer ? null : this.pos); return; }
       const wasGround = this.onGround;
       world.moveBody(this, dt);
       if (this.onGround && !wasGround && this.landSpeed > 7) {

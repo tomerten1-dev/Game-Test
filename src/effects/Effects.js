@@ -336,8 +336,21 @@ export class Effects {
     }
   }
 
-  damageNumber(pos, amount, headshot = false, shield = false) {
+  // With stacking on (the default), quick hits on the same target add up into one number.
+  damageNumber(pos, amount, headshot = false, shield = false, target = null) {
+    const st = this._stack;
+    if (this.stackDamage !== false && target && st && st.target === target && st.n.life > 0.25 && st.n.el.dataset.kind === 'dmg') {
+      st.total += amount;
+      st.head ||= headshot;
+      st.n.pos.copy(pos);
+      st.n.life = 0.9;
+      st.n.el.textContent = Math.round(st.total);
+      st.n.el.className = 'dmg-num stack' + (st.head ? ' head' : '') + (shield ? ' shield' : '');
+      return;
+    }
     const n = this.numbers[this.numberCursor];
+    n.el.dataset.kind = 'dmg';
+    this._stack = target ? { target, n, total: amount, head: headshot } : null;
     this.numberCursor = (this.numberCursor + 1) % this.numbers.length;
     n.pos.copy(pos);
     n.pos.x += (Math.random() - 0.5) * 0.6;
@@ -355,6 +368,7 @@ export class Effects {
     n.pos.copy(pos);
     n.vx = (Math.random() - 0.5) * 0.6;
     n.life = 0.9;
+    n.el.dataset.kind = 'mat';
     n.el.textContent = `+${amount}`;
     n.el.className = `dmg-num mat mat-${mat}`;
     n.el.style.display = 'block';

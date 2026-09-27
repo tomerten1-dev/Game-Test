@@ -19,6 +19,9 @@ const SLIDERS = [
   ['hudScale', 'HUD scale', 0.75, 1.3, 0.05, (v) => `${Math.round(v * 100)}%`],
 ];
 const keyName = keyLabel;
+// on/off gameplay options (missing from older saves = on)
+const TOGGLES = [['autoPickup', 'Auto pick up weapons'], ['stackDamage', 'Stack damage numbers'], ['autoSort', 'Auto sort consumables right']];
+export const setting = (game, k) => game.meta?.profile?.d?.settings?.[k] !== false;
 
 // Apply saved settings to the running game.
 export function applySettings(game) {
@@ -28,6 +31,7 @@ export function applySettings(game) {
   game.sound.setVolumes(s.master, s.music);
   document.documentElement.style.setProperty('--hud-scale', String(s.hudScale));
   game.hud?.setSoundViz(!!s.soundViz);
+  if (game.effects) game.effects.stackDamage = s.stackDamage !== false;
   game.input.applyBindings(s.keys || {});
 }
 
@@ -42,6 +46,7 @@ export function renderSettings(el, game, { compact = false } = {}) {
         <label class="set-row"><span>${label}</span><input type="range" data-k="${k}" min="${min}" max="${max}" step="${step}" value="${s[k]}"><b data-v="${k}"></b></label>`).join('')}
       <div class="set-row"><span>Graphics</span><div class="seg">${['auto', 'low', 'medium', 'high'].map((q) => `<button data-q="${q}">${q[0].toUpperCase() + q.slice(1)}</button>`).join('')}</div></div>
       <div class="set-row"><span>Visualize sound</span><div class="seg"><button data-sv="0">Off</button><button data-sv="1">On</button></div></div>
+      ${TOGGLES.map(([k, label]) => `<div class="set-row"><span>${label}</span><div class="seg"><button data-tog="${k}" data-val="0">Off</button><button data-tog="${k}" data-val="1">On</button></div></div>`).join('')}
       ${compact ? '' : `<div class="set-row"><span>Island season</span><div class="seg">${[['auto', 'Auto'], ['summer', 'Summer'], ['winter', 'Winter'], ['desert', 'Desert']].map(([k, n]) => `<button data-island="${k}">${n}</button>`).join('')}</div></div>
       <div class="set-row island-note hidden"><span></span><div class="seg"><button data-act="reload">Reload to build the new island</button></div></div>`}
     </div>
@@ -54,6 +59,7 @@ export function renderSettings(el, game, { compact = false } = {}) {
     el.querySelectorAll('[data-q]').forEach((b) => b.classList.toggle('on', b.dataset.q === q));
     el.querySelectorAll('[data-sv]').forEach((b) => b.classList.toggle('on', (b.dataset.sv === '1') === !!s.soundViz));
     el.querySelectorAll('[data-island]').forEach((b) => b.classList.toggle('on', b.dataset.island === (s.island || 'auto')));
+    el.querySelectorAll('[data-tog]').forEach((b) => b.classList.toggle('on', (b.dataset.val === '1') === (s[b.dataset.tog] !== false)));
     const want = s.island && s.island !== 'auto' ? s.island : null;
     el.querySelector('.island-note')?.classList.toggle('hidden', !want || want === VARIANT_KEY);
     el.querySelectorAll('[data-bind]').forEach((b) => { b.textContent = keyName(game.input.keyFor(b.dataset.bind)); b.classList.remove('wait'); });
@@ -61,6 +67,7 @@ export function renderSettings(el, game, { compact = false } = {}) {
   el.querySelectorAll('input[type=range]').forEach((inp) => inp.addEventListener('input', () => { s[inp.dataset.k] = Number(inp.value); save(); sync(); }));
   el.querySelectorAll('[data-q]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); game.quality.set(b.dataset.q); s.quality = b.dataset.q; save(); sync(); }));
   el.querySelectorAll('[data-sv]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); s.soundViz = b.dataset.sv === '1'; save(); sync(); }));
+  el.querySelectorAll('[data-tog]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); s[b.dataset.tog] = b.dataset.val === '1'; save(); sync(); }));
   el.querySelectorAll('[data-bind]').forEach((b) => b.addEventListener('click', (e) => {
     e.stopPropagation();
     b.textContent = 'press a key or mouse button…';

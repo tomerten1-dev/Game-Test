@@ -43,6 +43,7 @@ export class HUD {
         </div>
         <div id="banner"></div>
         <div id="prompt" class="hidden"><span class="key">E</span><span id="prompt-text"></span></div>
+        <div id="loot-card" class="hidden"></div>
         <div id="toast"></div>
         <div id="reload-ring" class="hidden"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16"/></svg><span id="ring-label">RELOADING</span></div>
         <div id="pickup-notes"></div>
@@ -178,15 +179,52 @@ export class HUD {
     this._bannerT = setTimeout(() => b.classList.remove('show'), seconds * 1000);
   }
 
-  prompt(text, rarity) {
+  prompt(text, rarity, weapon = null) {
+    this.lootCard(text ? weapon : null);
     const key = text ? text + rarity : null;
     if (this.cache.prompt === key) return;
     this.cache.prompt = key;
     this.el.prompt.classList.toggle('hidden', !text);
     if (text) {
+      const k = this.el.prompt.querySelector('.key');
+      if (k && this.game.input?.keyFor) k.textContent = keyLabel(this.game.input.keyFor('interact')).replace('Mouse ', 'M');
       this.el.promptText.textContent = text;
       this.el.promptText.style.color = rarity !== undefined ? RARITIES[rarity].color : '#fff';
     }
+  }
+
+  // Stat card for the weapon you're looking at on the floor, compared with the gun you hold
+  // (or the same kind of gun in your inventory): green is better, red is worse.
+  lootCard(w) {
+    const el = this.el.lootCard || (this.el.lootCard = document.getElementById('loot-card'));
+    const p = this.game.player;
+    const cmp = !w ? null : p?.held?.isGun ? p.held : p?.items.find((it) => it?.isGun && it.type === w.type) || null;
+    const key = w ? `${w.type}${w.rarity}|${cmp ? cmp.type + cmp.rarity : ''}` : null;
+    if (this.cache.lootCard === key) return;
+    this.cache.lootCard = key;
+    el.classList.toggle('hidden', !w);
+    if (!w) return;
+    const stats = (x) => {
+      const d = x.def;
+      return [
+        ['Damage', Math.round(x.damage) * d.pellets, 1],
+        ['Fire rate', +d.rate.toFixed(1), 1],
+        ['Magazine', d.mag, 1],
+        ['Reload', +(d.shellReload ? d.shellReload * d.mag : d.reload).toFixed(1), -1],
+      ];
+    };
+    const mine = cmp && stats(cmp);
+    const rows = stats(w).map(([name, v, better], i) => {
+      let tag = '';
+      if (mine && mine[i][1] !== v) {
+        const up = (v - mine[i][1]) * better > 0;
+        tag = `<i class="${up ? 'up' : 'down'}">${up ? '▲' : '▼'}</i>`;
+      }
+      return `<div class="lc-row"><span>${name}</span><b>${v}${name === 'Reload' ? 's' : ''}</b>${tag}</div>`;
+    }).join('');
+    const r = RARITIES[w.rarity];
+    el.style.setProperty('--rar', r.color);
+    el.innerHTML = `<div class="lc-rar">${r.name}</div><div class="lc-name">${w.def.name}</div>${rows}${cmp ? `<div class="lc-vs">vs ${cmp.name}</div>` : ''}`;
   }
 
   toast(text) {
@@ -388,7 +426,8 @@ export class HUD {
     else if (!killer || killer === victim) row.innerHTML = `${name(victim)} <span>was lost in the storm</span>`;
     else {
       const w = killer.weapon;
-      row.innerHTML = `${name(killer)} <span class="kf-w" style="color:${w ? RARITIES[w.rarity].color : '#fff'}">${w ? w.def.icon : '⛏'}</span> ${name(victim)}`;
+      const m = Math.round(Math.hypot(killer.pos.x - victim.pos.x, killer.pos.y - victim.pos.y, killer.pos.z - victim.pos.z));
+      row.innerHTML = `${name(killer)} <span class="kf-w" style="color:${w ? RARITIES[w.rarity].color : '#fff'}" title="${w ? w.name : 'Harvesting Axe'}">${w ? w.def.icon : '⛏'}</span> ${name(victim)} <span class="kf-d">${m} m</span>`;
     }
     this.el.killfeed.prepend(row);
     while (this.el.killfeed.children.length > 5) this.el.killfeed.lastChild.remove();

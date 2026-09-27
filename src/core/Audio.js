@@ -75,6 +75,8 @@ export class Sound {
   updateListener(camera) {
     const e = camera.matrixWorld.elements;
     this.right = { x: e[0], y: e[1], z: e[2] };
+    this.up = { x: e[4], y: e[5], z: e[6] };
+    this.back = { x: e[8], y: e[9], z: e[10] };
   }
 
   // Soft shimmering loop that swells as you get close to an unopened chest.
@@ -328,13 +330,27 @@ export class Sound {
     if (v <= 0.01) return;
     // positional sounds pan left/right relative to the camera
     this._out = null;
-    if (pos && this.listener && ctx.createStereoPanner) {
+    // positional sounds use HRTF 3D panning, so you can tell in front from behind and above from below
+    // (loudness still comes from our own distance falloff, the panner only gives direction)
+    if (pos && this.listener) {
       const dx = pos.x - this.listener.x, dy = pos.y - this.listener.y, dz = pos.z - this.listener.z;
       const d = Math.hypot(dx, dy, dz) || 1;
-      const pan = ctx.createStereoPanner();
-      pan.pan.value = Math.max(-1, Math.min(1, (dx * this.right.x + dz * this.right.z) / d)) * 0.85;
-      pan.connect(this.master);
-      this._out = pan;
+      const r = this.right, u = this.up, b = this.back;
+      if (ctx.createPanner && u && b && d > 1.5) {
+        const pan = ctx.createPanner();
+        pan.panningModel = 'HRTF';
+        pan.distanceModel = 'linear';
+        pan.rolloffFactor = 0;
+        const lx = (dx * r.x + dy * r.y + dz * r.z) / d, ly = (dx * u.x + dy * u.y + dz * u.z) / d, lz = (dx * b.x + dy * b.y + dz * b.z) / d;
+        if (pan.positionX) { pan.positionX.value = lx; pan.positionY.value = ly; pan.positionZ.value = lz; } else pan.setPosition(lx, ly, lz);
+        pan.connect(this.master);
+        this._out = pan;
+      } else if (ctx.createStereoPanner) {
+        const pan = ctx.createStereoPanner();
+        pan.pan.value = Math.max(-1, Math.min(1, (dx * r.x + dz * r.z) / d)) * 0.85;
+        pan.connect(this.master);
+        this._out = pan;
+      }
     }
     // recorded CC0 sample first (footsteps use short slices of Kenney's walking loop)
     if (name === 'step' && this.buffers?.walking) {

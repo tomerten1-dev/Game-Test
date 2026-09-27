@@ -126,7 +126,7 @@ export class Combat {
       const dealt = target.takeDamage(e.dmg, shooter, e.head);
       g.effects.hitSparks(e.point, e.head ? '#ffd23f' : shieldBefore > 0 ? '#6cc4ff' : '#ffffff');
       if (shooter.isPlayer) {
-        g.effects.damageNumber(e.point, dealt, e.head, shieldBefore > 0);
+        g.effects.damageNumber(e.point, dealt, e.head, shieldBefore > 0, target);
         g.hud?.hitMarker(e.head, !target.alive);
         g.sound.play(e.head ? 'headshot' : shieldBefore > 0 ? 'shieldHit' : 'hit');
       }
@@ -198,7 +198,7 @@ export class Combat {
       const shieldBefore = r.actor.shield;
       const dealt = r.actor.takeDamage(!actor.isPlayer && !r.actor.isPlayer ? 9 : 20, actor, false);
       g.effects.hitSparks(_end, '#ffffff');
-      if (actor.isPlayer) { g.effects.damageNumber(_end, dealt, false, shieldBefore > 0); g.hud?.hitMarker(false, !r.actor.alive); g.sound.play('hit'); }
+      if (actor.isPlayer) { g.effects.damageNumber(_end, dealt, false, shieldBefore > 0, r.actor); g.hud?.hitMarker(false, !r.actor.alive); g.sound.play('hit'); }
       return true;
     }
     const c = r.collider;
@@ -207,12 +207,49 @@ export class Combat {
     const mat = r.terrain ? null : c?.mat || (c?.tree || c?.crate ? 'wood' : c?.rock || c?.stone ? 'stone' : c?.house ? 'wood' : null);
     g.effects.impact(_end, mat === 'wood' ? 'wood' : 'stone', _n.copy(dir).negate());
     if (mat) {
-      const amount = 7 + Math.floor(Math.random() * 4);
+      let amount = 7 + Math.floor(Math.random() * 4);
+      // weak point: hitting the glowing spot doubles the harvest and moves it
+      if (actor.isPlayer && c?.kind === 'circle') {
+        const crit = this.weak?.c === c && _end.distanceTo(this.weak.pos) < 0.6;
+        if (crit) { amount *= 2; g.sound.play('hit'); g.effects.hitSparks(this.weak.pos, '#6cd8ff'); }
+        this._placeWeak(c, actor, _end.y, crit);
+      }
       actor.addMat(mat, amount);
       if (actor.isPlayer) { g.effects.matNumber?.(_end, amount, mat); g.meta?.track('harvest', amount); }
       g.sound.play(`harvest_${mat}`, actor.isPlayer ? null : _end, { range: 50 });
     } else if (actor.isPlayer) g.sound.play('impact');
     return mat || true;
+  }
+
+  // Place (or move) the harvest weak point on a round collider (tree trunk, rock), on the side facing the actor.
+  _placeWeak(c, actor, y, moved) {
+    if (!this.weakMesh) {
+      const m = new THREE.Mesh(new THREE.RingGeometry(0.14, 0.26, 24), new THREE.MeshBasicMaterial({ color: '#58d0ff', transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false }));
+      m.add(new THREE.Mesh(new THREE.CircleGeometry(0.12, 16), new THREE.MeshBasicMaterial({ color: '#dff6ff', transparent: true, opacity: 0.85, depthWrite: false })));
+      m.renderOrder = 5;
+      this.game.scene.add(m);
+      this.weakMesh = m;
+    }
+    if (this.weak?.c === c && !moved) { this.weak.t = this.game.time; return; }
+    const base = Math.atan2(actor.pos.z - c.z, actor.pos.x - c.x);
+    const a = base + (this.weak?.c === c ? (Math.random() < 0.5 ? -1 : 1) * (0.25 + Math.random() * 0.35) : (Math.random() - 0.5) * 0.5);
+    const r = c.r + 0.04;
+    const wy = Math.max(c.y0 + 2.4, Math.min(c.y1 - 0.3, y + (Math.random() - 0.5) * 1.0, actor.pos.y + 2.1));
+    const pos = new THREE.Vector3(c.x + Math.cos(a) * r, Math.max(wy, actor.pos.y + 0.5), c.z + Math.sin(a) * r);
+    this.weak = { c, pos, t: this.game.time };
+    this.weakMesh.position.copy(pos);
+    this.weakMesh.lookAt(pos.x + Math.cos(a), pos.y, pos.z + Math.sin(a));
+    this.weakMesh.visible = true;
+  }
+
+  // Hide the weak point when the player walks away, puts the axe down or stops harvesting.
+  updateWeak(p) {
+    const w = this.weak;
+    if (!w) return;
+    const far = (p.pos.x - w.pos.x) ** 2 + (p.pos.z - w.pos.z) ** 2 > 16;
+    if (!p.alive || !p.held?.isPickaxe || far || this.game.time - w.t > 5) { this.weak = null; this.weakMesh.visible = false; return; }
+    const s = 1 + Math.sin(this.game.time * 8) * 0.08;
+    this.weakMesh.scale.setScalar(s);
   }
 
   damageProp(c, amount) {

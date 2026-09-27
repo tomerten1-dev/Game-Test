@@ -114,7 +114,7 @@ export class Projectiles {
             const botVsBot = a.owner && !a.owner.isPlayer && !act.isPlayer ? 0.6 : 1;
             const shieldBefore = act.shield;
             const dealt = act.takeDamage(a.dps * 0.5 * botVsBot, act === a.owner ? null : a.owner, false);
-            if (a.owner?.isPlayer && act !== a.owner) { fx.damageNumber(act.chest(_pt), dealt, false, shieldBefore > 0); g.hud?.hitMarker(false, !act.alive); }
+            if (a.owner?.isPlayer && act !== a.owner) { fx.damageNumber(act.chest(_pt), dealt, false, shieldBefore > 0, act); g.hud?.hitMarker(false, !act.alive); }
           }
           for (const st of [...g.building.structures]) {
             if (st.mat !== 'wood') continue;
@@ -211,7 +211,7 @@ export class Projectiles {
       const dealt = target.takeDamage(p.damage * (r.head ? p.headMult : 1) * botVsBot, owner, r.head);
       g.effects.hitSparks(pt, r.head ? '#ffd23f' : shieldBefore > 0 ? '#6cc4ff' : '#ffffff');
       if (owner.isPlayer) {
-        g.effects.damageNumber(pt, dealt, r.head, shieldBefore > 0);
+        g.effects.damageNumber(pt, dealt, r.head, shieldBefore > 0, target);
         g.hud?.hitMarker(r.head, !target.alive);
         g.sound.play(r.head ? 'headshot' : shieldBefore > 0 ? 'shieldHit' : 'hit');
       }
@@ -270,7 +270,7 @@ export function explode(game, pos, owner, damage, radius, structureDamage) {
     const shieldBefore = a.shield;
     const dealt = a.takeDamage(damage * (1 - 0.6 * (d / radius)) * botVsBot, owner, false);
     if (owner?.isPlayer) {
-      fx.damageNumber(a.chest(_pt), dealt, false, shieldBefore > 0);
+      fx.damageNumber(a.chest(_pt), dealt, false, shieldBefore > 0, a);
       game.hud?.hitMarker(false, !a.alive);
     }
   }
