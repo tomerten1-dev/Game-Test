@@ -7,6 +7,11 @@ export class Player extends Actor {
     super(game, { name: 'You', color: '#20d6c0', isPlayer: true });
   }
 
+  onDamaged(amount, attacker) {
+    this.game.hud.hurt(attacker);
+    this.game.sound.play('hurt');
+  }
+
   readInput(dt, input, rig) {
     const look = input.consumeLook();
     rig.addLook(look.x, look.y);

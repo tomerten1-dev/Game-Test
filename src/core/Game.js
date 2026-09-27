@@ -10,7 +10,9 @@ import { Sound } from './Audio.js';
 import { Effects } from '../effects/Effects.js';
 import { Combat } from '../weapons/Combat.js';
 import { Weapon } from '../weapons/Weapon.js';
-import { Actor } from '../player/Actor.js';
+import { Bot } from '../bots/Bot.js';
+import { BOT_NAMES, botColors } from '../bots/names.js';
+import { LOOT_WEAPONS } from '../weapons/WeaponDefs.js';
 import { HUD } from '../ui/HUD.js';
 
 export class Game {
@@ -66,14 +68,19 @@ export class Game {
     this.player.giveWeapon(new Weapon('pistol', 0), 0);
     this.player.giveWeapon(new Weapon('ar', 2), 1);
     this.player.giveWeapon(new Weapon('shotgun', 4), 2);
-    // Stage 3 training dummies
-    const colors = ['#ff5d73', '#ffb830', '#9b5de5'];
-    for (let i = 0; i < 3; i++) {
-      const d = new Actor(this, { name: `Dummy ${i + 1}`, color: colors[i] });
-      d.spawnGround(t.x - 6 + i * 5, t.z - 8);
-      d.giveWeapon(new Weapon('smg', i + 1));
-      d.shield = 50;
-      this.actors.push(d);
+    // Stage 4: bots spawn around the island
+    const colors = botColors(19);
+    this.bots = [];
+    for (let i = 0; i < 19; i++) {
+      const b = new Bot(this, BOT_NAMES[i], colors[i], Math.random());
+      let x, z;
+      do { const a = Math.random() * Math.PI * 2, d = 20 + Math.random() * 130; x = Math.cos(a) * d; z = Math.sin(a) * d; } while (this.world.heightAt(x, z) < 2);
+      b.spawnGround(x, z);
+      b.giveWeapon(new Weapon('pistol', 0));
+      b.giveWeapon(new Weapon(LOOT_WEAPONS[Math.floor(Math.random() * 3)], Math.floor(Math.random() * 3)));
+      b.wood = 30;
+      this.bots.push(b);
+      this.actors.push(b);
     }
     this.rig.yaw = 0;
     this.hud.show(true);
@@ -94,13 +101,20 @@ export class Game {
   update(dt) {
     this.time += dt;
     const p = this.player;
-    p.readInput(dt, this.input, this.rig);
-    this.updatePlayerCombat(dt);
+    if (p.alive) {
+      p.readInput(dt, this.input, this.rig);
+      this.updatePlayerCombat(dt);
+    } else {
+      p.intent.mx = p.intent.mz = 0;
+      const look = this.input.consumeLook();
+      this.rig.addLook(look.x, look.y);
+    }
+    for (const b of this.bots) b.update(dt);
     for (const a of this.actors) {
       a.updateMovement(dt);
       for (const w of a.weapons) if (w && w.update(dt) === 'reloaded' && a.isPlayer) this.sound.play('reloaded');
     }
-    const mode = p.state === 'ground' ? (p.aiming ? 'aim' : 'ground') : p.state;
+    const mode = !p.alive ? 'dead' : p.state === 'ground' ? (p.aiming ? 'aim' : 'ground') : p.state;
     this.rig.update(dt, p.pos, mode);
     for (const a of this.actors) a.updateVisual(dt, this.camera.position);
     this.focus.copy(p.pos);
@@ -136,13 +150,15 @@ export class Game {
     }
   }
 
+  get aliveCount() { return this.actors.reduce((n, a) => n + (a.alive ? 1 : 0), 0); }
+
   onActorDied(actor, killer) {
     this.effects.eliminate(actor.pos, actor.color);
     this.sound.play(killer?.isPlayer ? 'elim' : 'break', actor.pos);
-    if (killer) killer.kills++;
-    if (actor.name.startsWith('Dummy')) {
-      setTimeout(() => { actor.alive = true; actor.health = 100; actor.shield = 50; actor.setState('ground'); actor.character.play('Idle', 0.2); }, 2500);
-    }
+    if (killer && killer !== actor) killer.kills++;
+    this.hud.killFeed?.(killer, actor);
+    this.loot?.dropInventory(actor);
+    if (actor === this.player) this.hud.hurt();
   }
 
   onResize() {
