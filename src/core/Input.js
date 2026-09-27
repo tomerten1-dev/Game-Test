@@ -15,7 +15,7 @@ export const DEFAULT_KEYMAP = {
   KeyC: 'crouch', ControlLeft: 'crouch',
   Escape: 'pause',
   KeyM: 'map', KeyN: 'mute',
-  KeyP: 'ping', KeyJ: 'drop', Tab: 'inventory',
+  KeyP: 'ping', KeyJ: 'drop', Tab: 'inventory', KeyY: 'shoulder',
 };
 
 export class Input {

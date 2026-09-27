@@ -489,6 +489,7 @@ export class Game {
     const p = this.player;
     if (this.input.pressed('map')) { this.toggleInventory(false); this.toggleMap(); }
     else if (this.map.open && this.input.pressed('pause')) this.toggleMap(false);
+    if (this.input.pressed('shoulder')) { this.rig.shoulder *= -1; this.hud.toast?.(this.rig.shoulder > 0 ? 'Right shoulder' : 'Left shoulder'); }
     if (this.input.pressed('inventory')) this.toggleInventory();
     else if (this.inv.open && (this.input.pressed('pause') || !p.alive)) this.toggleInventory(false);
     if (this.inv.open) this.inv.tick(dt);

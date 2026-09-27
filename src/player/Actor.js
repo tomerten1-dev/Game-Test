@@ -219,6 +219,36 @@ export class Actor {
     return true;
   }
 
+  // Vault over something low and thin (up to ~1.3 m) when there's ground on the far side.
+  _tryHurdle(dx, dz) {
+    if ((this.hurdleCd || 0) > this.game.time) return false;
+    const w = this.game.world;
+    // probe a few spots just ahead (thin fences only show up close in)
+    let top = -Infinity;
+    for (const k of [0.15, 0.35, 0.6, 0.85]) top = Math.max(top, w.groundAt(this.pos.x + dx * (this.radius + k), this.pos.z + dz * (this.radius + k), this.pos.y + 1.5, 0.2));
+    const rise = top - this.pos.y;
+    if (rise < 0.35 || rise > 1.35) return false;
+    // landing spot a little further on: roughly level with us and clear
+    const lx = this.pos.x + dx * 2.2, lz = this.pos.z + dz * 2.2;
+    const land = w.groundAt(lx, lz, this.pos.y + 0.6, 0.3);
+    if (Math.abs(land - this.pos.y) > 0.9) return false;
+    for (const c of w.colliders.query(lx - 0.35, lx + 0.35, lz - 0.35, lz + 0.35, _mq)) {
+      if (c.kind === 'ramp' || c.kind === 'cone') continue;
+      const over = c.kind === 'circle' ? Math.hypot(lx - c.x, lz - c.z) < c.r + 0.35
+        : lx > c.minX - 0.35 && lx < c.maxX + 0.35 && lz > c.minZ - 0.35 && lz < c.maxZ + 0.35;
+      if (over && c.y1 > land + 0.4 && c.y0 < land + 1.8) return false;
+    }
+    const sp = Math.max(7.5, Math.hypot(this.vel.x, this.vel.z));
+    this.vel.set(dx * sp, 6.2 + rise * 1.5, dz * sp);
+    this.onGround = false;
+    this.pos.y += 0.05;
+    this.hurdleCd = this.game.time + 0.5;
+    this.rollT = 0;
+    this.character.setPose('Jump_Start', null, 0.05, 1.8);
+    this.game.sound?.play('jump', this.isPlayer ? null : this.pos);
+    return true;
+  }
+
   _updateMantle(dt) {
     this.mantleT -= dt;
     const k = 1 - Math.max(0, this.mantleT) / 0.32;
@@ -403,17 +433,23 @@ export class Actor {
       world.moveBody(this, dt);
       if (this.onGround && !wasGround && this.landSpeed > 7) {
         this.onHardLanding?.(this.landSpeed);
+        // a real drop while running: roll out of it and keep the speed
+        if (this.landSpeed > 11 && Math.hypot(this.vel.x, this.vel.z) > 3) { this.rollT = 0.5; this.character.setPose('Dodge_Forward', null, 0.06, 1.3); }
         if (this.landSpeed > FALL_SAFE && !(this.noFallT > 0)) this.fallDamage(Math.round((this.landSpeed - FALL_SAFE) * 5.5));
       }
+      // sprinting into something low (fence, crate, rail): hurdle over it
+      if (this.sprinting && this.blocked && this.onGround && mlen > 0.3) this._tryHurdle(it.mx / mlen, it.mz / mlen);
       // footsteps
       const hs = Math.hypot(this.vel.x, this.vel.z);
-      if (this.onGround && hs > 1.5 && !this.crouched && this.slideT <= 0) {
+      if (this.onGround && hs > 1.2 && this.slideT <= 0 && !this.swimming) {
         this._stepDist += hs * dt;
-        const stepLen = this.sprinting ? 2.4 : hs > 4 ? 1.9 : 1.3;
+        const stepLen = this.crouched ? 1.1 : this.sprinting ? 2.4 : hs > 4 ? 1.9 : 1.3;
         if (this._stepDist > stepLen) {
           this._stepDist = 0;
-          if (this.isPlayer) this.game.sound?.play('step', null, { vol: this.sprinting ? 0.35 : 0.22 });
-          else if (this.distToCam < 45) this.game.sound?.play('step', this.pos, { range: 45, vol: this.sprinting ? 1.1 : 0.8 });
+          // crouch-walking is much quieter (and only heard up close)
+          const v = this.crouched ? 0.35 : this.sprinting ? 1.1 : 0.8;
+          if (this.isPlayer) this.game.sound?.play('step', null, { vol: this.crouched ? 0.08 : this.sprinting ? 0.35 : 0.22 });
+          else if (this.distToCam < (this.crouched ? 15 : 45)) this.game.sound?.play('step', this.pos, { range: this.crouched ? 15 : 45, vol: v });
         }
       }
       // dust puffs while running (only near the camera)
@@ -499,6 +535,7 @@ export class Actor {
       if (this.victory) ch.setPose(this.victoryEmote || 'Cheer', null, 0.3);
       else if (emoting) ch.setPose(this.emote, null, 0.25);
       else if (!this.alive) { /* death pose set in setState */ }
+      else if (this.rollT > 0) { this.rollT -= dt; ch.setPose('Dodge_Forward', null, 0.06, 1.3); }
       else if (this.airT > 0.12 && this.vel.y > -25) {
         ch.setPose('Jump_Idle', upperArmed, 0.15);
         this._wasAir = this.airT > 0.35;

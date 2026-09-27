@@ -17,6 +17,7 @@ export class CameraRig {
     this.pitch = -0.1;
     this.dist = 3.6;
     this.side = 0.72;
+    this.shoulder = 1; // 1 = over the right shoulder, -1 = left
     this.up = 0.28;
     this.curDist = 3.6;
     this.recoil = 0;
@@ -50,7 +51,7 @@ export class CameraRig {
     else if (mode === 'skydive' || mode === 'glide') { dist = 7.5; side = 0; up = 1.2; fov = base + 8; pivotH = 1.0; }
     else if (mode === 'bus') { dist = 18; side = 0; up = 4; fov = base; pivotH = 0; }
     else if (mode === 'dead') { dist = 6; side = 0; up = 1.5; }
-    this.side = damp(this.side, side, 8, dt);
+    this.side = damp(this.side, side * this.shoulder, 8, dt);
     this.up = damp(this.up, up, 8, dt);
     this.fov = damp(this.fov, fov, 10, dt);
     if (Math.abs(this.camera.fov - this.fov) > 0.01) { this.camera.fov = this.fov; this.camera.updateProjectionMatrix(); }
