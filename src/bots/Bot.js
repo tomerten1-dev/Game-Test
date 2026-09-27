@@ -64,13 +64,21 @@ export class Bot extends Actor {
     this.rushN = 0;
     this.coverWall = null;  // our own wall we fight behind (edit-peeking through it)
     this.coverT = 0;
+    // play style, so bots don't all think alike
+    const r = Math.random();
+    this.persona = r < 0.3 ? 'rusher' : r < 0.6 ? 'looter' : r < 0.8 ? 'camper' : 'builder';
+    const P = { rusher: [1.9, 0.9, 1, 1], looter: [0.5, 1.6, 1, 1], camper: [0.2, 1.1, 1.1, 1], builder: [0.8, 1, 1.6, 1.5] }[this.persona];
+    [this.huntMul, this.lootMul, this.wallMul, this.matMul] = P;
+    // personal slant on where to stand in the next circle
+    this.zoneAngle = (Math.random() - 0.5) * 1.3;
+    this.zoneDepth = 0.35 + Math.random() * 0.5;
   }
 
   get smartLoot() { return true; }
 
   // Fresh brain for the real match (after the warm-up).
   resetAI() {
-    this.climb = null; this.ninetyCd = 0; this.tunnelCd = 0; this.coneCd = 0; this.rushT = 0; this.rushN = 0;
+    this.climb = null; this.ninetyCd = 0; this.tunnelCd = 0; this.coneCd = 0; this.rushT = 0; this.rushN = 0; this.holdSpot = null;
     this.target = null; this.mode = 'idle'; this.hasGoal = false;
     this.boxed = false; this.retreatT = 0; this.exitT = 0; this.peekT = 0; this.peekWall = null; this.coverWall = null;
     this.lootChest = null; this.pickup = null; this.tree = null; this.huntT = 0;
@@ -111,7 +119,7 @@ export class Bot extends Actor {
       return;
     }
     // under fire: box up with a wall (skilled bots do it more), or hop
-    const wallChance = 0.2 + this.skill * 0.35;
+    const wallChance = (0.2 + this.skill * 0.35) * (this.wallMul || 1);
     if (r < wallChance * 0.35 && this.skill > 0.4 && this.matTotal >= 50 && this.buildCooldown <= 0 && attacker && b) this._boxUp();
     else if (r < wallChance && this.buildCooldown <= 0 && b?.canAfford(this) && attacker) {
       this.buildCooldown = 3.5;
@@ -465,7 +473,10 @@ export class Bot extends Actor {
         return;
       }
       if (this.lootChest && this.lootChest.opened) this.lootChest = null;
-      if (!this.lootChest) this.lootChest = loot.nearestChest(this.pos, armed ? 45 : 90, storm);
+      if (!this.lootChest) {
+        this.lootChest = loot.nearestChest(this.pos, (armed ? 45 : 90) * this.lootMul, storm, this);
+        if (this.lootChest) { this.lootChest.claim = this; this.lootChest.claimUntil = g.time + 25; }
+      }
       if (this.lootChest) {
         this.mode = 'loot';
         this.setGoal(this.lootChest.x, this.lootChest.z);
@@ -473,7 +484,10 @@ export class Bot extends Actor {
         return;
       }
       if (this.pickup && !this.pickup.alive) this.pickup = null;
-      if (!this.pickup) this.pickup = loot.bestPickupFor(this, armed ? 30 : 70);
+      if (!this.pickup) {
+        this.pickup = loot.bestPickupFor(this, (armed ? 30 : 70) * this.lootMul);
+        if (this.pickup) { this.pickup.claim = this; this.pickup.claimUntil = g.time + 15; }
+      }
       if (this.pickup) {
         this.mode = 'pickup';
         this.setGoal(this.pickup.pos.x, this.pickup.pos.z);
@@ -515,7 +529,8 @@ export class Bot extends Actor {
       for (const a of g.actors) {
         if (a === this || !a.alive || g.time - a.lastFireTime > 0.6) continue;
         const dd = a.pos.distanceTo(this.pos);
-        if (dd < 25 + 60 * calm + late * 60 && Math.random() < 0.15 + this.skill * 0.25 + late * 0.3 && (!storm || storm.isSafe(a.pos.x, a.pos.z, 10))) {
+        if (dd < (25 + 60 * calm + late * 60) * Math.min(1.3, this.huntMul) && Math.random() < (0.15 + this.skill * 0.25 + late * 0.3) * this.huntMul && (!storm || storm.isSafe(a.pos.x, a.pos.z, 10)) &&
+            g.bots.filter((o) => o.mode === 'hunt' && o.alive && (o.huntPos.x - a.pos.x) ** 2 + (o.huntPos.z - a.pos.z) ** 2 < 900).length < 3) {
           this.huntPos.copy(a.pos);
           this.huntT = 12;
           this.mode = 'hunt';
@@ -525,7 +540,7 @@ export class Bot extends Actor {
       }
     }
     // gather wood for building when low
-    const matGoal = (g.storm?.phase || 0) >= 3 ? 150 : 90;
+    const matGoal = ((g.storm?.phase || 0) >= 3 ? 150 : 90) * this.matMul;
     if (this.matTotal < (this.mode === 'harvest' ? matGoal : matGoal * 0.5) && g.time - this.landTime > 8) {
       if (this.tree && Math.hypot(this.tree.x - this.pos.x, this.tree.z - this.pos.z) > 30) this.tree = null;
       if (!this.tree || this.mode !== 'harvest') this.tree = this._nearestTree(26);
@@ -533,6 +548,25 @@ export class Bot extends Actor {
         this.mode = 'harvest';
         const dx = this.pos.x - this.tree.x, dz = this.pos.z - this.tree.z, dl = Math.hypot(dx, dz) || 1;
         this.setGoal(this.tree.x + (dx / dl) * (this.tree.r + 0.9), this.tree.z + (dz / dl) * (this.tree.r + 0.9));
+        return;
+      }
+    }
+    // campers find some high ground inside the circle and hold it
+    if (this.persona === 'camper' && storm && armed) {
+      if (!this.holdSpot || !storm.isSafe(this.holdSpot.x, this.holdSpot.z, 4)) {
+        let best = null;
+        const c = storm.safeCenter(), r = storm.safeRadius() * 0.8;
+        for (let i = 0; i < 14; i++) {
+          const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * r;
+          const x = this.pos.x + Math.max(-60, Math.min(60, c.x + Math.cos(a) * rr - this.pos.x)), z = this.pos.z + Math.max(-60, Math.min(60, c.y + Math.sin(a) * rr - this.pos.z));
+          const h = g.world.heightAt(x, z);
+          if (h > 2 && storm.isSafe(x, z, 4) && (!best || h > best.h)) best = { x, z, h };
+        }
+        this.holdSpot = best;
+      }
+      if (this.holdSpot) {
+        this.mode = Math.hypot(this.holdSpot.x - this.pos.x, this.holdSpot.z - this.pos.z) < 3 ? 'hold' : 'wander';
+        this.setGoal(this.holdSpot.x, this.holdSpot.z);
         return;
       }
     }
@@ -621,10 +655,12 @@ export class Bot extends Actor {
     const timeLeft = storm.stage === 'wait' ? storm.timer + 10 : 0; // the shrink itself buys a little time
     const urgent = outsideNow || storm.stage !== 'wait' || timeLeft < travel + 25;
     if (!urgent && timeLeft > travel + 50) return null;
-    // aim for a point just inside the circle edge, on our side (less walking, avoids the center crowd)
-    const k = d > 0.1 ? Math.max(0, r - margin - 4) / d : 0;
-    const jitter = (this.skill - 0.5) * 4;
-    return { x: c.x + dx * k + jitter, z: c.y + dz * k - jitter, urgent };
+    // aim for a point inside the circle, roughly on our side but with our own slant and depth
+    // (bots coming from the same area don't all converge on one spot)
+    const ang = Math.atan2(dz, dx) + this.zoneAngle * Math.min(1, r / 60);
+    const depth = Math.max(0, (r - margin - 3) * this.zoneDepth + Math.min(r * 0.25, 8));
+    const rr = Math.min(Math.max(0, r - margin - 2), depth);
+    return { x: c.x + Math.cos(ang) * rr, z: c.y + Math.sin(ang) * rr, urgent };
   }
 
   _nearestTree(maxD) {

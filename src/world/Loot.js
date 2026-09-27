@@ -501,10 +501,13 @@ export class Loot {
     actor.character.setWeapon(null);
   }
 
-  nearestChest(pos, maxD, storm) {
+  nearestChest(pos, maxD, storm, who = null) {
     let best = null, bd = maxD;
+    const now = this.game.time;
     for (const c of this.chests) {
       if (c.opened) continue;
+      // someone else already heading for it (and still alive): leave it to them
+      if (who && c.claim && c.claim !== who && c.claim.alive && now < c.claimUntil) continue;
       const d = Math.hypot(c.x - pos.x, c.z - pos.z);
       if (d < bd && (!storm || storm.isSafe(c.x, c.z))) { bd = d; best = c; }
     }
@@ -518,6 +521,7 @@ export class Loot {
     const worst = hasFree ? 0 : Math.min(...guns.map((w) => w.score));
     for (const p of this.pickups) {
       if (!p.alive || !p.settled) continue;
+      if (p.claim && p.claim !== actor && p.claim.alive && this.game.time < p.claimUntil && p.type === 'weapon') continue;
       const d = p.pos.distanceTo(actor.pos);
       if (d > maxD) continue;
       let s = 0;

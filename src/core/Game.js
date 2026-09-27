@@ -420,7 +420,7 @@ export class Game {
     const towns = TOWNS;
     let x = 0, z = 0;
     for (let i = 0; i < 30; i++) {
-      if (Math.random() < 0.6) {
+      if (Math.random() < 0.5) {
         const t = towns[Math.floor(Math.random() * towns.length)];
         x = t.x + (Math.random() - 0.5) * t.r * 1.2; z = t.z + (Math.random() - 0.5) * t.r * 1.2;
       } else {
