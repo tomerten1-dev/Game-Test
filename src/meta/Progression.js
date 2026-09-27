@@ -40,9 +40,55 @@ const QUESTS = [
   { id: 'vend', text: 'Buy from a vending machine', event: 'vend', target: 1 },
 ];
 export const QUEST_REWARD = { xp: 500, coins: 100 };
+export const WEEKLY_REWARD = { xp: 2000, coins: 250 };
+
+// Weekly pool: bigger goals that add up over many matches.
+const WEEKLY = [
+  { id: 'w_elims', text: 'Eliminate {n} opponents', event: 'kill', target: 25 },
+  { id: 'w_damage', text: 'Deal {n} damage to opponents', event: 'damage', target: 5000 },
+  { id: 'w_chests', text: 'Open {n} chests', event: 'chest', target: 30 },
+  { id: 'w_harvest', text: 'Harvest {n} materials', event: 'harvest', target: 2000 },
+  { id: 'w_build', text: 'Build {n} pieces', event: 'build', target: 200 },
+  { id: 'w_circles', text: 'Survive {n} storm circles', event: 'circle', target: 30 },
+  { id: 'w_top10', text: 'Finish in the top 10 in {n} matches', event: 'top10', target: 5 },
+  { id: 'w_win', text: 'Win a match', event: 'win', target: 1 },
+  { id: 'w_heal', text: 'Use {n} healing or shield items', event: 'heal', target: 20 },
+  { id: 'w_supply', text: 'Open {n} supply drops', event: 'supply', target: 3 },
+  { id: 'w_pads', text: 'Bounce on {n} jump or launch pads', event: 'pad', target: 10 },
+  { id: 'w_boss', text: 'Defeat the Foreman at Rusty Works', event: 'boss', target: 1 },
+  { id: 'w_vault', text: 'Open the vault at Rusty Works', event: 'vault', target: 1 },
+];
+
+// ISO-ish week key (Monday start) so everyone gets the same weekly set.
+export function weekKey(d = new Date()) {
+  const day = (d.getDay() + 6) % 7;
+  const mon = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day);
+  return `${mon.getFullYear()}-W${String(mon.getMonth() + 1).padStart(2, '0')}${String(mon.getDate()).padStart(2, '0')}`;
+}
+
+export function weeklyQuests(week) {
+  const r = mulberry32(daySeed(week, 7));
+  const pool = [...WEEKLY];
+  const out = [];
+  while (out.length < 7) out.push({ id: pool.splice(Math.floor(r() * pool.length), 1)[0].id, progress: 0, done: false, weekly: true });
+  return out;
+}
+
+// Career milestones: tiers of lifetime stats, each tier pays out once.
+export const MILESTONES = [
+  { id: 'm_kills', name: 'Eliminations', stat: 'kills', tiers: [10, 50, 150, 500] },
+  { id: 'm_wins', name: 'Victories', stat: 'wins', tiers: [1, 5, 20, 50] },
+  { id: 'm_matches', name: 'Matches played', stat: 'matches', tiers: [5, 25, 100, 300] },
+  { id: 'm_damage', name: 'Damage dealt', stat: 'damage', tiers: [5000, 25000, 100000, 400000] },
+  { id: 'm_chests', name: 'Chests opened', stat: 'chests', tiers: [25, 100, 300, 1000] },
+  { id: 'm_built', name: 'Pieces built', stat: 'built', tiers: [100, 500, 2000, 8000] },
+  { id: 'm_harvest', name: 'Materials harvested', stat: 'harvested', tiers: [1000, 5000, 20000, 80000] },
+  { id: 'm_top10', name: 'Top 10 finishes', stat: 'top10', tiers: [5, 25, 100, 300] },
+];
+export const milestoneReward = (tier) => ({ xp: 1000 * (tier + 1), coins: 100 * (tier + 1) });
 
 export function questDef(q) {
-  const base = QUESTS.find((d) => d.id === q.id);
+  const base = QUESTS.find((d) => d.id === q.id) || WEEKLY.find((d) => d.id === q.id);
   return { ...base, target: q.target ?? base.target, town: q.town, text: base.text.replace('{n}', q.target ?? base.target).replace('{town}', q.town || '') };
 }
 
@@ -93,7 +139,8 @@ export function matchRewards(s) {
   else if (s.place <= 5) { xp.push(['Top 5', 300]); coins.push(['Top 5', 100]); }
   else if (s.place <= 10) { xp.push(['Top 10', 150]); coins.push(['Top 10', 50]); }
   coins.push(['Match played', 25]);
-  if (s.questsDone) { xp.push(['Quests', s.questsDone * QUEST_REWARD.xp]); coins.push(['Quests', s.questsDone * QUEST_REWARD.coins]); }
+  if (s.questsDone) { xp.push(['Daily quests', s.questsDone * QUEST_REWARD.xp]); coins.push(['Daily quests', s.questsDone * QUEST_REWARD.coins]); }
+  if (s.weeklyDone) { xp.push(['Weekly quests', s.weeklyDone * WEEKLY_REWARD.xp]); coins.push(['Weekly quests', s.weeklyDone * WEEKLY_REWARD.coins]); }
   return { xp, coins, totalXp: xp.reduce((a, b) => a + b[1], 0), totalCoins: coins.reduce((a, b) => a + b[1], 0) };
 }
 

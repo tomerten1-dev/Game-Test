@@ -809,6 +809,7 @@ export class Game {
     if (actor.npc) {
       this.hud.killFeed?.(killer, actor);
       this.boss.onDeath(actor);
+      if (killer?.isPlayer && actor.npc === 'boss') this.meta.track('boss');
       this.loot?.dropInventory(actor);
       if (actor === this.spectating) {
         const next = killer && killer.alive && !killer.npc ? killer : this.actors.find((x) => x.alive && !x.npc && !x.isPlayer);

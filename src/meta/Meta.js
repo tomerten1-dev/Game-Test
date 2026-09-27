@@ -1,6 +1,6 @@
 import { Profile } from './Profile.js';
 import { COSMETICS } from './Cosmetics.js';
-import { dailyQuests, questDef, today, matchRewards, applyXp, shopOffers } from './Progression.js';
+import { dailyQuests, weeklyQuests, weekKey, questDef, today, matchRewards, applyXp, shopOffers, MILESTONES, milestoneReward } from './Progression.js';
 
 // Glue between matches and saved progress: tracks in-match events, quests, rewards and the shop.
 export class Meta {
@@ -25,9 +25,29 @@ export class Meta {
 
   quests() { return this.ensureQuests().map((q) => ({ ...q, def: questDef(q) })); }
 
+  ensureWeekly() {
+    const wk = weekKey();
+    const w = this.p.d.weekly;
+    if (!w || w.week !== wk) { this.p.d.weekly = { week: wk, list: weeklyQuests(wk) }; this.p.save(); }
+    return this.p.d.weekly.list;
+  }
+
+  weekly() { return this.ensureWeekly().map((q) => ({ ...q, def: questDef(q) })); }
+
+  // Milestone tiers reached per stat (claimed ones are remembered).
+  milestones() {
+    const st = this.p.d.stats, claimed = this.p.d.milestones || {};
+    return MILESTONES.map((m) => {
+      const v = st[m.stat] || 0;
+      const tier = m.tiers.filter((t) => v >= t).length;
+      return { ...m, value: v, tier, claimed: claimed[m.id] || 0, next: m.tiers[tier] };
+    });
+  }
+
   startMatch() {
     this.ensureQuests();
-    this.match = { kills: 0, damage: 0, chests: 0, supply: 0, harvested: 0, built: 0, heals: 0, circles: 0, questsDone: 0, landed: null };
+    this.ensureWeekly();
+    this.match = { kills: 0, damage: 0, chests: 0, supply: 0, harvested: 0, built: 0, heals: 0, circles: 0, questsDone: 0, weeklyDone: 0, landed: null };
   }
 
   // Report something that happened to the player during a real match (not warm-up).
@@ -45,7 +65,7 @@ export class Meta {
     else if (event === 'circle') m.circles += amount;
     else if (event === 'land') m.landed = extra;
     if (event === 'chest' || event === 'supply') g.hud.pickupNote(`+${event === 'chest' ? 40 : 100} XP`, '#ffd23f');
-    for (const q of this.ensureQuests()) {
+    for (const q of [...this.ensureQuests(), ...this.ensureWeekly()]) {
       if (q.done) continue;
       const def = questDef(q);
       if (def.event !== event) continue;
@@ -53,8 +73,8 @@ export class Meta {
       q.progress = Math.min(def.target, q.progress + amount);
       if (q.progress >= def.target) {
         q.done = true;
-        m.questsDone++;
-        g.hud.banner(`Quest complete! ${def.text}`, 3);
+        if (q.weekly) m.weeklyDone++; else m.questsDone++;
+        g.hud.banner(`${q.weekly ? 'Weekly quest' : 'Quest'} complete! ${def.text}`, 3);
         g.sound.play('buy');
       }
     }
@@ -65,6 +85,7 @@ export class Meta {
   finishMatch({ place, timeAlive }) {
     if (!this.match) this.startMatch();
     if (place <= 10) this._questEvent('top10');
+    if (place === 1) this._questEvent('win');
     const m = this.match;
     this.match = null;
     const s = { ...m, place, timeAlive };
@@ -81,6 +102,19 @@ export class Meta {
     st.harvested += m.harvested || 0;
     st.timeAlive += Math.round(timeAlive);
     st.bestPlace = st.bestPlace ? Math.min(st.bestPlace, place) : place;
+    // milestone tiers reached with this match's stats
+    const claimed = (this.p.d.milestones ||= {});
+    const reached = [];
+    for (const ms of this.milestones()) {
+      for (let t = claimed[ms.id] || 0; t < ms.tier; t++) {
+        const r = milestoneReward(t);
+        rewards.xp.push([`Milestone: ${ms.name} ${ms.tiers[t]}`, r.xp]);
+        rewards.coins.push([`Milestone: ${ms.name}`, r.coins]);
+        rewards.totalXp += r.xp; rewards.totalCoins += r.coins;
+        reached.push(ms.name);
+      }
+      claimed[ms.id] = Math.max(claimed[ms.id] || 0, ms.tier);
+    }
     const before = { level: this.p.d.level, xp: this.p.d.xp };
     this.p.d.coins += rewards.totalCoins;
     const levelUps = applyXp(this.p, rewards.totalXp);
@@ -89,9 +123,11 @@ export class Meta {
   }
 
   _questEvent(event) {
-    for (const q of this.ensureQuests()) {
+    for (const q of [...this.ensureQuests(), ...this.ensureWeekly()]) {
       const def = questDef(q);
-      if (!q.done && def.event === event) { q.progress = def.target; q.done = true; this.match.questsDone++; }
+      if (q.done || def.event !== event) continue;
+      q.progress = Math.min(def.target, q.progress + 1);
+      if (q.progress >= def.target) { q.done = true; if (q.weekly) this.match.weeklyDone++; else this.match.questsDone++; }
     }
   }
 

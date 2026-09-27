@@ -455,3 +455,10 @@ body.touch .kbd { display: none; }
 .ew-item i { font-style: normal; font-size: 22px; color: #ffd23f; }
 .ew-item.on { background: #ffd23f; color: #3a2400; border-color: #fff; }
 .ew-item.on i { color: #3a2400; }
+
+.card-h .h-sub { font-family: var(--num); font-size: 13px; opacity: 0.7; margin-left: 8px; letter-spacing: 0; }
+.quest.weekly { background: rgba(161,92,255,0.12); }
+.milestones { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.ms { padding: 8px 10px; border-radius: 12px; background: rgba(255,255,255,0.06); font-size: 14px; }
+.ms .qt { display: flex; justify-content: space-between; margin-bottom: 4px; } .ms .qt span { color: #ffd23f; letter-spacing: 1px; }
+.ms .xpbar { width: 100%; height: 8px; } .ms small { opacity: 0.8; font-size: 11px; }

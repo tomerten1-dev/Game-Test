@@ -60,6 +60,8 @@ Production build: `npm run build` (output in `dist/`), preview it with `npm run 
 - **Modes:** *Solo* (you vs 19 bots) or *Quick Match* (you vs 9 bots, faster storm). After a short matchmaking screen there's a **20-second warm-up**: everyone spawns with an AR, a shotgun and 100 wood, respawns on death, and nothing counts. Then inventories are wiped and the Storm Bus leaves.
 - **XP & levels:** earned for time survived, eliminations, chests, supply drops, damage, placement and quests; the results screen itemises it. Every level gives Storm Coins, and the **Season 1 reward track** (levels 2–30) unlocks outfits colours, gliders, contrails, emotes, weapon wraps and heroes.
 - **Daily quests:** three per day (e.g. "Open 3 chests", "Land at Candy Corners"), +500 XP and 100 Storm Coins each.
+- **Weekly quests:** seven bigger goals each week (e.g. 25 eliminations, defeat the Foreman, open the vault, win a match), +2000 XP and 250 Storm Coins each.
+- **Milestones:** four-star career goals (eliminations, wins, matches, damage, chests, builds, harvesting, top 10s); every star pays XP and coins on the results screen.
 - **Item Shop — no real money:** Storm Coins are only earned by playing (matches, quests, level-ups). The shop has two featured items (plus a 20% bundle) and six daily items that rotate at midnight; click to preview on your hero, then buy with coins. There is no payment code anywhere in the game.
 - **Locker:** 5 heroes, outfit colours, gliders, contrails, 8 emotes and weapon wraps — all visible in matches.
 - **Career:** matches, wins, top 5/10, eliminations, K/D, damage, chests, builds, harvest, time alive, best placement.

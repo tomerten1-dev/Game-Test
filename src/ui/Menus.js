@@ -1,6 +1,6 @@
 import { SLOTS, COSMETIC_LIST, COSMETICS } from '../meta/Cosmetics.js';
 import { RARITIES } from '../weapons/WeaponDefs.js';
-import { TRACK, SEASON, xpForLevel, QUEST_REWARD } from '../meta/Progression.js';
+import { TRACK, SEASON, xpForLevel, QUEST_REWARD, WEEKLY_REWARD, milestoneReward } from '../meta/Progression.js';
 import { renderSettings } from './Settings.js';
 
 const HERO_ICON = { Knight: '🛡️', Barbarian: '🪓', Mage: '🔮', Rogue: '🗡️', Rogue_Hooded: '🏹' };
@@ -235,6 +235,17 @@ export class Menus {
       <div class="card-h big">Daily quests</div>
       ${quests.map((q) => `<div class="quest ${q.done ? 'done' : ''}"><div class="qt"><b>${q.def.text}</b><span>+${QUEST_REWARD.xp} XP · ${coin}${QUEST_REWARD.coins}</span></div>
         <div class="xpbar"><i style="width:${(q.progress / q.def.target) * 100}%"></i></div><small>${q.done ? 'Complete!' : `${Math.floor(q.progress)} / ${q.def.target}`}</small></div>`).join('')}
+      <div class="card-h big">Weekly quests <small class="h-sub">new set in ${this._weekLeft()}</small></div>
+      ${this.meta.weekly().map((q) => `<div class="quest weekly ${q.done ? 'done' : ''}"><div class="qt"><b>${q.def.text}</b><span>+${WEEKLY_REWARD.xp} XP · ${coin}${WEEKLY_REWARD.coins}</span></div>
+        <div class="xpbar"><i style="width:${(q.progress / q.def.target) * 100}%"></i></div><small>${q.done ? 'Complete!' : `${Math.floor(q.progress).toLocaleString()} / ${q.def.target.toLocaleString()}`}</small></div>`).join('')}
+      <div class="card-h big">Milestones</div>
+      <div class="milestones">${this.meta.milestones().map((m) => {
+    const prev = m.tier ? m.tiers[m.tier - 1] : 0, next = m.next;
+    const pct = next ? ((m.value - prev) / (next - prev)) * 100 : 100;
+    const r = next ? milestoneReward(m.tier) : null;
+    return `<div class="ms"><div class="qt"><b>${m.name}</b><span>${'★'.repeat(m.tier)}${'☆'.repeat(m.tiers.length - m.tier)}</span></div>
+      <div class="xpbar"><i style="width:${Math.min(100, pct)}%"></i></div><small>${next ? `${m.value.toLocaleString()} / ${next.toLocaleString()} · next: +${r.xp} XP, ${r.coins} coins` : 'All tiers done!'}</small></div>`;
+  }).join('')}</div>
       <div class="card-h big">${SEASON.name}</div>
       <div class="track">${levels.map((l) => {
     const r = TRACK[l], c = r.item && COSMETICS[r.item];
@@ -243,6 +254,13 @@ export class Menus {
   }).join('')}</div>`;
     const cur = this.$('#quests .tier:not(.got)');
     cur?.scrollIntoView?.({ inline: 'center', block: 'nearest' });
+  }
+
+  _weekLeft() {
+    const now = new Date(), d = (now.getDay() + 6) % 7;
+    const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() - d + 7);
+    const h = Math.max(0, (next - now) / 3600000);
+    return h > 24 ? `${Math.floor(h / 24)}d ${Math.floor(h % 24)}h` : `${Math.floor(h)}h`;
   }
 
   renderCareer() {

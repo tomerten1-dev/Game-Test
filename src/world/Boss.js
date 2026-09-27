@@ -77,6 +77,7 @@ export class BossEvent {
     if (actor.slot === slot) actor.switchSlot(0);
     v.opened = true;
     v.openT = 0;
+    if (actor.isPlayer) g.meta?.track('vault');
     g.world.colliders.remove(v.doorCol);
     g.sound.play('supply');
     g.hud.banner('VAULT OPENED!', 2.5);
