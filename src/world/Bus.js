@@ -46,6 +46,7 @@ export class Bus {
   constructor(scene) {
     this.mesh = buildBusMesh();
     this.mesh.scale.setScalar(1.4);
+    this.mesh.visible = false;
     scene.add(this.mesh);
     this.pos = new THREE.Vector3();
     this.vel = new THREE.Vector3();

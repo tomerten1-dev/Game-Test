@@ -17,6 +17,9 @@ import { Bus } from '../world/Bus.js';
 import { Loot } from '../world/Loot.js';
 import { Building } from '../world/Building.js';
 import { HUD } from '../ui/HUD.js';
+import { Menus } from '../ui/Menus.js';
+import { TouchControls } from '../ui/TouchControls.js';
+import { isTouch } from './device.js';
 
 export class Game {
   constructor(container) {
@@ -37,6 +40,9 @@ export class Game {
     this.timer = new THREE.Timer();
     this.time = 0;
     this.actors = [];
+    this.bots = [];
+    this.state = 'loading';
+    this.paused = false;
     window.addEventListener('resize', () => this.onResize());
   }
 
@@ -62,8 +68,59 @@ export class Game {
     this._firstMatch = true;
     this.rig = new CameraRig(this.camera, this.world);
     this.focus = new THREE.Vector3();
-    this.startMatch();
+    this.menus = new Menus(ui, this);
+    if (isTouch) {
+      document.body.classList.add('touch');
+      this.touch = new TouchControls(ui, this.input, this);
+    }
+    document.addEventListener('pointerlockchange', () => this.onPointerLockChange());
+    this.state = 'menu';
+    this.menus.showMenu(true);
     progress(1, 'Ready!');
+  }
+
+  // Menu "Play" / end screen "Play Again": new match without reloading the page.
+  play() {
+    this.menus.showMenu(false);
+    this.menus.hideEnd();
+    this.menus.showPause(false);
+    this.paused = false;
+    this.hud.reset();
+    this.startMatch();
+    this.state = 'playing';
+    this.touch?.show(true);
+    if (!isTouch) this.input.requestLock();
+  }
+
+  resume() {
+    this.menus.showPause(false);
+    this.paused = false;
+    if (!isTouch) this.input.requestLock();
+  }
+
+  onPointerLockChange() {
+    if (isTouch) return;
+    if (this.input.locked) {
+      this.paused = false;
+      this.menus.showPause(false);
+    } else if (this.state === 'playing' && this.player?.alive) {
+      this.paused = true;
+      this.input.reset();
+      this.menus.showPause(true);
+    }
+  }
+
+  endMatch(victory, place, killer) {
+    if (this.state !== 'playing') return;
+    this.state = 'ending';
+    const p = this.player;
+    setTimeout(() => {
+      this.state = 'ended';
+      this.touch?.show(false);
+      if (document.pointerLockElement) document.exitPointerLock();
+      this.menus.showEnd({ victory, place, killer: killer?.name, kills: p.kills, time: Math.max(0, this.time - this.matchStart) });
+      this.sound.play(victory ? 'victory' : 'defeat');
+    }, victory ? 2600 : 2200);
   }
 
   startMatch() {
@@ -72,7 +129,7 @@ export class Game {
     this.effects.clear();
     this.time = 0;
     this.stormTick = 0;
-    this.matchOver = false;
+    this.matchStart = 0;
     this.bus.launch();
     this.storm.reset();
     this.building.reset();
@@ -96,7 +153,7 @@ export class Game {
     this.rig.yaw = Math.atan2(-this.bus.vel.x, -this.bus.vel.z) + 0.6;
     this.rig.pitch = -0.25;
     this.hud.show(true);
-    this.hud.banner?.('Press SPACE to jump from the Battle Bus', 6);
+    this.hud.banner(isTouch ? 'Tap JUMP to drop from the Battle Bus' : 'Press SPACE to jump from the Battle Bus', 6);
     this.sound.play('bus');
     this.input.enabled = true;
   }
@@ -131,12 +188,26 @@ export class Game {
   frame() {
     this.timer.update();
     const dt = Math.min(this.timer.getDelta(), 0.05);
-    this.update(dt);
+    if (this.state === 'menu') this.updateMenu(dt);
+    else if (!this.paused) this.update(dt);
     this.renderer.render(this.scene, this.camera);
+  }
+
+  // Slow cinematic orbit behind the start screen.
+  updateMenu(dt) {
+    this.time += dt;
+    const t = this.time * 0.04;
+    this.camera.position.set(Math.cos(t) * 185, 70, Math.sin(t) * 185);
+    this.camera.lookAt(0, 8, 0);
+    this.focus.set(0, 0, 0);
+    this.world.update(dt, this.time, this.focus, this.camera);
+    this.loot.update(dt, this.time);
+    this.effects.update(dt);
   }
 
   update(dt) {
     this.time += dt;
+    if (this.input.pressed('mute')) this.hud.toast(this.sound.toggleMute() ? 'Sound off' : 'Sound on');
     const p = this.player;
     if (p.alive) {
       p.readInput(dt, this.input, this.rig);
@@ -150,7 +221,7 @@ export class Game {
     for (const a of this.actors) if (a.state === 'bus') a.pos.copy(this.bus.pos);
     if (p.state === 'bus' && ((this.input.pressed('jump') && this.bus.canDrop) || !this.bus.active)) {
       p.jumpFromBus(this.bus.pos, this.bus.vel);
-      this.hud.banner?.('Steer with WASD — glider opens automatically', 4);
+      this.hud.banner(isTouch ? 'Steer with the stick — glider opens automatically' : 'Steer with WASD — glider opens automatically', 4);
       this.sound.play('glider');
     }
     for (const b of this.bots) {
@@ -164,7 +235,7 @@ export class Game {
       a.updateMovement(dt);
       for (const w of a.weapons) if (w && w.update(dt) === 'reloaded' && a.isPlayer) this.sound.play('reloaded');
     }
-    const mode = !p.alive ? 'dead' : p.state === 'ground' ? (p.aiming ? 'aim' : 'ground') : p.state;
+    const mode = !p.alive || p.victory ? 'dead' : p.state === 'ground' ? (p.aiming ? 'aim' : 'ground') : p.state;
     this.rig.update(dt, p.state === 'bus' ? this.bus.mesh.position : p.pos, mode);
     for (const a of this.actors) a.updateVisual(dt, this.camera.position);
     this.focus.copy(p.pos);
@@ -239,7 +310,17 @@ export class Game {
     if (killer && killer !== actor) killer.kills++;
     this.hud.killFeed?.(killer, actor);
     this.loot?.dropInventory(actor);
-    if (actor === this.player) this.hud.hurt();
+    if (this.state !== 'playing') return;
+    const p = this.player;
+    if (actor === p) {
+      this.hud.hurt();
+      this.hud.prompt(null);
+      this.endMatch(false, this.aliveCount + 1, killer && killer !== p ? killer : null);
+    } else if (p.alive && this.aliveCount === 1) {
+      p.victory = true;
+      this.hud.banner('#1 VICTORY!', 3);
+      this.endMatch(true, 1, null);
+    }
   }
 
   onResize() {
