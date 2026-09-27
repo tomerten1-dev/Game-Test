@@ -60,13 +60,15 @@ export class Bot extends Actor {
     this.lookT = 0;
     this.push = false;      // enemy is weak / reloading / healing: close in
     this.aimHead = false;
+    this.rushT = 0;         // ramp-rushing a higher / weak enemy
+    this.rushN = 0;
   }
 
   get smartLoot() { return true; }
 
   // Fresh brain for the real match (after the warm-up).
   resetAI() {
-    this.climb = null; this.ninetyCd = 0; this.tunnelCd = 0; this.coneCd = 0;
+    this.climb = null; this.ninetyCd = 0; this.tunnelCd = 0; this.coneCd = 0; this.rushT = 0; this.rushN = 0;
     this.target = null; this.mode = 'idle'; this.hasGoal = false;
     this.boxed = false; this.retreatT = 0; this.exitT = 0; this.peekT = 0; this.peekWall = null;
     this.lootChest = null; this.pickup = null; this.tree = null; this.huntT = 0;
@@ -294,6 +296,32 @@ export class Bot extends Actor {
       }
     }
 
+    // build fights (skilled bots with mats)
+    this.ninetyCd -= THINK;
+    if (this.target && armed && !this.boxed && this.useT <= 0 && this.onGround && g.building && this.skill > 0.35 && !this.climb) {
+      const t = this.target, dd = this.pos.distanceTo(t.pos), above = t.pos.y - this.pos.y;
+      // enemy has height and is close: quick 90s to take it back
+      if (above > 3 && dd < 16 && this.matTotal >= 60 && this.ninetyCd <= 0) {
+        const dir = g.building.do90(this);
+        if (dir) {
+          this.climb = { x: dir.x, z: dir.z, t: dir.dist / 6.4 + 0.15, top: dir.top };
+          this.ninetyCd = 2.2 + Math.random() * 1.5;
+          return;
+        }
+      }
+      // enemy sits in a box next to us: box up too and fight it out through peeks
+      if (t.boxed && dd < 9 && this.matTotal >= 60 && this.buildCooldown <= 0 && this.health + this.shield > 50) {
+        this._boxUp();
+        if (this.boxed) return;
+      }
+      // enemy above at range (or weak): ramp-rush toward them behind walls
+      if ((above > 2 || this.push) && dd > 7 && dd < 38 && this.matTotal >= 40 && this.rushT <= 0 && (above > 2 || g.time - this.lastHurtTime < 3)) {
+        this.rushT = 2.5 + this.skill * 2;
+        this.rushN = 0;
+        this.rushHigh = above > 2; // rushing for height (stop once we have it) vs. pushing under cover
+      }
+    }
+
     // throwables: frag / fire at enemies hiding behind builds, impulse to knock them out of a box
     this.nadeCd = (this.nadeCd || 0) - THINK;
     if (this.target && this.nadeCd <= 0 && this.useT <= 0 && !this.boxed) {
@@ -308,7 +336,15 @@ export class Bot extends Actor {
     // in a box: heal up, peek through windows, leave when it's time
     if (this.boxed) {
       this.boxT += THINK;
-      const walls = this._inBox();
+      let walls = this._inBox();
+      // a wall got shot out: put it back straight away (the side facing the enemy first)
+      if (walls >= 2 && walls < 4 && g.building?.canAfford(this)) {
+        const first = this.target ? this._yawTo(this.target.pos) : 0;
+        for (let k = 0; k < 4; k++) {
+          const yaw = first + (k * Math.PI) / 2;
+          if (!g.building.wallAt(this, yaw) && g.building.buildPiece(this, 'wall', yaw)) walls++;
+        }
+      }
       const needHeal = (this.health < 75 && this.findConsumable('heal') > 0) || (this.shield < 75 && this.findConsumable('shield') > 0);
       const lost = !this.target || g.time - this.lastSeenT > 5;
       if (walls < 2) this.boxed = false;
@@ -318,7 +354,6 @@ export class Bot extends Actor {
       } else {
         this.mode = 'boxed';
         // skilled bots take the high ground with quick 90s instead of sitting tight
-        this.ninetyCd -= THINK;
         const b = g.building;
         if (!needHeal && this.useT <= 0 && this.target && this.skill > 0.3 && this.matTotal >= 60 && this.ninetyCd <= 0 &&
             this.target.pos.y > this.pos.y - 1.5 && this.peekT <= 0 && b) {
@@ -423,7 +458,8 @@ export class Bot extends Actor {
       }
     }
     // gather wood for building when low
-    if (this.matTotal < 40 && g.time - this.landTime > 8) {
+    const matGoal = (g.storm?.phase || 0) >= 3 ? 150 : 90;
+    if (this.matTotal < (this.mode === 'harvest' ? matGoal : matGoal * 0.5) && g.time - this.landTime > 8) {
       if (this.tree && Math.hypot(this.tree.x - this.pos.x, this.tree.z - this.pos.z) > 30) this.tree = null;
       if (!this.tree || this.mode !== 'harvest') this.tree = this._nearestTree(26);
       if (this.tree) {
@@ -694,6 +730,20 @@ export class Bot extends Actor {
           this.coneCd = 3;
           bld.buildPiece(this, 'cone', Math.atan2(dx, dz), 0);
         }
+        // ramp rush: a ramp + a wall in front of it every half second while closing in
+        if (this.rushT > 0) {
+          this.rushT -= dt;
+          this.rushCd = (this.rushCd || 0) - dt;
+          const done = (this.rushHigh && this.pos.y > tgt.pos.y + 1.5) || d < 6 || this.matTotal < 20 || this.rushN >= 5;
+          if (done) this.rushT = 0;
+          else {
+            mx = dx / d; mz = dz / d; wantSprint = false;
+            if (this.rushCd <= 0 && this.onGround) {
+              this.rushCd = 0.55 - this.skill * 0.15;
+              if (bld?.rampRush(this, Math.atan2(dx, dz))) this.rushN++;
+            }
+          }
+        }
         // take the high ground with a ramp when the enemy is above us
         if (tgt.pos.y - this.pos.y > 2.5 && d < 20 && g.building?.canAfford(this) && this.rampCooldown <= 0 && this.onGround && g.building) {
           this.rampCooldown = 3 - this.skill;
@@ -743,7 +793,7 @@ export class Bot extends Actor {
         if (this.held !== this.items[0]) this.switchSlot(0);
         const r = g.combat.melee(this, this.eye(_eye), _dir.set(tx, 0, tz).normalize(), this.tree.r + 2.2);
         if (r) this.tree.hits++;
-        if (this.tree.hits > 6 || this.matTotal >= 80) { this.tree = null; this.mode = 'wander'; this._chooseWeapon(30); }
+        if (this.tree.hits > 6 || this.matTotal >= 160) { this.tree = null; this.mode = 'wander'; this._chooseWeapon(30); }
       }
     }
     if (this.mode !== 'engage' || !tgt) this.crouched = false;

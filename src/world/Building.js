@@ -380,6 +380,22 @@ export class Building {
     return { x: dx, z: dz, dist: Math.max(0.5, GRID / 2 - along - 0.4), top: ramp ? ramp.y0 + HEIGHT : actor.pos.y + 3.5 };
   }
 
+  // Wall on the far edge of a floor-sized cell (e.g. in front of a ramp), at base height y0.
+  edgeWallPlan(cx, cz, dx, dz, y0) {
+    const wx = cx + dx * GRID / 2, wz = cz + dz * GRID / 2, alongX = dx === 0, h = 0.12;
+    const box = alongX ? [wx - 2, wx + 2, y0, y0 + HEIGHT, wz - h, wz + h] : [wx - h, wx + h, y0, y0 + HEIGHT, wz - 2, wz + 2];
+    return { type: 'wall', dirX: dx, dirZ: dz, alongX, cx: wx, cz: wz, y0, box, key: `w:${wx}:${wz}:${alongX ? 1 : 0}:${Math.round(y0 * 4)}` };
+  }
+
+  // Ramp toward yaw plus a wall covering its far end ("ramp rush"). Returns the ramp or null.
+  rampRush(actor, yaw) {
+    const ramp = this.buildPiece(actor, 'ramp', yaw);
+    // the cover wall only makes sense where the ground doesn't already rise past the ramp's base
+    const ex = ramp && ramp.cx + ramp.dirX * GRID / 2, ez = ramp && ramp.cz + ramp.dirZ * GRID / 2;
+    if (ramp && this.canAfford(actor) && this.world.heightAt(ex, ez) < ramp.y0 + 1) this.build(actor, this.edgeWallPlan(ramp.cx, ramp.cz, ramp.dirX, ramp.dirZ, ramp.y0));
+    return ramp;
+  }
+
   // --- helpers used by bots (and touch quick-build) ---
   buildWallFacing(actor, yaw) { return !!this.buildPiece(actor, 'wall', yaw); }
   buildRamp(actor) { return !!this.buildPiece(actor, 'ramp', actor.aimYaw); }
