@@ -131,7 +131,7 @@ Legend: ✅ have · 🟡 partial · ❌ missing · Effort: S (≤½ day) · M (1
 | Account level + XP from matches | ✅ | ❌ | S (localStorage) |
 | Season "pass" with tiers unlocking cosmetics | ✅ | ❌ | M |
 | Daily / weekly quests ("Open 5 chests") | ✅ | ❌ | M |
-| Item shop / currency | ✅ | ❌ | skip (or earnable-only coins) |
+| Item shop / currency | ✅ | ❌ | M — **earnable coins only, no real money** (see Phase E) |
 | Career stats (wins, top 10, K/D, matches) | ✅ | ❌ | S |
 | Settings: sensitivity, key rebinding, audio volumes, FOV, HUD scale | ✅ | 🟡 graphics only | M |
 | News / patch-notes panel | ✅ | ❌ | S |
@@ -178,8 +178,9 @@ Each phase ends with a playable build, a screenshot check and a git commit (same
 3. Locker: hero (5 KayKit heroes), color tint, glider color, contrail, emote picks — saved in localStorage.
 4. XP & levels, end-of-match XP breakdown, career stats page.
 5. Daily quests (3 per day), seasonal reward track unlocking locker items.
-6. Settings: sensitivity, FOV, key rebinding, volume sliders, HUD scale.
-7. Music: lobby theme, bus/drop sting, victory/defeat jingles.
+6. **Item Shop (no real money):** players earn **Storm Coins** from matches (placement, eliminations, quests, level-ups) and spend them on locker cosmetics (hero tints, glider colors, trails, emotes, weapon wraps). Daily rotating offers + featured bundle, preview on your hero, "owned" badges. Everything saved in localStorage; no purchases, no payment code.
+7. Settings: sensitivity, FOV, key rebinding, volume sliders, HUD scale.
+8. Music: lobby theme, bus/drop sting, victory/defeat jingles.
 
 ### Phase F — Scale & modes · ~3+ days
 1. 40–60 bots with stronger LOD (animation + logic tiers).
@@ -188,4 +189,4 @@ Each phase ends with a playable build, a screenshot check and a git commit (same
 4. NPC boss with keycard vault.
 
 ### Not planned (needs servers / licensing)
-Real online multiplayer, friends/party, item shop with real money, replays.
+Real online multiplayer, friends/party, real-money purchases of any kind, replays.
