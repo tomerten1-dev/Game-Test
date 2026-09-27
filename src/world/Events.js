@@ -307,6 +307,10 @@ export class Events {
     for (const s of this.supplies) if (!s.opened) out.push({ x: s.x, z: s.z, color: '#58a6ff', shape: 'square' });
     for (const v of this.vending) out.push({ x: v.x, z: v.z, color: '#4fd1ff', shape: 'vending' });
     for (const p of this.pads) if (p.kind === 'jump') out.push({ x: p.x, z: p.z, color: '#39e0ff', shape: 'dot' });
+    const boss = this.game.boss;
+    if (boss?.boss?.alive) out.push({ x: boss.boss.pos.x, z: boss.boss.pos.z, color: '#ff8a2a', shape: 'square' });
+    const v = boss?.vault;
+    if (v && !v.opened) out.push({ x: v.x, z: v.z, color: '#ffe94d', shape: 'vending' });
     return out;
   }
 

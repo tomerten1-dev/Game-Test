@@ -6,6 +6,7 @@ export const RARITIES = [
   { key: 'rare', name: 'Rare', color: '#3d8dff', mult: 1.16 },
   { key: 'epic', name: 'Epic', color: '#b64cff', mult: 1.25 },
   { key: 'legendary', name: 'Legendary', color: '#ffb52b', mult: 1.34 },
+  { key: 'mythic', name: 'Mythic', color: '#ffe94d', mult: 1.5 }, // boss & vault only
 ];
 
 export const WEAPONS = {

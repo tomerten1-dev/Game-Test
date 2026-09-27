@@ -431,3 +431,9 @@ body.touch .kbd { display: none; }
 
 #edit-hint { position: absolute; left: 50%; top: calc(50% + 70px); transform: translateX(-50%); padding: 6px 14px; border-radius: 10px; background: rgba(10,18,40,0.7); font-weight: 800; font-size: 15px; letter-spacing: 0.5px; color: #bff0ff; white-space: nowrap; }
 #edit-hint b { color: #ffd23f; }
+
+/* boss health bar */
+#bossbar { position: absolute; left: 50%; top: 58px; transform: translateX(-50%); flex-direction: column; align-items: center; gap: 3px; }
+#bossbar b { font-family: var(--title); font-weight: 400; letter-spacing: 1px; font-size: 18px; color: #ffb36b; text-shadow: 0 2px 0 rgba(0,0,0,0.5); }
+#bossbar .bb { display: flex; width: min(360px, 50vw); height: 10px; border-radius: 6px; background: rgba(0,0,0,0.45); overflow: hidden; }
+#bb-health { background: linear-gradient(90deg, #ff6b3d, #ffb36b); } #bb-shield { background: linear-gradient(90deg, #4fb5ff, #8fd3ff); }

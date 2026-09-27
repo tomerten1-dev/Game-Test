@@ -28,6 +28,7 @@ export class HUD {
         </div>
         <div id="scope" class="hidden"><i class="sc-h"></i><i class="sc-v"></i></div>
         <canvas id="compass"></canvas>
+        <div id="bossbar" class="hidden"><b>THE FOREMAN</b><div class="bb"><i id="bb-shield"></i><i id="bb-health"></i></div></div>
         <div id="soundviz"></div>
         <div id="spectate" class="hidden">
           <div class="sp-label">SPECTATING</div>
@@ -346,6 +347,13 @@ export class HUD {
     if (!p) return;
     if (this.hitT > 0) { this.hitT -= dt; if (this.hitT <= 0) this.el.hitmarker.className = ''; }
     this._drawCompass();
+    const boss = g.boss?.boss;
+    const showBoss = !!boss && boss.alive && p.alive && p.pos.distanceTo(boss.pos) < 75;
+    this.set('bossOn', this.root.querySelector('#bossbar').style, showBoss ? 'flex' : 'none', 'display');
+    if (showBoss) {
+      this.set('bbH', this.root.querySelector('#bb-health').style, `${(boss.health / 400) * 66.7}%`, 'width');
+      this.set('bbS', this.root.querySelector('#bb-shield').style, `${(boss.shield / 200) * 33.3}%`, 'width');
+    }
     this._updateSoundViz(dt);
     const sp = g.spectating;
     if (sp) this.set('spinfo', this.spect.info, `${sp.kills} eliminations · ${Math.ceil(sp.health)} HP${sp.shield > 0 ? ` · ${Math.ceil(sp.shield)} shield` : ''}`);

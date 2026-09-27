@@ -23,6 +23,7 @@ export const CONSUMABLES = {
   // thrown / placed items share the consumable stack logic
   grenade: { name: 'Grenade', throw: 'grenade', max: 6, stack: 3, icon: '●', color: '#8fd16a', damage: 70, radius: 5, fuse: 2.2 },
   launchpad: { name: 'Launch Pad', place: 'launchpad', max: 1, stack: 1, icon: '⇑', color: '#ffcf3f' },
+  keycard: { name: 'Vault Keycard', key: true, max: 1, stack: 1, icon: '⌘', color: '#ffe94d' },
 };
 export const CONSUMABLE_TYPES = Object.keys(CONSUMABLES);
 export const HEAL_TYPES = CONSUMABLE_TYPES.filter((k) => CONSUMABLES[k].heal || CONSUMABLES[k].shield);
@@ -52,7 +53,7 @@ export class Consumable {
   // Can this actor benefit right now?
   usableBy(a) {
     const d = this.def;
-    if (d.throw || d.place) return true;
+    if (d.throw || d.place || d.key) return true;
     if (d.heal) return a.health < d.cap;
     return a.shield < d.cap;
   }

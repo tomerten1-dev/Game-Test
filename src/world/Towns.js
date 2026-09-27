@@ -460,6 +460,7 @@ export class Towns {
       this.houses.push({ ...box, x, z, y: gy, h, rot });
       this.chestSpots.push({ x: x + (rot ? w / 2 + 1.8 : 3), z: z + (rot ? 3 : d / 2 + 1.8), rot });
     }
+    this._vault(t, parts);
     // smokestack
     const sx = t.x + 12, sz = t.z + 14, sy = this.terrain.heightAt(sx, sz) - 0.3;
     parts.push(part(new THREE.CylinderGeometry(1.4, 2, 26, 12), '#9a4b33', mat(sx, sy + 13, sz)));
@@ -490,6 +491,32 @@ export class Towns {
       this._lamp(parts, t.x + Math.cos(a) * t.r * 0.55, t.z + Math.sin(a) * t.r * 0.55);
     }
     this.chestSpots.push({ x: t.x, z: t.z, rot: 0 });
+  }
+
+  // Steel vault with a sliding door, opened with the boss's keycard (see Events).
+  _vault(t, parts) {
+    const vx = t.x + 21, vz = t.z + 18, gy = this.terrain.heightAt(vx, vz) - 0.2;
+    const W = 7, D = 7, H = 4.2, th = 0.5, steel = '#5d6b7a', trim = '#ffe94d';
+    const box = (cx, cz, w, d, col = steel) => {
+      parts.push(part(new THREE.BoxGeometry(w, H, d), col, mat(cx, gy + H / 2, cz)));
+      this.colliders.add({ kind: 'box', minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2, y0: gy - 1, y1: gy + H, house: true, mat: 'metal' });
+    };
+    box(vx, vz - D / 2, W, th); // back
+    box(vx - W / 2, vz, th, D); box(vx + W / 2, vz, th, D); // sides
+    box(vx - W / 2 + 1.4, vz + D / 2, 2.8, th); box(vx + W / 2 - 1.4, vz + D / 2, 2.8, th); // front with a door gap
+    parts.push(part(new THREE.BoxGeometry(W + 0.6, 0.5, D + 0.6), '#3d4752', mat(vx, gy + H + 0.25, vz)));
+    parts.push(part(new THREE.BoxGeometry(W + 0.7, 0.2, 0.2), trim, mat(vx, gy + H + 0.05, vz + D / 2 + 0.3)));
+    this.colliders.add({ kind: 'box', minX: vx - W / 2, maxX: vx + W / 2, minZ: vz - D / 2, maxZ: vz + D / 2, y0: gy + H, y1: gy + H + 0.5, house: true, mat: 'metal' });
+    // the door (its own mesh + collider so it can slide open)
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3.4, 0.35), new THREE.MeshStandardMaterial({ color: '#8a96a3', metalness: 0.6, roughness: 0.35, emissive: '#3a2f00', emissiveIntensity: 0.3 }));
+    door.position.set(vx, gy + 1.7, vz + D / 2);
+    door.castShadow = true;
+    this.scene.add(door);
+    const doorCol = { kind: 'box', minX: vx - 0.75, maxX: vx + 0.75, minZ: vz + D / 2 - 0.25, maxZ: vz + D / 2 + 0.25, y0: gy - 1, y1: gy + 3.6, house: true, mat: 'metal' };
+    this.colliders.add(doorCol);
+    parts.push(part(new THREE.BoxGeometry(1.9, 0.25, 0.4), trim, mat(vx, gy + 3.55, vz + D / 2)));
+    this.houses.push({ minX: vx - W / 2, maxX: vx + W / 2, minZ: vz - D / 2, maxZ: vz + D / 2, x: vx, z: vz, y: gy, h: H, rot: 0 });
+    this.vault = { x: vx, z: vz, y: gy, door, doorCol, front: { x: vx, z: vz + D / 2 + 1.2 }, opened: false, town: t };
   }
 
   // Wooden walkway on posts (axis aligned). Walkable via a thin box collider.

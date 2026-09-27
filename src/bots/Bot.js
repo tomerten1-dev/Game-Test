@@ -167,6 +167,7 @@ export class Bot extends Actor {
       return;
     }
     if (this.state !== 'ground') return;
+    if (this.npc) { this._npcThink(); return; }
 
     // --- perception ---
     if (this.target && (!this.target.alive || this.target.state === 'bus')) this.target = null;
@@ -452,6 +453,40 @@ export class Bot extends Actor {
       if (d < bd && this.game.world.heightAt(cx, cz) > 1) { bd = d; best = { x: cx, z: cz, r: c.kind === 'circle' ? c.r : Math.max(c.maxX - c.minX, c.maxZ - c.minZ) / 2, y: c.y0 + 2, hits: 0 }; }
     }
     return best;
+  }
+
+  // Boss / guards: defend a home area, fight anyone who comes close, never loot or rotate.
+  _npcThink() {
+    const g = this.game, L = this.leash, eye = this.eye(_eye);
+    const far = (a) => Math.hypot(a.pos.x - L.x, a.pos.z - L.z) > L.r + 30;
+    if (this.target && (!this.target.alive || far(this.target))) this.target = null;
+    let best = null, bd = 55;
+    for (const a of g.actors) {
+      if (a === this || !a.alive || a.npc || a.state !== 'ground') continue;
+      const d = a.pos.distanceTo(this.pos);
+      if (d < bd && !far(a) && g.world.lineOfSight(eye, a.chest(_tp))) { best = a; bd = d; }
+    }
+    if (best) {
+      if (best !== this.target) this.reactionT = 0.35 + Math.random() * 0.3;
+      this.target = best;
+      this.lastSeenT = g.time;
+      this.lastSeenPos.copy(best.pos);
+      this.targetVisible = true;
+    } else {
+      this.targetVisible = false;
+      if (this.target && g.time - this.lastSeenT > 5) this.target = null;
+    }
+    this._chooseWeapon(this.target ? this.pos.distanceTo(this.target.pos) : 30);
+    if (this.weapon && this.weapon.ammo < this.weapon.def.mag * 0.4 && !this.targetVisible) g.combat.reload(this);
+    const d = this.target ? this.pos.distanceTo(this.target.pos) : 10;
+    const err = (0.25 + d * 0.022) * (1.45 - this.skill * 0.65);
+    this.aimErr.set(Math.random() - 0.5, (Math.random() - 0.5) * 0.8, Math.random() - 0.5).multiplyScalar(err * 2);
+    if (this.target) { this.mode = 'engage'; return; }
+    this.mode = 'wander';
+    if (!this.hasGoal || Math.hypot(this.goal.x - this.pos.x, this.goal.z - this.pos.z) < 2 || Math.random() < 0.02) {
+      const a = Math.random() * Math.PI * 2, r = Math.random() * L.r * 0.45;
+      this.setGoal(L.x + Math.cos(a) * r, L.z + Math.sin(a) * r);
+    }
   }
 
   _chooseWeapon(d) {

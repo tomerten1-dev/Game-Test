@@ -34,6 +34,7 @@ import { LobbyStage } from '../ui/LobbyStage.js';
 import { applySettings } from '../ui/Settings.js';
 import { Pickaxe } from '../weapons/Items.js';
 import { Weapon } from '../weapons/Weapon.js';
+import { BossEvent } from '../world/Boss.js';
 
 const WARMUP_TIME = 20;
 import { isTouch } from './device.js';
@@ -89,6 +90,7 @@ export class Game {
     this.building = new Building(this);
     this.projectiles = new Projectiles(this);
     this.events = new Events(this);
+    this.boss = new BossEvent(this);
     this.ambient = new Ambient(this);
     this._firstMatch = true;
     this.post = new Post(this.renderer, this.scene, this.camera);
@@ -340,6 +342,8 @@ export class Game {
       a.resetAI?.();
     }
     for (const b of this.bots) this._planDrop(b);
+    this.boss.reset();
+    this.boss.spawn();
     this.rig.yaw = Math.atan2(-this.bus.vel.x, -this.bus.vel.z) + 0.6;
     this.rig.pitch = -0.25;
     this.meta.startMatch();
@@ -435,6 +439,7 @@ export class Game {
     this.projectiles.update(dt);
     this.combat.updateBursts(dt);
     if (this.warmup <= 0) this.events.update(dt, this.time);
+    this.boss.update(dt);
     this.ambient.update(dt, this.time);
     for (const a of this.actors) {
       a.updateMovement(dt);
@@ -495,12 +500,13 @@ export class Game {
     }
     if (this.updateBuild(dt)) return;
     if (p.state === 'ground') {
-      const near = this.events.nearestInteractable(p.pos) || this.loot.nearestInteractable(p.pos);
+      const near = this.events.nearestInteractable(p.pos) || this.boss.nearestInteractable(p) || this.loot.nearestInteractable(p.pos);
       const text = !near ? null : near.text || (near.kind === 'chest' ? (near.chest.rare ? 'Open Rare Chest' : 'Open Chest') : near.kind === 'ammobox' ? 'Open Ammo Box' : `Pick up ${this.loot.label(near.pickup)}`);
       this.hud.prompt?.(text, near?.pickup?.weapon?.rarity ?? near?.rarity);
       if (near && input.pressed('interact') && this.warmup > 0) this.hud.toast?.('Loot unlocks when the match starts');
       else if (near && input.pressed('interact')) {
         if (near.kind === 'supply') this.events.openSupply(near.supply, p);
+        else if (near.kind === 'vault') { const msg = this.boss.openVault(p); if (msg) this.hud.toast?.(msg); }
         else if (near.kind === 'vending') { const msg = this.events.buy(near.vending, p); if (msg) this.hud.toast?.(msg); }
         else if (near.kind === 'chest') this.loot.openChest(near.chest, p);
         else if (near.kind === 'ammobox') this.loot.openAmmoBox(near.box, p);
@@ -517,6 +523,10 @@ export class Game {
         p.bodyYaw = p.aimYaw;
         p.throwHeld(dir);
       }
+      return;
+    }
+    if (held.isConsumable && held.def.key) {
+      if (input.pressed('fire')) this.hud.toast?.('Take it to the vault at Rusty Works');
       return;
     }
     if (held.isConsumable && held.def.place) {
@@ -706,7 +716,8 @@ export class Game {
     }
   }
 
-  get aliveCount() { return this.actors.reduce((n, a) => n + (a.alive ? 1 : 0), 0); }
+  // Players still in the match (NPC boss and guards don't count).
+  get aliveCount() { return this.actors.reduce((n, a) => n + (a.alive && !a.npc ? 1 : 0), 0); }
 
   onActorDied(actor, killer) {
     this.effects.eliminate(actor.pos, actor.color);
@@ -716,6 +727,16 @@ export class Game {
       this.hud.killFeed?.(killer, actor);
       this.respawns.push({ a: actor, t: this.time + 2.5 });
       if (actor.isPlayer) this.hud.banner('Respawning…', 2);
+      return;
+    }
+    if (actor.npc) {
+      this.hud.killFeed?.(killer, actor);
+      this.boss.onDeath(actor);
+      this.loot?.dropInventory(actor);
+      if (actor === this.spectating) {
+        const next = killer && killer.alive && !killer.npc ? killer : this.actors.find((x) => x.alive && !x.npc && !x.isPlayer);
+        if (next) this.startSpectate(next);
+      }
       return;
     }
     if (killer?.isPlayer && actor !== killer) this.meta.track('kill');
