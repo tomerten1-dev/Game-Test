@@ -485,6 +485,23 @@ export class Bot extends Actor {
         if (box) loot.openAmmoBox(box, this);
       }
     }
+    // spare materials and a bench nearby: upgrade the best gun
+    if (armed && this.matTotal >= 250 && (this.benchCd || 0) < g.time && g.events?.benches?.length) {
+      const bench = g.events.nearestBench(this.pos, 35);
+      const gun = this.items.filter((it) => it?.isGun && it.rarity < 4).sort((a, b) => b.score - a.score)[0];
+      const cost = gun && g.events.constructor.upgradeCost(gun);
+      if (bench && cost && this.mats[cost[0]] >= cost[1]) {
+        this.mode = 'upgrade';
+        this.setGoal(bench.x, bench.z);
+        if (Math.hypot(bench.x - this.pos.x, bench.z - this.pos.z) < 2.6) {
+          this.switchSlot(this.items.indexOf(gun));
+          g.events.upgrade(bench, this);
+          this.benchCd = g.time + 20;
+        }
+        return;
+      }
+    }
+
     // third-party: go where the shooting is (only when healthy enough to take another fight)
     if (armed && this.health + this.shield >= 80) {
       if (this.huntT > 0 && Math.hypot(this.huntPos.x - this.pos.x, this.huntPos.z - this.pos.z) > 6) {

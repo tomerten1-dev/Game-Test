@@ -13,6 +13,8 @@ const _fc = new THREE.Color();
 const DROP_TIMES = [90, 220, 350, 460]; // seconds after the bus leaves
 const FALL_SPEED = 5.5;
 const VEND_PRICES = [0, 0, 100, 200, 300]; // by rarity (rare+)
+// upgrade bench: cost to go from rarity i to i + 1
+const UPGRADE_COST = { 0: ['wood', 100], 1: ['stone', 150], 2: ['metal', 200], 3: ['metal', 300] };
 const VEND_MATS = ['wood', 'stone', 'metal'];
 
 function labelTexture(lines, colors) {
@@ -43,10 +45,12 @@ export class Events {
     this.pads = [];      // jump pads (world) + launch pads (placed)
     this.zones = [];     // placed shield kegs / campfires
     this.vending = [];
+    this.benches = [];   // upgrade benches (materials -> weapon rarity)
     this.dropIdx = 0;
     this.padMat = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.5 });
     this._createJumpPads();
     this._createVending();
+    this._createBenches();
   }
 
   // ---------- helpers ----------
@@ -211,6 +215,72 @@ export class Events {
     }
   }
 
+  // ---------- upgrade benches ----------
+  _createBenches() {
+    const wood = new THREE.MeshStandardMaterial({ color: '#9a6a3f', roughness: 0.8 });
+    const dark = new THREE.MeshStandardMaterial({ color: '#5a3b22', roughness: 0.85 });
+    const steel = new THREE.MeshStandardMaterial({ color: '#8a96a3', roughness: 0.35, metalness: 0.6 });
+    const glow = new THREE.MeshStandardMaterial({ color: '#ffb52b', emissive: '#ffb52b', emissiveIntensity: 1.2 });
+    const towns = [...TOWNS].sort((a, b) => b.name.localeCompare(a.name)).slice(0, 7);
+    for (const t of towns) {
+      let spot = null;
+      for (let i = 0; i < 160 && !spot; i++) {
+        const a = i * 2.39 + 1.3, d = t.r * (0.2 + (i % 9) * 0.08);
+        const x = t.x + Math.cos(a) * d, z = t.z + Math.sin(a) * d;
+        if (this._clearSpot(x, z, 1.8, 0.85) && !this.vending.some((v) => Math.hypot(v.x - x, v.z - z) < 8)) spot = { x, z };
+      }
+      if (!spot) continue;
+      const y = this.world.heightAt(spot.x, spot.z);
+      const g = new THREE.Group();
+      const add = (geo, m, x, yy, z) => { const mesh = new THREE.Mesh(geo, m); mesh.position.set(x, yy, z); mesh.castShadow = mesh.receiveShadow = true; g.add(mesh); return mesh; };
+      add(new THREE.BoxGeometry(2.2, 0.16, 1.0), wood, 0, 0.95, 0);
+      for (const [lx, lz] of [[-0.95, -0.38], [0.95, -0.38], [-0.95, 0.38], [0.95, 0.38]]) add(new THREE.BoxGeometry(0.14, 0.9, 0.14), dark, lx, 0.45, lz);
+      add(new THREE.BoxGeometry(2.0, 0.08, 0.8), dark, 0, 0.3, 0);
+      add(new THREE.BoxGeometry(0.34, 0.22, 0.3), steel, -0.6, 1.14, 0); // vise
+      add(new THREE.BoxGeometry(0.5, 0.2, 0.28), steel, 0.5, 1.13, 0.05); // anvil
+      add(new THREE.BoxGeometry(0.3, 0.1, 0.2), steel, 0.5, 1.28, 0.05);
+      add(new THREE.CylinderGeometry(0.1, 0.1, 0.04, 16), glow, 0.05, 1.05, -0.3);
+      const rot = Math.atan2(t.x - spot.x, t.z - spot.z);
+      g.rotation.y = rot;
+      g.position.set(spot.x, y, spot.z);
+      const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture(['UPGRADE BENCH', 'Materials → rarity'], ['#ffb52b', '#ffffff']), transparent: true, depthWrite: false }));
+      label.scale.set(2.6, 0.95, 1); label.position.set(0, 2.4, 0); g.add(label);
+      this.scene.add(g);
+      this.world.colliders.add({ kind: 'box', minX: spot.x - 1.1, maxX: spot.x + 1.1, minZ: spot.z - 1.1, maxZ: spot.z + 1.1, y0: y - 0.5, y1: y + 1.05, crate: true });
+      this.benches.push({ x: spot.x, z: spot.z, y, rot, group: g });
+    }
+  }
+
+  // Cost to take a gun from its rarity to the next one (Legendary is the top; Mythics can't be upgraded).
+  static upgradeCost(w) {
+    return w?.isGun && w.rarity < 4 ? UPGRADE_COST[w.rarity] : null;
+  }
+
+  upgrade(bench, actor) {
+    if (this.game.warmup > 0) return 'Benches open when the match starts';
+    const w = actor.held;
+    const cost = Events.upgradeCost(w);
+    if (!w?.isGun) return 'Hold the weapon you want to upgrade';
+    if (!cost) return w.rarity >= 5 ? "Mythic weapons can't be upgraded" : 'Already Legendary';
+    const [mat, n] = cost;
+    if (actor.mats[mat] < n) return `Need ${n} ${mat}`;
+    actor.mats[mat] -= n;
+    const nw = new Weapon(w.type, w.rarity + 1);
+    nw.ammo = Math.max(w.ammo, Math.min(nw.def.mag, w.ammo));
+    actor.items[actor.slot] = nw;
+    actor._equip();
+    const at = _v.set(bench.x, bench.y + 1.3, bench.z);
+    this.game.effects.shieldBreak?.(at);
+    this.game.sound.play('buy', actor.isPlayer ? null : actor.pos);
+    return null;
+  }
+
+  nearestBench(pos, maxD) {
+    let best = null, bd = maxD;
+    for (const b of this.benches) { const d = Math.hypot(b.x - pos.x, b.z - pos.z); if (d < bd) { bd = d; best = b; } }
+    return best;
+  }
+
   _rollOffers(v) {
     v.offers = [0, 1, 2].map((k) => {
       const rarity = 2 + k;
@@ -345,6 +415,18 @@ export class Events {
         best = { kind: 'vending', vending: v, text: `Buy ${RARITIES[o.rarity].name} ${WEAPONS[o.type].name} · ${o.price} ${o.mat}`, rarity: o.rarity };
       }
     }
+    for (const b of this.benches) {
+      const d = Math.hypot(b.x - pos.x, b.z - pos.z);
+      if (d < bd + 0.8 && Math.abs(b.y - pos.y) < 2.5) {
+        const w = this.game.player?.held, cost = Events.upgradeCost(w);
+        bd = d;
+        best = {
+          kind: 'bench', bench: b, rarity: w?.isGun ? Math.min(4, w.rarity + (cost ? 1 : 0)) : 4,
+          text: !w?.isGun ? 'Upgrade Bench · hold a weapon' : !cost ? `${w.name} · can't upgrade further`
+            : `Upgrade to ${RARITIES[w.rarity + 1].name} ${WEAPONS[w.type].name} · ${cost[1]} ${cost[0]}`,
+        };
+      }
+    }
     return best;
   }
 
@@ -363,6 +445,7 @@ export class Events {
     const out = [];
     for (const s of this.supplies) if (!s.opened) out.push({ x: s.x, z: s.z, color: '#58a6ff', shape: 'square' });
     for (const v of this.vending) out.push({ x: v.x, z: v.z, color: '#4fd1ff', shape: 'vending' });
+    for (const b of this.benches) out.push({ x: b.x, z: b.z, color: '#ffb52b', shape: 'vending' });
     for (const p of this.pads) if (p.kind === 'jump') out.push({ x: p.x, z: p.z, color: '#39e0ff', shape: 'dot' });
     const boss = this.game.boss;
     if (boss?.boss?.alive) out.push({ x: boss.boss.pos.x, z: boss.boss.pos.z, color: '#ff8a2a', shape: 'square' });
