@@ -22,7 +22,7 @@ const Q_ANIM = {
   Cheer: 'Yes', Spellcasting: 'Spell_Simple_Idle_Loop', Spellcast_Raise: 'Spell_Simple_Idle_Loop', Spellcast_Long: 'Spell_Simple_Shoot',
   Sit_Floor_Idle: 'Sitting_Idle_Loop', Lie_Idle: 'Idle_No_Loop',
 };
-const Q_SKIN = ['#e8b894', '#c68e67', '#8d5a3b', '#f1c9a5', '#b07650'];
+const Q_SKIN = ['#8a5a3e', '#7a4d34', '#95654a']; // close to the outfits' skin texture
 // hand slot on the UAL right-hand bone (bone-local, before the model scale), tuned so held tools
 // sit like they do in the KayKit hand slot
 // (measured against the KayKit slot in the idle and aiming poses)
@@ -51,8 +51,10 @@ export class CharacterAssets {
     if (!man || !skel) return null;
     const bones = man.skeleton.bones.map((b) => skel.bones.find((x) => x.name === b.name));
     if (bones.some((b) => !b)) return null;
-    const neckIdx = man.skeleton.bones.findIndex((b) => b.name === 'neck_01');
-    const neckY = new THREE.Matrix4().copy(man.skeleton.boneInverses[neckIdx]).invert().elements[13];
+    const bindY = (name) => new THREE.Matrix4().copy(man.skeleton.boneInverses[man.skeleton.bones.findIndex((b) => b.name === name)]).invert().elements[13];
+    const neckY = bindY('neck_01');
+    man.geometry.computeBoundingBox();
+    const headAbove = man.geometry.boundingBox.max.y - bindY('Head'); // head bone -> top of the head
     const mat = new THREE.MeshStandardMaterial({ color: '#e8b894', roughness: 0.55 });
     mat.name = 'MI_QHead';
     mat.userData.cut = neckY + 0.05;
@@ -61,6 +63,7 @@ export class CharacterAssets {
     const parent = skel.bones[0].parent;
     parent.add(mesh);
     mesh.bind(new THREE.Skeleton(bones, man.skeleton.boneInverses), new THREE.Matrix4());
+    mesh.userData.headAbove = headAbove;
     return mesh;
   }
 
@@ -106,7 +109,7 @@ export class CharacterAssets {
         g.scene.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(g.scene);
         const h = Math.max(1.75, box.max.y - box.min.y);
-        a.types[t] = { scene: g.scene, scale: HEIGHT / h, footOffset: (-box.min.y * HEIGHT) / h, q: true, head };
+        a.types[t] = { scene: g.scene, scale: HEIGHT / h, footOffset: (-box.min.y * HEIGHT) / h, q: true, head, headAbove: (head?.userData.headAbove ?? 0.2) + (t.includes('Ranger') ? 0.06 : 0) };
       });
     }
     // legacy fields used elsewhere
@@ -134,6 +137,7 @@ export class Character {
 
     this.materials = [];
     this.q = !!src.q;
+    this.headAbove = (src.headAbove || 0) * src.scale; // Quaternius rig: head bone -> top of head (hood)
     this.clips = this.q ? assets.q : assets;
     const tintColor = new THREE.Color(1, 1, 1).lerp(this.color, tint);
     const skin = new THREE.Color(Q_SKIN[Math.floor(Math.random() * Q_SKIN.length)]);
@@ -261,7 +265,11 @@ export class Character {
   }
 
   update(dt, pitch = 0, armed = false, crouch = 0) {
+    // undo last frame's torso bend first: clips that don't key the chest bone would otherwise let
+    // the bend pile up frame after frame (the character spins)
+    if (this.chestBone && this._chestRest) this.chestBone.quaternion.copy(this._chestRest);
     this.mixer.update(dt);
+    if (this.chestBone) (this._chestRest ||= new THREE.Quaternion()).copy(this.chestBone.quaternion);
     if (this.weaponMesh) this.weaponMesh.visible = this.inHand || armed;
     const bend = (armed ? -pitch * 0.55 : 0) + crouch * 0.35;
     if (this.chestBone && Math.abs(bend) > 0.001) {

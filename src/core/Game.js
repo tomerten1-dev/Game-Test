@@ -512,9 +512,6 @@ export class Game {
     else if (this.inv.open && (this.input.pressed('pause') || !p.alive)) this.toggleInventory(false);
     if (this.inv.open) this.inv.tick(dt);
     if (this.spectating) this.updateSpectate(dt);
-    // final circles: tense music
-    if (this.state === 'playing' && p.alive && !p.victory && p.state !== 'bus' && this.warmup <= 0 &&
-        (this.storm.phase >= 4 || this.aliveCount <= 8) && this.sound.musicName !== 'endgame') this.sound.music('endgame');
     if (this.warmup > 0) this.updateWarmup(dt);
     this.updateEmoteWheel(dt);
     if (p.alive) {

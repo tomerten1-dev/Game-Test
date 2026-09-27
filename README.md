@@ -89,7 +89,7 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 - **Results screen:** medals (First Blood, Sharpshooter, Headhunter, Marksman, Rampage, Demolition, Lumberjack, Boss Slayer…, each worth XP) and match stats (accuracy, headshots, damage to players and builds, longest elimination).
 - **Career:** matches, wins, top 5/10, eliminations, K/D, damage, chests, builds, harvest, time alive, best placement.
 - **Settings:** mouse sensitivity, field of view, master/music volume, HUD scale, graphics, sound visualizer and full **key rebinding**. Everything (progress, locker, settings) is saved in your browser.
-- **Music:** a rotating lobby playlist, a guitar battle theme on the Battle Bus, a boss theme for the final circles and victory / defeat jingles.
+- **Music:** a rotating lobby playlist, a guitar battle theme on the Battle Bus and victory / defeat jingles (no music during the match itself). Sounds are only heard close by (about 40 m at most).
 
 ## Loot & world events
 
@@ -192,5 +192,5 @@ public/models/        models: chars/ (KayKit heroes), kk/ (KayKit world), env/ (
   - **Quaternius Modular Character Outfits (Fantasy)** and **Universal Animation Library 1 & 2** (CC0): the player and bot characters, their animations and the mannequin heads. See `public/models/outfits/CREDITS.md` and `public/models/anims/CREDITS.md`.
   - **KayKit Resource Bits** (CC0): lumber, stone, fuel and scrap piles. See `public/models/res/CREDITS.md`.
   - **Procedural:** far-away round/autumn trees, bushes, grass, the bus, fences, fountains and lamps are built from low-poly shapes.
-  - **Audio:** CC0 Kenney sound samples plus synthesized effects (see `public/audio/CREDITS.md`), the chest hum and chest-opening sounds (clips of Fortnite's, provided by the project owner, not CC0), music from the Sitting on Clouds OST by Rom Di Prisco for the lobby and the Battle Bus (provided by the project owner, not CC0), and CC0 music for the final circles and the victory / defeat jingles (see `public/audio/music/CREDITS.md`).
+  - **Audio:** CC0 Kenney sound samples plus synthesized effects (see `public/audio/CREDITS.md`), the chest hum and chest-opening sounds (clips of Fortnite's, provided by the project owner, not CC0), music from the Sitting on Clouds OST by Rom Di Prisco for the lobby and the Battle Bus (provided by the project owner, not CC0), and CC0 victory / defeat jingles (see `public/audio/music/CREDITS.md`).
 

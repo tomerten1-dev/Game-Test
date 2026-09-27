@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { attachHat, attachBackBling, makeHarvestTool, HEAD_TOP } from '../player/Gear.js';
+import { attachHat, attachBackBling, makeHarvestTool, headAnchor } from '../player/Gear.js';
 import { makeCrownMesh } from '../world/ItemMeshes.js';
 import { Character } from '../player/Character.js';
 import { makeGlider } from '../player/Glider.js';
@@ -94,7 +94,7 @@ export class LobbyStage {
     x.beginPath(); x.roundRect(8, 12, 496, 104, 26); x.fill();
     x.textAlign = 'center';
     x.fillStyle = '#ffffff'; x.font = 'bold 44px sans-serif'; x.fillText(name, 256, 62);
-    x.fillStyle = '#ffd23f'; x.font = 'bold 28px sans-serif'; x.fillText(`LEVEL ${level}${wins ? `  ·  👑 ${wins}` : ''}`, 256, 100);
+    x.fillStyle = '#ffd23f'; x.font = 'bold 28px sans-serif'; x.fillText(`LEVEL ${level}${wins ? `  ·  ${wins} WIN${wins === 1 ? '' : 'S'}` : ''}`, 256, 100);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
     this.plate.material.map?.dispose();
     this.plate.material.map = t;
@@ -114,7 +114,7 @@ export class LobbyStage {
       this.heroRoot.add(this.character.root);
       if (look.hat) attachHat(this.character, look.hat);
       if (look.backbling) attachBackBling(this.character, look.backbling);
-      if (look.crowned) { const c = makeCrownMesh(); c.position.set(0, HEAD_TOP + (look.hat ? 0.12 : -0.08), 0); this.character.root.add(c); this.character.root.updateMatrixWorld(true); this.character.head?.attach(c); }
+      if (look.crowned) { const c = makeCrownMesh(); c.position.copy(headAnchor(this.character, look.hat ? 0.12 : -0.08)); this.character.root.add(c); this.character.root.updateMatrixWorld(true); this.character.head?.attach(c); }
       this.character.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     }
     if (this.glider) this.character.root.remove(this.glider);

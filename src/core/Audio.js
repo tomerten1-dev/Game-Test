@@ -3,7 +3,9 @@
 
 // Music (public/audio/music, see CREDITS.md). Loops fade in and out; jingles play once; a playlist
 // plays its files one after another (a different one each time it starts).
-const MUSIC_TRACKS = { lobby: { playlist: ['menu', 'title', 'title_alt'], gain: 0.75 }, bus: { file: 'battle', loop: true, gain: 0.75 }, endgame: { loop: true, gain: 0.7 }, victory: { loop: false, gain: 1 }, defeat: { loop: false, gain: 1 } };
+const MUSIC_TRACKS = { lobby: { playlist: ['menu', 'title', 'title_alt'], gain: 0.75 }, bus: { file: 'battle', loop: true, gain: 0.75 }, victory: { loop: false, gain: 1 }, defeat: { loop: false, gain: 1 } };
+// Sounds are only heard close by: every range is cut to about a third, and nothing carries past 40 m.
+const hearRange = (range = 110) => Math.min(40, range * 0.35);
 const SAMPLE_FILES = ['blaster', 'blaster_repeater', 'enemy_destroy', 'enemy_hurt', 'jump_a', 'jump_b', 'jump_c', 'land', 'walking', 'weapon_change', 'coin', 'break', 'fall', 'impact', 'engine', 'ui-tap', 'build', 'chest_open', 'chest_hum'];
 // sound name -> [sample, playbackRate, gain, (optional) synth layer too]
 const SAMPLE_MAP = {
@@ -340,13 +342,13 @@ export class Sound {
   play(name, pos = null, opts = {}) {
     // visual sound cues work even when muted or before audio is unlocked
     if (pos && this.onPositional) {
-      const vv = this._vol(pos, opts.range || 110) * (opts.vol ?? 1);
+      const vv = this._vol(pos, hearRange(opts.range)) * (opts.vol ?? 1);
       if (vv > 0.02) this.onPositional(name, pos, vv);
     }
     if (this.muted || !this.ctx || this.ctx.state !== 'running') return;
     const ctx = this.ctx;
     const t = ctx.currentTime;
-    let v = pos ? this._vol(pos, opts.range || 110) : 1;
+    let v = pos ? this._vol(pos, hearRange(opts.range)) : 1;
     if (opts.vol != null) v *= opts.vol;
     if (v <= 0.01) return;
     // positional sounds pan left/right relative to the camera

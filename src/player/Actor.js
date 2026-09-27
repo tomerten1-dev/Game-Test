@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { makeCrownMesh } from '../world/ItemMeshes.js';
-import { attachHat, attachBackBling, makeHarvestTool, HEAD_TOP } from './Gear.js';
+import { attachHat, attachBackBling, makeHarvestTool, headAnchor } from './Gear.js';
 import { Character } from './Character.js';
 import { makeGlider } from './Glider.js';
 import { damp, dampAngle } from '../core/noise.js';
@@ -455,7 +455,7 @@ export class Actor {
     if (on && !this.crownMesh) {
       const c = makeCrownMesh();
       const ch = this.character;
-      c.position.set(0, HEAD_TOP - (this.hat ? -0.12 : 0.08), 0);
+      c.position.copy(headAnchor(ch, this.hat ? 0.12 : -0.08));
       ch.root.add(c);
       ch.root.updateMatrixWorld(true);
       if (ch.head) ch.head.attach(c);

@@ -166,6 +166,16 @@ export function makeBackBling(id) {
   return g;
 }
 
+// Root-space point on top of the head (hats, the crown sit here). The Quaternius rig is measured
+// from its head bone; the KayKit heroes all share HEAD_TOP.
+export function headAnchor(character, lift = 0) {
+  if (!character.q || !character.head) return new THREE.Vector3(0, HEAD_TOP + lift, 0);
+  character.root.updateMatrixWorld(true);
+  const p = character.head.getWorldPosition(new THREE.Vector3());
+  character.root.worldToLocal(p);
+  return p.set(0, p.y + character.headAbove + lift, p.z);
+}
+
 // Attach a back bling to a character (root space, then parented to the torso bone).
 export function attachBackBling(character, id) {
   const g = makeBackBling(id);
@@ -173,6 +183,13 @@ export function attachBackBling(character, id) {
   const wrap = new THREE.Group();
   wrap.add(g);
   wrap.position.set(0, id === 'cape' ? 1.02 : 0.78, id === 'cape' ? -0.2 : -0.24);
+  if (character.q && character.chestBone) {
+    // human proportions: hang it from the upper back
+    character.root.updateMatrixWorld(true);
+    const c = character.root.worldToLocal(character.chestBone.getWorldPosition(new THREE.Vector3()));
+    wrap.position.set(0, c.y + (id === 'cape' ? 0.12 : -0.12), c.z + (id === 'cape' ? -0.12 : -0.17));
+    wrap.scale.setScalar(0.85);
+  }
   character.root.add(wrap);
   character.root.updateMatrixWorld(true);
   const torso = character.chestBone || character.spine;
@@ -183,7 +200,7 @@ export function attachBackBling(character, id) {
 export function attachHat(character, id) {
   const g = makeHat(id);
   if (!g) return null;
-  g.position.set(0, HEAD_TOP, 0);
+  g.position.copy(headAnchor(character));
   character.root.add(g);
   character.root.updateMatrixWorld(true);
   if (character.head) character.head.attach(g);
