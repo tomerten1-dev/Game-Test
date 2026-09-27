@@ -296,7 +296,11 @@ export class Loot {
   }
 
   update(dt, t) {
+    const cam = this.game.camera.position;
     for (const c of this.chests) {
+      const d2 = (c.x - cam.x) ** 2 + (c.z - cam.z) ** 2;
+      c.group.visible = d2 < 150 * 150;
+      if (!c.group.visible && !(c.opened && c.openT < 1)) continue;
       if (c.opened && c.openT < 1) {
         c.openT = Math.min(1, c.openT + dt * 3);
         const k = 1 - Math.pow(1 - c.openT, 3);
@@ -309,6 +313,9 @@ export class Loot {
     for (const p of this.pickups) {
       if (!p.alive) continue;
       p.age += dt;
+      const far = (p.pos.x - cam.x) ** 2 + (p.pos.z - cam.z) ** 2 > 85 * 85;
+      p.group.visible = !far;
+      if (far && p.settled) continue;
       if (!p.settled) {
         p.vel.y -= 18 * dt;
         p.pos.addScaledVector(p.vel, dt);

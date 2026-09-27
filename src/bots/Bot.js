@@ -74,13 +74,13 @@ export class Bot extends Actor {
     let best = null, bestD = SIGHT;
     // aggression ramps up after landing: early on bots mostly loot
     if (this.landTime === undefined) this.landTime = g.time;
-    const calm = Math.min(1, (g.time - this.landTime) / 100);
-    const sight = 22 + (SIGHT - 22) * calm;
+    const calm = Math.min(1, (g.time - this.landTime) / 140);
+    const sight = 18 + (SIGHT - 18) * calm;
     const cands = [];
     for (const a of g.actors) {
       if (a === this || !a.alive || a.state === 'bus') continue;
       const d = a.pos.distanceTo(this.pos);
-      const range = a === this.target ? SIGHT + 30 : a.isPlayer ? sight + 10 : sight * 0.8;
+      const range = a === this.target ? SIGHT + 30 : a.isPlayer ? sight + 12 : calm < 0.4 ? 7 : sight * 0.7;
       if (d < range) cands.push([d, a]);
     }
     cands.sort((a, b) => a[0] - b[0]);
