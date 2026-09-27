@@ -41,6 +41,7 @@ export class Destructibles {
     o.hp -= amount;
     if (o.hp > 0) return false;
     this.destroy(o, by);
+    if (by?.isPlayer && o.kind === 'tree') this.game?.meta?.track('tree');
     return true;
   }
 

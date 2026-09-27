@@ -1,6 +1,6 @@
 import { SLOTS, COSMETIC_LIST, COSMETICS } from '../meta/Cosmetics.js';
 import { RARITIES } from '../weapons/WeaponDefs.js';
-import { TRACK, SEASON, xpForLevel, QUEST_REWARD, WEEKLY_REWARD, milestoneReward } from '../meta/Progression.js';
+import { TRACK, SEASON, xpForLevel, QUEST_REWARD, WEEKLY_REWARD, milestoneReward, arenaDivision } from '../meta/Progression.js';
 import { renderSettings } from './Settings.js';
 
 const HERO_ICON = { Knight: '🛡️', Barbarian: '🪓', Mage: '🔮', Rogue: '🗡️', Rogue_Hooded: '🏹' };
@@ -59,6 +59,7 @@ export class Menus {
                 <button class="mode" data-mode="solo"><b>Solo</b><span>You vs 99 bots</span></button>
                 <button class="mode" data-mode="quick"><b>Quick Match</b><span>You vs 29 bots · faster storm</span></button>
                 <button class="mode" data-mode="zb"><b>Zero Build</b><span>No building · 50 overshield</span></button>
+                <button class="mode arena" data-mode="arena"><b>Arena</b><span id="arena-div">Ranked · Open I</span></button>
               </div>
               <button id="play-btn" class="btn big">PLAY</button>
               <div class="sub">Straight onto the Storm Bus</div>
@@ -142,6 +143,8 @@ export class Menus {
     $('#lb-xpfill').style.width = `${Math.min(100, (d.xp / xpForLevel(d.level)) * 100)}%`;
     $('#lb-xptext').textContent = `${d.xp} / ${xpForLevel(d.level)} XP`;
     $('#lb-coins').textContent = d.coins.toLocaleString();
+    const ad = arenaDivision(d.arena?.points || 0);
+    $('#arena-div').innerHTML = `<i style="color:${ad.color}">${ad.name}</i> · ${d.arena?.points || 0} Hype`;
     const quests = this.meta.quests();
     $('#qmini').innerHTML = quests.map((q) => `<div class="qrow ${q.done ? 'done' : ''}"><span>${q.def.text}</span><b>${q.done ? '✓' : `${Math.floor(q.progress)}/${q.def.target}`}</b></div>`).join('');
     if (this.tab === 'locker') this.renderLocker();
@@ -276,7 +279,10 @@ export class Menus {
       ['Time alive', `${Math.floor(s.timeAlive / 3600)}h ${Math.floor((s.timeAlive % 3600) / 60)}m`], ['Best placement', s.bestPlace ? `#${s.bestPlace}` : '—'],
       ['Storm Coins', d.coins], ['Items owned', `${d.owned.length} / ${COSMETIC_LIST.length}`],
     ];
-    this.$('#career').innerHTML = `<div class="card-h big">Career</div><div class="stats">${rows.map(([k, v]) => `<div><b>${v}</b><span>${k}</span></div>`).join('')}</div>`;
+    const A = d.arena || { points: 0, best: 0, matches: 0, wins: 0 }, ad = arenaDivision(A.points);
+    const arena = [['Division', `<i style="color:${ad.color}">${ad.name}</i>`], ['Hype', A.points], ['Best Hype', A.best], ['Arena matches', A.matches], ['Arena wins', A.wins], ['Crowned wins', s.crownedWins || 0]];
+    this.$('#career').innerHTML = `<div class="card-h big">Career</div><div class="stats">${rows.map(([k, v]) => `<div><b>${v}</b><span>${k}</span></div>`).join('')}</div>
+      <div class="card-h">Arena</div><div class="stats">${arena.map(([k, v]) => `<div><b>${v}</b><span>${k}</span></div>`).join('')}</div>`;
   }
 
   // ---- screens ----
@@ -310,16 +316,36 @@ export class Menus {
     const el = $('end-rewards');
     if (r) {
       const d = this.meta.profile.d;
+      const st = r.stats || {};
+      const acc = st.shots ? Math.round((st.hits / st.shots) * 100) : 0;
+      const statRows = [['Accuracy', st.shots ? `${acc}%` : '—'], ['Headshots', st.heads || 0], ['Damage to players', Math.round(st.damage || 0)], ['Damage to builds', Math.round(st.buildDamage || 0)],
+        ['Longest elimination', st.longest ? `${Math.round(st.longest)} m` : '—'], ['Materials harvested', st.harvested || 0], ['Pieces built', st.built || 0], ['Chests opened', st.chests || 0]];
       el.innerHTML = `
+        ${r.medals?.length ? `<div class="medal-row">${r.medals.map((m, i) => `<div class="medal-b" style="animation-delay:${0.15 * i}s"><span>${m.icon}</span><b>${m.name}</b>${m.xp ? `<small>+${m.xp} XP</small>` : ''}</div>`).join('')}</div>` : ''}
+        <div class="match-stats">${statRows.map(([k, v]) => `<div><b>${v}</b><span>${k}</span></div>`).join('')}</div>
         <div class="rw-cols">
           <div><div class="card-h">XP earned</div>${r.xp.map(([k, v]) => `<div class="rw"><span>${k}</span><b>+${v}</b></div>`).join('')}<div class="rw total"><span>Total</span><b>+${r.totalXp} XP</b></div></div>
           <div><div class="card-h">Storm Coins</div>${r.coins.map(([k, v]) => `<div class="rw"><span>${k}</span><b>+${v}</b></div>`).join('')}${r.levelUps.length ? `<div class="rw"><span>Level-ups</span><b>+${r.levelUps.reduce((a, e) => a + e.coins, 0)}</b></div>` : ''}<div class="rw total"><span>Total</span><b>${coin}${r.totalCoins + r.levelUps.reduce((a, e) => a + e.coins, 0)}</b></div></div>
         </div>
         <div class="lvl-line"><b>Level ${d.level}</b><div class="xpbar"><i style="width:${(d.xp / xpForLevel(d.level)) * 100}%"></i></div><small>${d.xp} / ${xpForLevel(d.level)}</small></div>
+        ${r.arena ? this._arenaCard(r.arena) : ''}
         ${r.levelUps.map((e) => `<div class="lvlup">LEVEL ${e.level}!${e.item ? ` Unlocked <b style="color:${RARITIES[e.item.rarity].color}">${e.item.name}</b>` : ''}</div>`).join('')}`;
     } else el.innerHTML = '';
     this.el.end.classList.toggle('victory', victory);
     this.el.end.classList.remove('hidden');
+  }
+
+  // Arena result: hype rows, division bar and any promotion.
+  _arenaCard(a) {
+    const div = a.division, next = div.next;
+    const k = next ? (a.to - div.min) / (next.min - div.min) : 1;
+    return `<div class="arena-card" style="--div:${div.color}">
+      <div class="ac-h"><span>ARENA</span><b>${div.name}</b><em>${a.from} → ${a.to} Hype (${a.total >= 0 ? '+' : ''}${a.total})</em></div>
+      <div class="ac-rows">${a.rows.map(([n, v]) => `<div class="rw"><span>${n}</span><b class="${v < 0 ? 'neg' : ''}">${v >= 0 ? '+' : ''}${v}</b></div>`).join('')}</div>
+      <div class="ac-bar"><i style="width:${Math.max(2, Math.min(100, k * 100))}%"></i></div>
+      <small>${next ? `${next.min - a.to} Hype to ${next.name}` : 'Top division!'}</small>
+      ${a.promoted ? `<div class="lvlup">PROMOTED TO ${div.name.toUpperCase()}!</div>` : ''}
+    </div>`;
   }
 
   hideEnd() { this.el.end.classList.add('hidden'); }

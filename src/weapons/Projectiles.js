@@ -211,6 +211,7 @@ export class Projectiles {
       const dealt = target.takeDamage(p.damage * (r.head ? p.headMult : 1) * botVsBot, owner, r.head);
       g.effects.hitSparks(pt, r.head ? '#ffd23f' : shieldBefore > 0 ? '#6cc4ff' : '#ffffff');
       if (owner.isPlayer) {
+        g.meta?.track('hit', 1, r.head);
         g.effects.damageNumber(pt, dealt, r.head, shieldBefore > 0, target);
         g.hud?.hitMarker(r.head, !target.alive);
         g.sound.play(r.head ? 'headshot' : shieldBefore > 0 ? 'shieldHit' : 'hit');
@@ -218,7 +219,7 @@ export class Projectiles {
     } else {
       const c = r.collider;
       g.effects.impact(pt, c?.structure ? (c.structure.mat === 'wood' ? 'wood' : 'stone') : c ? 'stone' : 'terrain', _n.copy(_dir).negate());
-      if (c?.structure) c.structure.damage(p.damage, owner);
+      if (c?.structure) { c.structure.damage(p.damage, owner); if (owner?.isPlayer && c.structure.owner !== owner) g.meta?.track('buildDamage', p.damage); }
       else if (c?.breakable) g.combat.damageProp(c, p.damage);
       else if (c?.part) c.part.damage(p.damage, owner);
       else if (c?.obj) g.world.destructibles.damage(c, p.damage, owner);

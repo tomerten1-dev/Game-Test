@@ -1,6 +1,6 @@
 import { Profile } from './Profile.js';
 import { COSMETICS } from './Cosmetics.js';
-import { dailyQuests, weeklyQuests, weekKey, questDef, today, matchRewards, applyXp, shopOffers, MILESTONES, milestoneReward } from './Progression.js';
+import { dailyQuests, weeklyQuests, weekKey, questDef, today, matchRewards, applyXp, shopOffers, MILESTONES, milestoneReward, arenaPoints, arenaDivision, matchMedals } from './Progression.js';
 
 // Glue between matches and saved progress: tracks in-match events, quests, rewards and the shop.
 export class Meta {
@@ -47,7 +47,8 @@ export class Meta {
   startMatch() {
     this.ensureQuests();
     this.ensureWeekly();
-    this.match = { kills: 0, damage: 0, chests: 0, supply: 0, harvested: 0, built: 0, heals: 0, circles: 0, questsDone: 0, weeklyDone: 0, landed: null };
+    this.match = { kills: 0, damage: 0, chests: 0, supply: 0, harvested: 0, built: 0, heals: 0, circles: 0, questsDone: 0, weeklyDone: 0, landed: null,
+      shots: 0, hits: 0, heads: 0, buildDamage: 0, longest: 0, trees: 0, firstBlood: false, bossKills: 0, crownKills: 0 };
   }
 
   // Report something that happened to the player during a real match (not warm-up).
@@ -55,7 +56,12 @@ export class Meta {
     const m = this.match;
     const g = this.game;
     if (!m || g.warmup > 0 || g.state !== 'playing') return;
-    if (event === 'kill') m.kills += amount;
+    if (event === 'kill') { m.kills += amount; if (extra?.dist) m.longest = Math.max(m.longest, extra.dist); if (extra?.first) m.firstBlood = true; }
+    else if (event === 'shot') m.shots += amount;
+    else if (event === 'hit') { m.hits += amount; if (extra) m.heads += amount; }
+    else if (event === 'buildDamage') m.buildDamage += amount;
+    else if (event === 'tree') m.trees += amount;
+    else if (event === 'bossKill') m.bossKills += amount;
     else if (event === 'damage') m.damage += amount;
     else if (event === 'chest') m.chests += amount;
     else if (event === 'supply') m.supply += amount;
@@ -65,6 +71,7 @@ export class Meta {
     else if (event === 'circle') m.circles += amount;
     else if (event === 'land') m.landed = extra;
     else if (event === 'crownKill') m.crownKills = (m.crownKills || 0) + amount;
+    if (event === 'shot' || event === 'hit' || event === 'buildDamage' || event === 'tree' || event === 'bossKill') return;
     if (event === 'chest' || event === 'supply') g.hud.pickupNote(`+${event === 'chest' ? 40 : 100} XP`, '#ffd23f');
     for (const q of [...this.ensureQuests(), ...this.ensureWeekly()]) {
       if (q.done) continue;
@@ -83,7 +90,7 @@ export class Meta {
   }
 
   // Wrap up: stats, XP, coins and level-ups. Returns the breakdown for the results screen.
-  finishMatch({ place, timeAlive, crowned = false }) {
+  finishMatch({ place, timeAlive, crowned = false, mode = 'solo' }) {
     if (!this.match) this.startMatch();
     if (place <= 10) this._questEvent('top10');
     if (place === 1) this._questEvent('win');
@@ -119,11 +126,27 @@ export class Meta {
       }
       claimed[ms.id] = Math.max(claimed[ms.id] || 0, ms.tier);
     }
+    // medals (accolades) for this match, each worth some XP
+    const medals = matchMedals(s);
+    for (const md of medals) { rewards.xp.push([`Medal: ${md.name}`, md.xp]); rewards.totalXp += md.xp; }
+    // arena: hype points and divisions
+    let arena = null;
+    if (mode === 'arena') {
+      const A = (this.p.d.arena ||= { points: 0, best: 0, matches: 0, wins: 0 });
+      const from = A.points, res = arenaPoints(from, { place, kills: m.kills });
+      A.points = Math.max(0, from + res.total);
+      A.best = Math.max(A.best, A.points);
+      A.matches++;
+      if (place === 1) A.wins++;
+      const d0 = arenaDivision(from), d1 = arenaDivision(A.points);
+      arena = { ...res, from, to: A.points, division: d1, promoted: d1.index > d0.index };
+      if (arena.promoted) { rewards.xp.push([`Promoted to ${d1.name}`, 500]); rewards.coins.push([`Promoted to ${d1.name}`, 150]); rewards.totalXp += 500; rewards.totalCoins += 150; }
+    }
     const before = { level: this.p.d.level, xp: this.p.d.xp };
     this.p.d.coins += rewards.totalCoins;
     const levelUps = applyXp(this.p, rewards.totalXp);
     this.p.save();
-    return { ...rewards, levelUps, before, after: { level: this.p.d.level, xp: this.p.d.xp } };
+    return { ...rewards, levelUps, before, after: { level: this.p.d.level, xp: this.p.d.xp }, arena, medals, stats: s };
   }
 
   _questEvent(event) {

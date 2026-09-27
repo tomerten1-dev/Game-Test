@@ -167,3 +167,56 @@ export function applyXp(profile, amount) {
   profile.save();
   return events;
 }
+
+// ---------- Arena (ranked) ----------
+// Hype points climb through ten divisions. Placement points stack (a win is worth 60), every
+// elimination is worth a few more, and the higher divisions charge a bus fare each match.
+export const ARENA_DIVISIONS = [
+  { name: 'Open I', min: 0, fare: 0, elim: 5, color: '#9aa7b8', skill: 0 },
+  { name: 'Open II', min: 50, fare: 0, elim: 5, color: '#9aa7b8', skill: 0.03 },
+  { name: 'Open III', min: 100, fare: 0, elim: 5, color: '#9aa7b8', skill: 0.06 },
+  { name: 'Open IV', min: 175, fare: 0, elim: 5, color: '#9aa7b8', skill: 0.09 },
+  { name: 'Contender I', min: 250, fare: 2, elim: 4, color: '#4dd2ff', skill: 0.12 },
+  { name: 'Contender II', min: 350, fare: 2, elim: 4, color: '#4dd2ff', skill: 0.15 },
+  { name: 'Contender III', min: 475, fare: 3, elim: 4, color: '#4dd2ff', skill: 0.18 },
+  { name: 'Champion I', min: 600, fare: 4, elim: 3, color: '#ffc93c', skill: 0.22 },
+  { name: 'Champion II', min: 800, fare: 5, elim: 3, color: '#ffc93c', skill: 0.26 },
+  { name: 'Champion III', min: 1000, fare: 6, elim: 3, color: '#ffc93c', skill: 0.3 },
+];
+
+export function arenaDivision(points) {
+  let i = 0;
+  while (i < ARENA_DIVISIONS.length - 1 && points >= ARENA_DIVISIONS[i + 1].min) i++;
+  return { ...ARENA_DIVISIONS[i], index: i, next: ARENA_DIVISIONS[i + 1] || null };
+}
+
+// Points for one arena match: [label, points] rows and the total.
+export function arenaPoints(points, { place, kills }) {
+  const div = arenaDivision(points);
+  const rows = [];
+  if (div.fare) rows.push(['Bus fare', -div.fare]);
+  if (place <= 25) rows.push(['Top 25', 10]);
+  if (place <= 15) rows.push(['Top 15', 10]);
+  if (place <= 5) rows.push(['Top 5', 10]);
+  if (place === 1) rows.push(['Victory Royale', 30]);
+  if (kills) rows.push([`Eliminations ×${kills}`, kills * div.elim]);
+  return { rows, total: rows.reduce((a, r) => a + r[1], 0) };
+}
+
+// ---------- match medals (accolades) ----------
+export const MEDALS = [
+  { id: 'victory', name: 'Victory Royale', icon: '👑', xp: 0, test: (s) => s.place === 1 },
+  { id: 'crowned', name: 'Crowned', icon: '♛', xp: 300, test: (s) => s.place === 1 && s.crowned },
+  { id: 'first', name: 'First Blood', icon: '🩸', xp: 150, test: (s) => s.firstBlood },
+  { id: 'sharp', name: 'Sharpshooter', icon: '🎯', xp: 200, test: (s) => s.shots >= 20 && s.hits / s.shots >= 0.5 },
+  { id: 'head', name: 'Headhunter', icon: '💥', xp: 150, test: (s) => s.heads >= 5 },
+  { id: 'marksman', name: 'Marksman', icon: '🔭', xp: 200, test: (s) => s.longest >= 100 },
+  { id: 'spree', name: 'Rampage', icon: '🔥', xp: 250, test: (s) => s.kills >= 5 },
+  { id: 'demo', name: 'Demolition', icon: '🧨', xp: 150, test: (s) => s.buildDamage >= 1000 },
+  { id: 'builder', name: 'Master Builder', icon: '🧱', xp: 100, test: (s) => s.built >= 60 },
+  { id: 'lumber', name: 'Lumberjack', icon: '🪓', xp: 100, test: (s) => s.trees >= 5 },
+  { id: 'treasure', name: 'Treasure Hunter', icon: '🧰', xp: 100, test: (s) => s.chests >= 6 },
+  { id: 'boss', name: 'Boss Slayer', icon: '💀', xp: 300, test: (s) => s.bossKills >= 1 },
+  { id: 'survivor', name: 'Survivor', icon: '⏱', xp: 100, test: (s) => s.place <= 10 },
+];
+export function matchMedals(s) { return MEDALS.filter((m) => { try { return m.test(s); } catch { return false; } }); }

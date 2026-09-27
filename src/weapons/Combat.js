@@ -71,6 +71,7 @@ export class Combat {
     const spread = w.spread(moving, !shooter.onGround, { crouched: shooter.crouched, still: hs < 0.4, now: g.time, scoped: shooter.aiming && w.def.scope }) * (shooter.accuracyMult ?? 1);
     w.onFire(g.time);
     shooter.lastFireTime = g.time;
+    if (shooter.isPlayer) g.meta?.track('shot');
     if (shooter.character) shooter.character.kick = Math.min(1, 0.35 + w.def.shake * 1.5);
     // burst weapons queue the rest of the burst (fired by updateBursts)
     if (w.def.burst && !this._inBurst) { w.burstLeft = w.def.burst - 1; w.burstT = w.def.burstGap; }
@@ -117,13 +118,14 @@ export class Combat {
       } else if (r.hit) {
         const kind = r.collider ? (r.collider.structure ? (r.collider.structure.mat === 'wood' ? 'wood' : 'stone') : r.collider.house ? (r.collider.mat === 'wood' ? 'wood' : 'stone') : r.collider.crate ? 'wood' : r.collider.tree ? 'wood' : r.collider.rock ? 'stone' : 'stone') : 'terrain';
         if (i < 4) g.effects.impact(_end.addScaledVector(_dir, -0.05), kind, _n.copy(_dir).negate());
-        if (r.collider?.structure) r.collider.structure.damage(w.damage * 0.9, shooter);
+        if (r.collider?.structure) { r.collider.structure.damage(w.damage * 0.9, shooter); if (shooter.isPlayer && r.collider.structure.owner !== shooter) g.meta?.track('buildDamage', w.damage * 0.9); }
         else if (r.collider?.breakable) this.damageProp(r.collider, w.damage);
         else if (r.collider?.part) r.collider.part.damage(w.damage, shooter); // house walls, doors, windows
         else if (r.collider?.obj) g.world.destructibles.damage(r.collider, w.damage, shooter); // trees, rocks
         if (shooter.isPlayer && i < 1) g.hud?.objHp?.(r.collider, _end);
       }
     }
+    if (shooter.isPlayer && perTarget.size) g.meta?.track('hit', 1, [...perTarget.values()].some((e) => e.head));
     for (const [target, e] of perTarget) {
       const shieldBefore = target.shield;
       const dealt = target.takeDamage(e.dmg, shooter, e.head);

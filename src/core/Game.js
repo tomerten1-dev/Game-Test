@@ -37,6 +37,7 @@ import { applySettings } from '../ui/Settings.js';
 import { Pickaxe } from '../weapons/Items.js';
 import { Weapon } from '../weapons/Weapon.js';
 import { COSMETICS } from '../meta/Cosmetics.js';
+import { arenaDivision } from '../meta/Progression.js';
 import { VARIANT, VARIANT_KEY } from '../world/Variant.js';
 import { Snowfall } from '../effects/Weather.js';
 import { WeatherSystem } from '../effects/WeatherFX.js';
@@ -315,7 +316,7 @@ export class Game {
       this.touch?.show(false);
       if (document.pointerLockElement) document.exitPointerLock();
       const alive = Math.max(0, (this.deathInfo?.time ?? this.time) - this.matchStart);
-      const rewards = this.meta.finishMatch({ place, timeAlive: alive, crowned: !!this.player?.crowned });
+      const rewards = this.meta.finishMatch({ place, timeAlive: alive, crowned: !!this.player?.crowned, mode: this.mode });
       this.menus.showEnd({ victory, place, killer: killer?.name, cause: p.deathCause, kills: p.kills, time: alive, rewards });
       this.sound.music(victory ? 'victory' : 'defeat');
     }, delay);
@@ -354,7 +355,9 @@ export class Game {
     const colors = botColors(n);
     this.bots = [];
     for (let i = 0; i < n; i++) {
-      const b = new Bot(this, BOT_NAMES[i], colors[i], Math.random(), CHARACTER_TYPES[i % CHARACTER_TYPES.length]);
+      // arena bots get sharper as you climb the divisions
+      const boost = this.mode === 'arena' ? 0.15 + arenaDivision(this.meta.profile.d.arena?.points || 0).skill : 0;
+      const b = new Bot(this, BOT_NAMES[i], colors[i], Math.min(1, Math.random() * (1 - boost * 0.5) + boost), CHARACTER_TYPES[i % CHARACTER_TYPES.length]);
       this.bots.push(b);
       this.actors.push(b);
     }
@@ -430,6 +433,7 @@ export class Game {
     this.rig.pitch = -0.25;
     this.meta.startMatch();
     this._thanked = false;
+    this._firstBlood = false;
     this._botThanks = 0;
     this.hud.banner(isTouch ? 'Tap JUMP to drop from the Storm Bus' : 'Press SPACE to jump from the Storm Bus', 6);
     this.sound.play('bus');
@@ -1007,7 +1011,7 @@ export class Game {
     if (actor.npc) {
       this.hud.killFeed?.(killer, actor);
       this.boss.onDeath(actor);
-      if (killer?.isPlayer && actor.npc === 'boss') this.meta.track('boss');
+      if (killer?.isPlayer && actor.npc === 'boss') { this.meta.track('boss'); this.meta.track('bossKill'); }
       this.loot?.dropInventory(actor);
       if (actor === this.spectating) {
         const next = killer && killer.alive && !killer.npc ? killer : this.actors.find((x) => x.alive && !x.npc && !x.isPlayer);
@@ -1015,7 +1019,18 @@ export class Game {
       }
       return;
     }
-    if (killer?.isPlayer && actor !== killer) { this.meta.track('kill'); if (killer.crowned) this.meta.track('crownKill'); }
+    if (killer?.isPlayer && actor !== killer) {
+      this.meta.track('kill', 1, { dist: killer.pos.distanceTo(actor.pos), first: !this._firstBlood });
+      if (killer.crowned) this.meta.track('crownKill');
+    }
+    if (killer && killer !== actor) this._firstBlood = true;
+    // arena siphon: +50 health / shield for the eliminator
+    if (this.mode === 'arena' && killer && killer !== actor && killer.alive) {
+      let give = 50;
+      const h = Math.min(give, 100 - killer.health); killer.health += h; give -= h;
+      killer.shield = Math.min(100, killer.shield + give);
+      if (killer.isPlayer) this.hud.pickupNote?.('+50 Siphon', '#7dff8a');
+    }
     if (killer && killer !== actor) killer.kills++;
     this.hud.killFeed?.(killer, actor);
     this.loot?.dropInventory(actor);
