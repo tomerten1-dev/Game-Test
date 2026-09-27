@@ -173,6 +173,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1830; col
 .tbtn.cone { right: 360px; bottom: 112px; font-size: 11px; width: 54px; height: 54px; }
 .tbtn.mat { right: 104px; bottom: 176px; font-size: 11px; width: 50px; height: 50px; }
 .tbtn.edit { right: 160px; bottom: 196px; font-size: 11px; width: 50px; height: 50px; }
+.tbtn.emote { right: 18px; bottom: 272px; font-size: 20px; width: 50px; height: 50px; }
 
 body.touch #bottom-right { bottom: 8px; right: auto; left: 50%; transform: translateX(-50%); align-items: center; gap: 2px; }
 body.touch #weapon-name { font-size: 14px; }
@@ -444,3 +445,13 @@ body.touch .kbd { display: none; }
 #shield-flash.on { animation: hurt 0.6s ease-out; }
 #crosshair.pop { animation: chpop 0.25s ease-out; }
 @keyframes chpop { 0% { transform: translate(-50%, -50%) scale(1.5); filter: drop-shadow(0 0 6px #ffd23f); } 100% { transform: translate(-50%, -50%) scale(1); } }
+
+/* emote wheel */
+#emote-wheel { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+#emote-wheel.touch { pointer-events: auto; }
+#emote-wheel::before { content: ''; position: absolute; left: -170px; top: -170px; width: 340px; height: 340px; border-radius: 50%; background: radial-gradient(circle, rgba(8,14,36,0.35) 30%, rgba(8,14,36,0.75) 31%, rgba(8,14,36,0.75) 70%, transparent 71%); }
+.ew-center { position: absolute; transform: translate(-50%, -50%); font-family: var(--title); font-size: 18px; letter-spacing: 1px; opacity: 0.85; }
+.ew-item { position: absolute; left: -44px; top: -34px; width: 88px; height: 68px; border-radius: 14px; border: 2px solid rgba(255,255,255,0.25); background: rgba(20,30,60,0.8); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-family: var(--num); font-weight: 800; font-size: 12px; pointer-events: auto; cursor: pointer; transition: background 0.1s, border-color 0.1s; }
+.ew-item i { font-style: normal; font-size: 22px; color: #ffd23f; }
+.ew-item.on { background: #ffd23f; color: #3a2400; border-color: #fff; }
+.ew-item.on i { color: #3a2400; }

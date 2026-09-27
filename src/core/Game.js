@@ -34,6 +34,7 @@ import { LobbyStage } from '../ui/LobbyStage.js';
 import { applySettings } from '../ui/Settings.js';
 import { Pickaxe } from '../weapons/Items.js';
 import { Weapon } from '../weapons/Weapon.js';
+import { COSMETICS } from '../meta/Cosmetics.js';
 import { BossEvent } from '../world/Boss.js';
 
 const WARMUP_TIME = 20;
@@ -423,7 +424,7 @@ export class Game {
     else if (this.map.open && this.input.pressed('pause')) this.toggleMap(false);
     if (this.spectating) this.updateSpectate(dt);
     if (this.warmup > 0) this.updateWarmup(dt);
-    if (this.input.pressed('emote') && p.alive && p.state === 'ground' && !p.buildMode) { p.emote = p.emote ? null : p.emoteClip; }
+    this.updateEmoteWheel(dt);
     if (p.alive) {
       p.readInput(dt, this.input, this.rig);
       this.updatePlayerCombat(dt);
@@ -723,6 +724,38 @@ export class Game {
     if (this.camera.fov !== 55) { this.camera.fov = 55; this.camera.updateProjectionMatrix(); }
     p.bodyYaw = Math.atan2(this.camera.position.x - p.pos.x, this.camera.position.z - p.pos.z);
     if (c.t > c.dur) this.cinematic = null;
+  }
+
+  // Emote wheel: hold the emote key, flick the mouse toward an emote, release to play it.
+  // A quick tap plays your equipped emote; on touch the wheel's slices are tappable.
+  updateEmoteWheel(dt) {
+    const p = this.player, input = this.input;
+    const can = p.alive && p.state === 'ground' && !p.buildMode && !this.editing;
+    const w = this.emoteWheel;
+    if (!w) {
+      if (input.pressed('emote') && can) {
+        const list = this.meta.profile.d.owned.map((id) => COSMETICS[id]).filter((c) => c?.type === 'emote');
+        const eq = this.meta.profile.equippedItem('emote');
+        list.sort((a, b) => (b.id === eq.id) - (a.id === eq.id));
+        this.emoteWheel = { t: 0, x: 0, y: 0, sel: -1, list: list.slice(0, 8), touch: !!this.touch };
+        this.hud.emoteWheel(this.emoteWheel);
+      }
+      return;
+    }
+    w.t += dt;
+    if (!w.touch) {
+      const l = input.consumeLook();
+      w.x = Math.max(-1, Math.min(1, w.x + l.x * 4)); w.y = Math.max(-1, Math.min(1, w.y + l.y * 4));
+      const n = w.list.length;
+      w.sel = Math.hypot(w.x, w.y) > 0.35 ? Math.round((((Math.atan2(w.x, -w.y) / (Math.PI * 2)) + 1) % 1) * n) % n : -1;
+      this.hud.emoteWheel(w);
+    }
+    const release = w.touch ? w.picked !== undefined : !input.down('emote');
+    if (!release && can) return;
+    const pick = w.touch ? w.picked : w.sel >= 0 ? w.sel : w.t < 0.25 ? 0 : -1;
+    if (can && pick >= 0 && w.list[pick]) p.emote = p.emote === w.list[pick].value ? null : w.list[pick].value;
+    this.emoteWheel = null;
+    this.hud.emoteWheel(null);
   }
 
   startSpectate(actor) {

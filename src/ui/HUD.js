@@ -194,6 +194,34 @@ export class HUD {
     t.classList.add('show');
   }
 
+  // Radial emote picker (desktop: mouse direction; touch: tap a slice).
+  emoteWheel(w) {
+    let el = this.root.querySelector('#emote-wheel');
+    if (!el) {
+      this.el.hud.insertAdjacentHTML('beforeend', '<div id="emote-wheel" class="hidden"><div class="ew-center">EMOTE</div></div>');
+      el = this.root.querySelector('#emote-wheel');
+    }
+    if (!w) { el.classList.add('hidden'); el.querySelectorAll('.ew-item').forEach((i) => i.remove()); this._ewKey = null; return; }
+    el.classList.remove('hidden');
+    const key = w.list.map((c) => c.id).join();
+    if (this._ewKey !== key) {
+      this._ewKey = key;
+      el.querySelectorAll('.ew-item').forEach((i) => i.remove());
+      w.list.forEach((c, i) => {
+        const a = (i / w.list.length) * Math.PI * 2;
+        const b = document.createElement('button');
+        b.className = 'ew-item';
+        b.style.transform = `translate(${Math.sin(a) * 120}px, ${-Math.cos(a) * 120}px)`;
+        b.innerHTML = `<i>♪</i><span>${c.name}</span>`;
+        b.addEventListener('pointerdown', (e) => { e.stopPropagation(); w.picked = i; });
+        el.appendChild(b);
+      });
+      if (w.touch) el.addEventListener('pointerdown', () => { w.picked = -1; }, { once: true });
+    }
+    el.querySelectorAll('.ew-item').forEach((b, i) => b.classList.toggle('on', i === w.sel));
+    el.classList.toggle('touch', !!w.touch);
+  }
+
   editHint(on) {
     let el = this.root.querySelector('#edit-hint');
     if (!el) {

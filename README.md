@@ -41,7 +41,7 @@ Production build: `npm run build` (output in `dist/`), preview it with `npm run 
 | 1 – 6 / mouse wheel | Switch slot (1 = harvesting axe) · leaves build mode |
 | M | Full-screen map (click: marker, right-click: clear, wheel: zoom, drag: pan) |
 | Middle click | Ping what you're looking at |
-| T | Emote |
+| T | Emote — tap for your equipped emote, hold for the emote wheel |
 | N | Mute |
 | Esc | Pause |
 

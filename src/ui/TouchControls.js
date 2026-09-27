@@ -20,6 +20,7 @@ export class TouchControls {
           <button class="tbtn cone" data-a="cone">CONE</button>
           <button class="tbtn mat" data-a="buildmat">MAT</button>
           <button class="tbtn edit" data-a="edit">EDIT</button>
+          <button class="tbtn emote" data-a="emote">♪</button>
         </div>
       </div>`);
     this.el = root.querySelector('#touch');
