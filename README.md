@@ -165,15 +165,21 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 
 ## Building
 
-Every piece costs 10 of the selected material and snaps to a 4 m grid, lining up with nearby builds so you can stack walls, floors and ramps. Look up to build a level higher, or look down to put a floor under you.
+Every piece costs 10 of the selected material and snaps to Fortnite's 5.12 m × 3.84 m grid, lining up with nearby builds so you can stack walls, floors and ramps. Look up to build a level higher, or look down to put a floor under you.
 
-| Material | Max HP | Time to reach full HP |
+| Material | Starting → max HP | Time to reach full HP |
 | --- | --- | --- |
-| Wood | 150 | 2.5 s |
-| Stone | 300 | 5 s |
-| Metal | 450 | 8 s |
+| Wood | 90 → 150 | 4 s |
+| Stone | 99 → 300 | 11.5 s |
+| Metal | 110 → 500 | 25 s |
 
 Pieces start weaker (and see-through) and harden while they build. Anything that loses its connection to the ground collapses. Bots box up (four walls + roof) when hurt, heal inside, open windows to shoot back, shoot through your walls and ramp up to high ground.
+
+- **Edits:** walls and floors use the 3×3 tile grid. Editing a **ramp** cycles full → left half → right half → turned around; editing a **cone** turns it into a **half cone** rising the way you look.
+- **Pre-edits:** in build mode with a wall or floor, press edit while not looking at a build of yours to shape the blueprint; every piece you place comes out edited until you clear it with the **reset-edit** key (U).
+- **Rotate ramps** before placing with the reload key (R) in build mode. **Change material** with right-click or L.
+- Settings: **Simple Build** (fire places walls, aim places a floor, ramp or cone depending on where you look), **Pre-edits** on/off and **Confirm edit on release**.
+- Chests give 30 of each material, and material piles lie around the towns.
 
 ## Graphics settings
 

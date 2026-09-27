@@ -1,18 +1,21 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-export const GRID = 4;
-export const HEIGHT = 4;
+// Fortnite's build tile: 5.12 m wide, 3.84 m tall
+export const GRID = 5.12;
+export const HEIGHT = 3.84;
+const HG = GRID / 2;
 export const COST = 10;
 export const PIECES = ['wall', 'floor', 'ramp', 'cone'];
 export const BUILD_MATS = ['wood', 'stone', 'metal'];
 // Stronger materials start weaker and take longer to reach full health.
 export const MAT_STATS = {
-  wood: { hp: 150, start: 0.35, time: 2.5, color: '#b07a45' },
-  stone: { hp: 300, start: 0.25, time: 5, color: '#a9adb5' },
-  metal: { hp: 450, start: 0.2, time: 8, color: '#7f93a8' },
+  // Fortnite: wood 90 -> 150 in 4 s, stone 99 -> 300 in 11.5 s, metal 110 -> 500 in 25 s
+  wood: { hp: 150, start: 0.6, time: 4, color: '#b07a45' },
+  stone: { hp: 300, start: 0.33, time: 11.5, color: '#a9adb5' },
+  metal: { hp: 500, start: 0.22, time: 25, color: '#7f93a8' },
 };
-const CONE_H = 1.8;
+const CONE_H = 1.75;
 const FLOOR_T = 0.22;
 
 function canvasTex(draw) {
@@ -84,9 +87,10 @@ const TEXTURES = {
 // of a wall / the -Z side of a floor. Named presets for bots and quick edits:
 export const EDIT_PRESETS = { door: (1 << 4) | (1 << 7), window: 1 << 4, arch: (1 << 6) | (1 << 7) | (1 << 8) | (1 << 3) | (1 << 4) | (1 << 5), half: (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) };
 const TILE = GRID / 3;
+const TILE_H = HEIGHT / 3;
 export const FULL_MASK = 511;
 
-// Solid rectangles of an edited wall (local x -2..2, y 0..4): merge kept tiles down each column.
+// Solid rectangles of an edited wall (local x -HG..HG, y 0..HEIGHT): merge kept tiles down each column.
 function wallRects(mask = 0) {
   const out = [];
   for (let c = 0; c < 3; c++) {
@@ -95,7 +99,7 @@ function wallRects(mask = 0) {
       const kept = r < 3 && !(mask & (1 << (r * 3 + c)));
       if (kept && !run) run = { start: r };
       if (!kept && run) {
-        out.push([-2 + c * TILE, -2 + (c + 1) * TILE, HEIGHT - r * TILE, HEIGHT - run.start * TILE]);
+        out.push([-HG + c * TILE, -HG + (c + 1) * TILE, HEIGHT - r * TILE_H, HEIGHT - run.start * TILE_H]);
         run = null;
       }
     }
@@ -109,7 +113,7 @@ function wallRects(mask = 0) {
   return merged;
 }
 
-// Solid rectangles of an edited floor (local x -2..2, z -2..2).
+// Solid rectangles of an edited floor (local x and z -HG..HG).
 function floorRects(mask = 0) {
   const out = [];
   for (let r = 0; r < 3; r++) {
@@ -117,7 +121,7 @@ function floorRects(mask = 0) {
     for (let c = 0; c <= 3; c++) {
       const kept = c < 3 && !(mask & (1 << (r * 3 + c)));
       if (kept && run === null) run = c;
-      if (!kept && run !== null) { out.push([-2 + run * TILE, -2 + c * TILE, -2 + r * TILE, -2 + (r + 1) * TILE]); run = null; }
+      if (!kept && run !== null) { out.push([-HG + run * TILE, -HG + c * TILE, -HG + r * TILE, -HG + (r + 1) * TILE]); run = null; }
     }
   }
   return out;
@@ -128,7 +132,7 @@ function floorGeometry(mask) {
     const w = x1 - x0, d = z1 - z0;
     const g = new THREE.BoxGeometry(w, FLOOR_T, d);
     const uv = g.attributes.uv;
-    for (let i = 0; i < uv.count; i++) uv.setXY(i, (x0 + 2) / GRID + uv.getX(i) * (w / GRID), (z0 + 2) / GRID + uv.getY(i) * (d / GRID));
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, (x0 + HG) / GRID + uv.getX(i) * (w / GRID), (z0 + HG) / GRID + uv.getY(i) * (d / GRID));
     g.translate((x0 + x1) / 2, -FLOOR_T / 2 + 0.04, (z0 + z1) / 2);
     return g;
   });
@@ -141,7 +145,7 @@ function wallGeometry(mask) {
     const g = new THREE.BoxGeometry(w, h, 0.24);
     // keep the texture at world scale so edited pieces line up
     const uv = g.attributes.uv;
-    for (let i = 0; i < uv.count; i++) uv.setXY(i, (x0 + 2) / GRID + uv.getX(i) * (w / GRID), y0 / HEIGHT + uv.getY(i) * (h / HEIGHT));
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, (x0 + HG) / GRID + uv.getX(i) * (w / GRID), y0 / HEIGHT + uv.getY(i) * (h / HEIGHT));
     g.translate((x0 + x1) / 2, (y0 + y1) / 2, 0);
     return g;
   });
@@ -249,19 +253,25 @@ export class Building {
       p.alongX = alongX;
       key = `w:${cx}:${cz}:${alongX ? 1 : 0}`;
       const h = 0.12;
-      box = alongX ? [cx - 2, cx + 2, y0, y0 + HEIGHT, cz - h, cz + h] : [cx - h, cx + h, y0, y0 + HEIGHT, cz - 2, cz + 2];
+      box = alongX ? [cx - HG, cx + HG, y0, y0 + HEIGHT, cz - h, cz + h] : [cx - h, cx + h, y0, y0 + HEIGHT, cz - HG, cz + HG];
     } else {
       let cell;
       if (opts.own || (type === 'floor' && pitch < -0.6)) cell = [ix, iz];
       else if (type === 'cone' && up) cell = [ix, iz];
-      else cell = [Math.floor((px + dx * 2.6) / GRID), Math.floor((pz + dz * 2.6) / GRID)];
+      else cell = [Math.floor((px + dx * GRID * 0.65) / GRID), Math.floor((pz + dz * GRID * 0.65) / GRID)];
       cx = cell[0] * GRID + GRID / 2; cz = cell[1] * GRID + GRID / 2;
       const lowX = type === 'ramp' ? cx - dx * GRID / 2 : cx, lowZ = type === 'ramp' ? cz - dz * GRID / 2 : cz;
       y0 = this._levelY(actor, lowX, lowZ, type === 'ramp' ? [0, 0] : [GRID / 2, GRID / 2]);
       if (type === 'floor' || type === 'cone') y0 += up * HEIGHT;
       key = `${type === 'floor' ? 'f' : 'm'}:${cx}:${cz}`;
       const top = type === 'floor' ? y0 + 0.04 : type === 'cone' ? y0 + CONE_H : y0 + HEIGHT;
-      box = [cx - 2, cx + 2, type === 'floor' ? y0 - FLOOR_T : y0, top, cz - 2, cz + 2];
+      box = [cx - HG, cx + HG, type === 'floor' ? y0 - FLOOR_T : y0, top, cz - HG, cz + HG];
+    }
+    // ramps can be turned before placing (quarter turns); the cell stays the same
+    if (type === 'ramp' && opts.rot) {
+      for (let k = 0; k < (opts.rot & 3); k++) { const t = p.dirX; p.dirX = p.dirZ; p.dirZ = -t; }
+      y0 = this._levelY(actor, cx - p.dirX * GRID / 2, cz - p.dirZ * GRID / 2, [0, 0]);
+      box = [cx - HG, cx + HG, y0, y0 + HEIGHT, cz - HG, cz + HG];
     }
     p.cx = cx; p.cz = cz; p.y0 = y0; p.box = box;
     p.key = `${key}:${Math.round(y0 * 4)}`;
@@ -307,10 +317,18 @@ export class Building {
       mesh.position.set(cx, y0, cz);
       mesh.rotation.y = plan.alongX ? 0 : Math.PI / 2;
     } else if (type === 'ramp') {
-      mesh.position.set(cx, y0 + HEIGHT / 2, cz);
+      // half ramps sit on one side of the tile
+      const off = plan.half ? plan.half * GRID / 4 : 0;
+      mesh.position.set(cx + dirZ * off, y0 + HEIGHT / 2, cz - dirX * off);
       mesh.rotation.order = 'YXZ';
       mesh.rotation.y = Math.atan2(dirX, dirZ);
       mesh.rotation.x = -Math.atan2(HEIGHT, GRID);
+    } else if (type === 'cone' && plan.shape === 'half') {
+      // half cone: a single roof slope rising toward (dirX, dirZ)
+      mesh.position.set(cx, y0 + CONE_H / 2, cz);
+      mesh.rotation.order = 'YXZ';
+      mesh.rotation.y = Math.atan2(dirX, dirZ);
+      mesh.rotation.x = -Math.atan2(CONE_H, GRID);
     } else mesh.position.set(cx, y0, cz);
   }
 
@@ -323,8 +341,17 @@ export class Building {
         : { kind: 'box', minX: cx - h, maxX: cx + h, minZ: cz - a1, maxZ: cz - a0, y0: y0 + b0, y1: y0 + b1 }));
     }
     if (type === 'floor') return floorRects(s.editMask).map(([a0, a1, b0, b1]) => ({ kind: 'box', minX: cx + a0, maxX: cx + a1, minZ: cz + b0, maxZ: cz + b1, y0: y0 - FLOOR_T, y1: y0 + 0.04 }));
-    if (type === 'ramp') return [{ kind: 'ramp', minX: cx - 2, maxX: cx + 2, minZ: cz - 2, maxZ: cz + 2, y0, y1: y0 + HEIGHT, dirX: s.dirX, dirZ: s.dirZ }];
-    return [{ kind: 'cone', minX: cx - 2, maxX: cx + 2, minZ: cz - 2, maxZ: cz + 2, y0, y1: y0 + CONE_H }];
+    if (type === 'ramp') {
+      if (s.half) {
+        // lateral axis (dirZ, -dirX); the ramp keeps one half of the tile
+        const lx = s.dirZ, lz = -s.dirX, hx = cx + lx * s.half * GRID / 4, hz = cz + lz * s.half * GRID / 4;
+        const ex = Math.abs(lx) ? GRID / 4 : HG, ez = Math.abs(lz) ? GRID / 4 : HG;
+        return [{ kind: 'ramp', minX: hx - ex, maxX: hx + ex, minZ: hz - ez, maxZ: hz + ez, y0, y1: y0 + HEIGHT, dirX: s.dirX, dirZ: s.dirZ }];
+      }
+      return [{ kind: 'ramp', minX: cx - HG, maxX: cx + HG, minZ: cz - HG, maxZ: cz + HG, y0, y1: y0 + HEIGHT, dirX: s.dirX, dirZ: s.dirZ }];
+    }
+    if (s.shape === 'half') return [{ kind: 'ramp', minX: cx - HG, maxX: cx + HG, minZ: cz - HG, maxZ: cz + HG, y0, y1: y0 + CONE_H, dirX: s.dirX, dirZ: s.dirZ }];
+    return [{ kind: 'cone', minX: cx - HG, maxX: cx + HG, minZ: cz - HG, maxZ: cz + HG, y0, y1: y0 + CONE_H }];
   }
 
   // Place a planned piece. Returns the structure or null.
@@ -348,6 +375,8 @@ export class Building {
     s.cols = this._colliders(s);
     for (const c of s.cols) { c.dynamic = true; c.structure = s; this.world.colliders.add(c); }
     if (plan.type === 'ramp') mesh.scale.setScalar(0.05); else mesh.scale.set(1, 0.05, 1);
+    // pre-edits: the piece comes out already edited
+    if (plan.preMask && (plan.type === 'wall' || plan.type === 'floor')) { s.editMask = 0; this.edit(s, plan.preMask); }
     this.scene.add(mesh);
     this.keys.set(s.key, s);
     this.structures.push(s);
@@ -362,7 +391,7 @@ export class Building {
   // A plan for a floor directly under a planned ramp (same cell, same base).
   floorUnder(plan) {
     const { cx, cz, y0 } = plan;
-    return { type: 'floor', cx, cz, y0, dirX: 0, dirZ: 1, box: [cx - 2, cx + 2, y0 - 0.22, y0 + 0.04, cz - 2, cz + 2], key: `f:${cx}:${cz}:${Math.round(y0 * 4)}` };
+    return { type: 'floor', cx, cz, y0, dirX: 0, dirZ: 1, box: [cx - HG, cx + HG, y0 - 0.22, y0 + 0.04, cz - HG, cz + HG], key: `f:${cx}:${cz}:${Math.round(y0 * 4)}` };
   }
 
   // Quick "90s": wall in your own cell and drop a ramp inside it whose low end is where you stand.
@@ -385,7 +414,7 @@ export class Building {
   // Wall on the far edge of a floor-sized cell (e.g. in front of a ramp), at base height y0.
   edgeWallPlan(cx, cz, dx, dz, y0) {
     const wx = cx + dx * GRID / 2, wz = cz + dz * GRID / 2, alongX = dx === 0, h = 0.12;
-    const box = alongX ? [wx - 2, wx + 2, y0, y0 + HEIGHT, wz - h, wz + h] : [wx - h, wx + h, y0, y0 + HEIGHT, wz - 2, wz + 2];
+    const box = alongX ? [wx - HG, wx + HG, y0, y0 + HEIGHT, wz - h, wz + h] : [wx - h, wx + h, y0, y0 + HEIGHT, wz - HG, wz + HG];
     return { type: 'wall', dirX: dx, dirZ: dz, alongX, cx: wx, cz: wz, y0, box, key: `w:${wx}:${wz}:${alongX ? 1 : 0}:${Math.round(y0 * 4)}` };
   }
 
@@ -434,6 +463,35 @@ export class Building {
     return s.edit;
   }
 
+  // Ramp edits cycle: full -> left half -> right half -> turned around (Fortnite's ramp tile edits).
+  editRamp(s) {
+    if (!s || s.type !== 'ramp' || s.falling) return;
+    if (!s.half) s.half = 1;
+    else if (s.half === 1) s.half = -1;
+    else { s.half = 0; s.dirX = -s.dirX; s.dirZ = -s.dirZ; }
+    s.mesh.geometry = s.half ? (this.geo.halfRamp ||= new THREE.BoxGeometry(GRID / 2, 0.2, Math.hypot(GRID, HEIGHT))) : this.geo.ramp;
+    this._refit(s);
+  }
+
+  // Cone edits: a full cone <-> a half cone (one slope) rising the way you look.
+  editCone(s, yaw) {
+    if (!s || s.type !== 'cone' || s.falling) return;
+    if (s.shape === 'half') s.shape = null;
+    else { s.shape = 'half'; [s.dirX, s.dirZ] = Building.dirFromYaw(yaw); }
+    s.mesh.geometry = s.shape === 'half' ? (this.geo.halfCone ||= new THREE.BoxGeometry(GRID, 0.2, Math.hypot(GRID, CONE_H))) : this.geo.cone;
+    s.mesh.rotation.set(0, 0, 0);
+    this._refit(s);
+  }
+
+  _refit(s) {
+    for (const c of s.cols) this.world.colliders.remove(c);
+    s.cols = this._colliders(s);
+    for (const c of s.cols) { c.dynamic = true; c.structure = s; this.world.colliders.add(c); }
+    this._place(s.mesh, s);
+    s.base.copy(s.mesh.position);
+    this.game.sound.play('click', s.mesh.position);
+  }
+
   // Ramps don't have tiles: editing flips which way they climb.
   flipRamp(s) {
     if (!s || s.type !== 'ramp' || s.falling) return;
@@ -453,15 +511,16 @@ export class Building {
     if (!s) return;
     g.children.forEach((m, i) => {
       const r = Math.floor(i / 3), c = i % 3;
-      const u = -2 + (c + 0.5) * TILE;
+      const u = -HG + (c + 0.5) * TILE;
+      m.scale.set(1, s.type === 'wall' ? TILE_H / TILE : 1, 1);
       if (s.type === 'wall') {
-        const v = HEIGHT - (r + 0.5) * TILE;
+        const v = HEIGHT - (r + 0.5) * TILE_H;
         m.rotation.set(0, s.alongX ? 0 : Math.PI / 2, 0);
         if (s.alongX) m.position.set(s.cx + u, s.y0 + v, s.cz);
         else m.position.set(s.cx, s.y0 + v, s.cz - u);
       } else {
         m.rotation.set(-Math.PI / 2, 0, 0);
-        m.position.set(s.cx + u, s.y0 + 0.12, s.cz - 2 + (r + 0.5) * TILE);
+        m.position.set(s.cx + u, s.y0 + 0.12, s.cz - HG + (r + 0.5) * TILE);
       }
       m.material = mask & (1 << i) ? this.tileSelMat : this.tileMat;
     });    g.updateMatrixWorld(true);

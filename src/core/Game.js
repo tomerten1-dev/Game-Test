@@ -886,7 +886,16 @@ export class Game {
       if ((input.pressed('build') || input.pressed('ninety') || PIECES.some((k) => input.pressed(k))) && !this._buildCd) { this.hud.toast?.('Zero Build · no building in this mode'); this._buildCd = 1; }
       return false;
     }
-    if (input.pressed('edit') && p.state === 'ground') { this.toggleEdit(); return !!this.editing; }
+    if (input.pressed('resetEdit') && p.state === 'ground') this.resetEditLooked();
+    if (input.pressed('edit') && p.state === 'ground') {
+      // in build mode with a wall / floor and nothing of yours in view: pre-edit the blueprint
+      if (this.preEditing) { this.finishPreEdit(); return true; }
+      if (p.buildMode && (p.buildMode === 'wall' || p.buildMode === 'floor') && setting(this, 'preEdits') && !this._lookedBuild()) { this.startPreEdit(); return true; }
+      this.toggleEdit(); return !!this.editing;
+    }
+    if (this.preEditing) { this.updatePreEdit(); return true; }
+    // "confirm edit on release": letting go of the edit key applies the edit
+    if (this.editing && setting(this, 'editOnRelease', false) && !input.down('edit')) { this.toggleEdit(); return false; }
     if (this.editing) { this.updateEdit(); return true; }
     for (const piece of PIECES) {
       if (!input.pressed(piece)) continue;
@@ -906,12 +915,20 @@ export class Game {
       return false;
     }
     this._lastPiece = p.buildMode;
-    if (input.pressed('aim')) this.cycleBuildMat();
-    const plan = b.plan(p, p.buildMode, p.aimYaw, p.aimPitch);
+    // the reload key turns the ramp before you place it
+    if (input.pressed('reload') && p.buildMode === 'ramp') { p.buildRot = ((p.buildRot || 0) + 1) & 3; this.sound.play('click'); }
+    const simple = setting(this, 'simpleBuild', false);
+    let piece = p.buildMode;
+    if (simple) {
+      // Simple Build: fire places walls; aim places a floor, ramp or cone depending on where you look
+      piece = input.down('aim') ? (p.aimPitch < -0.45 ? 'floor' : p.aimPitch > 0.45 ? 'cone' : 'ramp') : 'wall';
+    } else if (input.pressed('aim')) this.cycleBuildMat();
+    const plan = b.plan(p, piece, p.aimYaw, p.aimPitch, { rot: piece === 'ramp' ? p.buildRot || 0 : 0 });
+    if (this.preEdits?.[piece]) plan.preMask = this.preEdits[piece];
     const mat = b.pickMat(p, p.buildMat);
     b.showGhost(plan, b.isValid(plan, p, mat));
     this.hud.prompt?.(null);
-    if (input.down('fire') && this._buildCd <= 0) this.placePiece(p.buildMode, plan);
+    if ((simple ? input.down('fire') || input.down('aim') : input.down('fire')) && this._buildCd <= 0) this.placePiece(piece, plan);
     return true;
   }
 
@@ -934,7 +951,62 @@ export class Game {
     this.sound.play('click');
   }
 
-  // Edit mode (G): pick tiles on your own wall / floor, G again to confirm. Ramps just flip.
+  // The build of yours under the crosshair (for edits), or null.
+  _lookedBuild() {
+    const dir = this.camera.getWorldDirection(_dir);
+    const origin = _origin.copy(this.camera.position).addScaledVector(dir, this.rig.curDist * 0.8);
+    const s = this.world.raycast(origin, dir, 7)?.collider?.structure;
+    return s && s.owner === this.player ? s : null;
+  }
+
+  // Reset-edit key: your looked-at build goes back to its plain shape (or clears a pre-edit).
+  resetEditLooked() {
+    const b = this.building;
+    if (this.editing) { b.edit(this.editing.s, null); this.stopEdit(); this.hud.toast?.('Edit reset'); return; }
+    const s = this._lookedBuild();
+    if (s?.type === 'wall' || s?.type === 'floor') { b.edit(s, null); return; }
+    if (s?.type === 'ramp' && s.half) { s.half = -1; b.editRamp(s); s.dirX = -s.dirX; s.dirZ = -s.dirZ; b._refit(s); return; }
+    if (s?.type === 'cone' && s.shape) { b.editCone(s, 0); return; }
+    const piece = this.player.buildMode;
+    if (piece && this.preEdits?.[piece]) { this.preEdits[piece] = 0; this.hud.toast?.('Pre-edit cleared'); }
+  }
+
+  // Pre-edit: shape the held wall / floor blueprint; every one you place comes out edited.
+  startPreEdit() {
+    const p = this.player, b = this.building;
+    const plan = b.plan(p, p.buildMode, p.aimYaw, p.aimPitch);
+    this.preEdits ||= {};
+    this.preEditing = { s: plan, type: p.buildMode, mask: this.preEdits[p.buildMode] || 0, paint: null };
+    b.hideGhost();
+    b.showEditGrid(plan, this.preEditing.mask);
+    this.hud.editHint?.(true);
+  }
+
+  updatePreEdit() {
+    const e = this.preEditing, input = this.input;
+    if (!this.player.alive || !this.player.buildMode) { this.finishPreEdit(true); return; }
+    if (input.pressed('aim')) { e.mask = 0; this.building.showEditGrid(e.s, 0); return; }
+    if (setting(this, 'editOnRelease', false) && !input.down('edit')) { this.finishPreEdit(); return; }
+    if (!input.down('fire')) { e.paint = null; return; }
+    const tile = this.building.pickTile(this.camera.position, this.camera.getWorldDirection(_dir));
+    if (tile < 0) return;
+    const bit = 1 << tile;
+    if (e.paint === null) e.paint = !(e.mask & bit);
+    const next = e.paint ? e.mask | bit : e.mask & ~bit;
+    if (next !== e.mask && next !== 511) { e.mask = next; this.building.showEditGrid(e.s, e.mask); this.sound.play('click'); }
+  }
+
+  finishPreEdit(cancel = false) {
+    const e = this.preEditing;
+    this.preEditing = null;
+    this.building.showEditGrid(null);
+    this.hud.editHint?.(false);
+    if (cancel || !e) return;
+    this.preEdits[e.type] = e.mask;
+    this.hud.toast?.(e.mask ? `Pre-edit saved: every ${e.type} comes out edited (reset-edit key clears it)` : 'Pre-edit cleared');
+  }
+
+  // Edit mode (G): pick tiles on your own wall / floor, G again to confirm. Ramps and cones change shape.
   toggleEdit() {
     const b = this.building, p = this.player;
     if (this.editing) {
@@ -947,9 +1019,10 @@ export class Game {
     const origin = _origin.copy(this.camera.position).addScaledVector(dir, this.rig.curDist * 0.8);
     const hit = this.world.raycast(origin, dir, 7);
     const s = hit?.collider?.structure;
-    if (!s || s.type === 'cone') { this.hud.toast?.('Look at one of your builds to edit it'); return; }
+    if (!s) { this.hud.toast?.('Look at one of your builds to edit it'); return; }
     if (s.owner !== p) { this.hud.toast?.('You can only edit your own builds'); return; }
-    if (s.type === 'ramp') { b.flipRamp(s); return; }
+    if (s.type === 'cone') { b.editCone(s, p.aimYaw); return; }
+    if (s.type === 'ramp') { b.editRamp(s); return; }
     p.setBuildMode(null);
     this.editing = { s, mask: s.editMask || 0, paint: null };
     b.showEditGrid(s, this.editing.mask);

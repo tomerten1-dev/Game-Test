@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GRID } from '../world/Building.js';
 import { Actor, RUN_SPEED } from '../player/Actor.js';
 import { angleDiff, clamp } from '../core/noise.js';
 
@@ -193,7 +194,7 @@ export class Bot extends Actor {
     const nx = w.alongX ? 0 : 1, nz = w.alongX ? 1 : 0; // wall normal
     const sMe = (this.pos.x - w.cx) * nx + (this.pos.z - w.cz) * nz;
     const sT = (tgt.pos.x - w.cx) * nx + (tgt.pos.z - w.cz) * nz;
-    if (Math.sign(sMe) === Math.sign(sT) || Math.abs(sMe) > 4.6 || Math.abs(this.pos.y - w.y0) > 2.5) { this._dropCover(); return false; }
+    if (Math.sign(sMe) === Math.sign(sT) || Math.abs(sMe) > GRID + 0.6 || Math.abs(this.pos.y - w.y0) > 2.5) { this._dropCover(); return false; }
     // stand 1.2 m behind the middle of the wall
     const side = Math.sign(sMe) || 1;
     const ox = w.cx + nx * side * 1.2 - this.pos.x, oz = w.cz + nz * side * 1.2 - this.pos.z, ol = Math.hypot(ox, oz);
@@ -821,7 +822,7 @@ export class Bot extends Actor {
       mx = mz = 0;
     } else if (this.boxed) {
       // hold the middle of the box; peek through a window now and then
-      const cx = (Math.floor(this.pos.x / 4) + 0.5) * 4, cz = (Math.floor(this.pos.z / 4) + 0.5) * 4;
+      const cx = (Math.floor(this.pos.x / GRID) + 0.5) * GRID, cz = (Math.floor(this.pos.z / GRID) + 0.5) * GRID;
       const ox = cx - this.pos.x, oz = cz - this.pos.z;
       if (Math.hypot(ox, oz) > 0.4) { mx = ox; mz = oz; }
       this.peekCd -= dt;

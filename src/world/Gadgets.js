@@ -4,6 +4,7 @@ import { mulberry32 } from '../core/noise.js';
 import { Weapon } from '../weapons/Weapon.js';
 import { rollWeaponType } from '../weapons/WeaponDefs.js';
 import { CONSUMABLES } from '../weapons/Items.js';
+import { GRID, HEIGHT } from './Building.js';
 
 const _v = new THREE.Vector3();
 const _c = new THREE.Color();
@@ -107,9 +108,9 @@ export class Gadgets {
   portaFort(pos, owner) {
     const g = this.game, B = g.building;
     if (g.zeroBuild) { this.bubble(pos, owner); return; } // no builds in Zero Build: a bubble instead
-    const GRID = 4, H = 4;
+    const H = HEIGHT;
     const cx = Math.floor(pos.x / GRID) * GRID + GRID / 2, cz = Math.floor(pos.z / GRID) * GRID + GRID / 2;
-    const ground = Math.min(...[[-2, -2], [2, -2], [-2, 2], [2, 2], [0, 0]].map(([dx, dz]) => g.world.heightAt(cx + dx, cz + dz)));
+    const ground = Math.min(...[[-GRID / 2, -GRID / 2], [GRID / 2, -GRID / 2], [-GRID / 2, GRID / 2], [GRID / 2, GRID / 2], [0, 0]].map(([dx, dz]) => g.world.heightAt(cx + dx, cz + dz)));
     const base = Math.max(ground - 0.3, WATER_LEVEL - 1);
     const who = owner || g.player;
     const saved = { ...who.mats };

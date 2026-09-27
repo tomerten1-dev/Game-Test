@@ -9,7 +9,7 @@ const BINDABLE = [
   ['wall', 'Wall'], ['floor', 'Floor'], ['ramp', 'Ramp'], ['cone', 'Cone'], ['build', 'Build mode'], ['edit', 'Edit'], ['ninety', 'Quick 90s'],
   ['map', 'Map'], ['emote', 'Emote'], ['mute', 'Mute'],
   ['slot1', 'Harvesting tool'], ['slot2', 'Weapon slot 2'], ['slot3', 'Weapon slot 3'], ['slot4', 'Weapon slot 4'], ['slot5', 'Weapon slot 5'], ['slot6', 'Weapon slot 6'],
-  ['inventory', 'Inventory'], ['drop', 'Drop held item'], ['ping', 'Ping (also middle mouse)'], ['shoulder', 'Swap camera shoulder'], ['autorun', 'Auto-run'], ['sprite', 'Sprite power'],
+  ['inventory', 'Inventory'], ['drop', 'Drop held item'], ['ping', 'Ping (also middle mouse)'], ['shoulder', 'Swap camera shoulder'], ['autorun', 'Auto-run'], ['sprite', 'Sprite power'], ['buildmat', 'Change build material'], ['resetEdit', 'Reset edit'],
 ];
 const SLIDERS = [
   ['sensitivity', 'Mouse sensitivity', 0.3, 3, 0.05, (v) => `${v.toFixed(2)}×`],
@@ -24,7 +24,8 @@ const TOGGLES = [['autoPickup', 'Auto pick up weapons'], ['stackDamage', 'Stack 
   ['weaponReticles', 'Crosshair changes per weapon'], ['throwArc', 'Show throw arc'], ['legacyHitSound', 'Legacy headshot sound', false],
   ['sprintByDefault', 'Sprint by default (sprint key walks)', false], ['toggleSprint', 'Toggle sprint (instead of hold)', false],
   ['tapToSearch', 'Tap to search (no holding)', false], ['holdToSwap', 'Hold to swap when inventory is full'],
-  ['questTracker', 'Quest tracker in matches'], ['showMinimap', 'Show minimap'], ['showCompass', 'Show compass'], ['showKillfeed', 'Show kill feed'], ['showFps', 'FPS counter', false]];
+  ['questTracker', 'Quest tracker in matches'], ['showMinimap', 'Show minimap'], ['showCompass', 'Show compass'], ['showKillfeed', 'Show kill feed'], ['showFps', 'FPS counter', false],
+  ['simpleBuild', 'Simple Build (fire: wall · aim: floor / ramp / cone by where you look)', false], ['preEdits', 'Pre-edits (edit in build mode to pre-shape the piece)'], ['editOnRelease', 'Confirm edit on release', false]];
 // preferred inventory slot per kind of gun (0 = any)
 const PREF_ROWS = [['shotgun', 'Shotgun slot'], ['rifle', 'Assault rifle slot'], ['smg', 'SMG / pistol slot'], ['sniper', 'Sniper slot'], ['explosive', 'Explosive slot']];
 const TOGGLE_DEFAULT = Object.fromEntries(TOGGLES.map(([k, , d = true]) => [k, d]));

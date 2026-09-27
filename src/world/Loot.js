@@ -334,7 +334,7 @@ export class Loot {
           this.spawnPickup({ type: 'weapon', weapon: w }, _v.set(x, y, z));
           this.spawnPickup(Loot.ammoFor(w), _v.set(x + 0.9, y, z + 0.4));
         } else if (roll < 0.8) this.spawnPickup(Loot.randomConsumable(), _v.set(x, y, z));
-        else this.spawnPickup({ type: 'mat', matType: ['wood', 'stone', 'metal'][Math.floor(Math.random() * 3)], amount: 30 }, _v.set(x, y, z));
+        else this.spawnPickup({ type: 'mat', matType: ['wood', 'stone', 'metal'][Math.floor(Math.random() * 3)], amount: 30 + 10 * Math.floor(Math.random() * 3) }, _v.set(x, y, z)); // material piles
       }
     }
     // fishing rods lie on the shore near most fishing spots
@@ -458,7 +458,8 @@ export class Loot {
     // Earth Sprite: sometimes an extra rare item
     if (actor.sprite?.bonusChest()) { const w3 = new Weapon(rollWeaponType('rare'), 3 + (Math.random() < 0.3 ? 1 : 0)).withRandomMods(); out.push({ type: 'weapon', weapon: w3 }, Loot.ammoFor(w3)); }
     if (actor.isPlayer) this.game.addSpriteXp?.(5);
-    out.push({ type: 'mat', matType: ['wood', 'wood', 'stone', 'metal'][Math.floor(Math.random() * 4)], amount: 30 });
+    // Fortnite chests: 30 of each material
+    for (const m of ['wood', 'stone', 'metal']) out.push({ type: 'mat', matType: m, amount: 30 });
     out.push({ type: 'gold', amount: c.rare ? 70 + Math.floor(Math.random() * 40) : 25 + Math.floor(Math.random() * 25) });
     const fwd = c.group.rotation.y;
     out.forEach((it, i) => {
