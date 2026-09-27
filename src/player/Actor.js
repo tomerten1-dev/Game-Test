@@ -55,6 +55,8 @@ export class Actor {
     this.slideT = 0;
     this.slideDir = new THREE.Vector3();
     this.useT = 0; // consumable channel time left
+    this.buildMode = null; // piece type while in build mode
+    this.buildMat = 'wood';
     this.swingT = 0;
     this._stepDist = 0;
     this.distToCam = 0;
@@ -64,6 +66,7 @@ export class Actor {
   get held() { return this.items[this.slot]; }
   get weapon() { const h = this.items[this.slot]; return h && h.isGun ? h : null; }
   get weapons() { return this.items.filter((i) => i && i.isGun); }
+  get matTotal() { return this.mats.wood + this.mats.stone + this.mats.metal; }
   get wood() { return this.mats.wood; }
   set wood(v) { this.mats.wood = Math.max(0, Math.min(MAT_CAP, v)); }
 
@@ -376,7 +379,9 @@ export class Actor {
   }
 
   switchSlot(i) {
-    if (i === this.slot || i < 0 || i > 5) return false;
+    if (i < 0 || i > 5) return false;
+    if (this.buildMode) { this.buildMode = null; if (i === this.slot) { this._equip(); return true; } }
+    if (i === this.slot) return false;
     this.weapon?.cancelReload();
     this.useT = 0;
     this.slot = i;
@@ -384,9 +389,19 @@ export class Actor {
     return true;
   }
 
+  // Enter/leave build mode (hands are empty while building).
+  setBuildMode(piece) {
+    if (piece === this.buildMode) return;
+    const was = this.buildMode;
+    this.buildMode = piece;
+    if (piece && !was) { this.weapon?.cancelReload(); this.useT = 0; }
+    if (!!piece !== !!was) this._equip();
+  }
+
   _equip() {
     const h = this.held;
-    if (h && h.isGun) this.character.setWeapon(makeWeaponMesh(h.type, h.rarity));
+    if (this.buildMode) this.character.setWeapon(null);
+    else if (h && h.isGun) this.character.setWeapon(makeWeaponMesh(h.type, h.rarity));
     else if (h && h.isPickaxe) this.character.setWeapon(makePickaxeMesh(), true);
     else this.character.setWeapon(null);
   }

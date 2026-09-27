@@ -16,6 +16,9 @@ export class TouchControls {
           <button class="tbtn wall" data-a="wall">WALL</button>
           <button class="tbtn ramp" data-a="ramp">RAMP</button>
           <button class="tbtn crouch" data-a="crouch">▼</button>
+          <button class="tbtn floor" data-a="floor">FLOOR</button>
+          <button class="tbtn cone" data-a="cone">CONE</button>
+          <button class="tbtn mat" data-a="buildmat">MAT</button>
         </div>
       </div>`);
     this.el = root.querySelector('#touch');

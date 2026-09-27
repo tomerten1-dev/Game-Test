@@ -152,8 +152,8 @@ Each phase ends with a playable build, a screenshot check and a git commit (same
 4. 5-slot inventory (+ axe slot); consumables with use time (bandage 15 hp, medkit 100 hp, small shield 25, big shield 50).
 5. 3D positional audio + footsteps + chest hum.
 
-### Phase B — Building like Fortnite · ~3 days
-1. Build mode with ghost preview (Q wall, Z floor, V ramp, C cone), place with fire button.
+### Phase B — Building like Fortnite · ✅ done
+1. Build mode with ghost preview (Q wall, Z floor, V ramp, X cone — C stays crouch), place with fire button.
 2. Three materials (wood/stone/metal): build-up animation, HP grows while building.
 3. Structural support (pieces fall when unsupported).
 4. Simple edit mode (door/window cut-outs on walls).

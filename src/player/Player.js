@@ -39,7 +39,7 @@ export class Player extends Actor {
     rig.addLook(look.x, look.y);
     this.aimYaw = rig.yaw + Math.PI;
     this.aimPitch = rig.pitch + rig.recoil;
-    this.aiming = input.down('aim');
+    this.aiming = input.down('aim') && !this.buildMode;
     const m = input.move();
     // camera-relative move direction
     const sy = Math.sin(rig.yaw), cy = Math.cos(rig.yaw);

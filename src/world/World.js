@@ -67,7 +67,7 @@ export class World {
       if (c.kind === 'box') {
         if (x < c.minX - radius * 0.6 || x > c.maxX + radius * 0.6 || z < c.minZ - radius * 0.6 || z > c.maxZ + radius * 0.6) continue;
         if (c.y1 <= feetY + STEP && c.y1 > g) g = c.y1;
-      } else if (c.kind === 'ramp') {
+      } else if (c.kind === 'ramp' || c.kind === 'cone') {
         if (x < c.minX || x > c.maxX || z < c.minZ || z > c.maxZ) continue;
         const s = rampSurfaceY(c, x, z);
         if (s <= feetY + 1.0 && s > g) g = s;
@@ -88,7 +88,7 @@ export class World {
     let hit = false;
     for (let pass = 0; pass < 2; pass++) {
       for (const c of list) {
-        if (c.kind === 'ramp') continue;
+        if (c.kind === 'ramp' || c.kind === 'cone') continue;
         if (feet >= c.y1 - STEP || head <= c.y0) continue;
         if (c.kind === 'circle') {
           const dx = pos.x - c.x, dz = pos.z - c.z;
@@ -167,7 +167,7 @@ export class World {
         t = c.rock
           ? raySphere(o.x, o.y, o.z, d.x, d.y, d.z, c.x, c.y1 - c.r * 0.6, c.z, c.r, best)
           : rayCylinder(o.x, o.y, o.z, d.x, d.y, d.z, c, best);
-      } else if (c.kind === 'ramp') t = rayRamp(o.x, o.y, o.z, d.x, d.y, d.z, c, best);
+      } else if (c.kind === 'ramp' || c.kind === 'cone') t = rayRamp(o.x, o.y, o.z, d.x, d.y, d.z, c, best);
       if (t >= 0 && t < best) { best = t; bestC = c; }
     }
     const tt = this.rayTerrain(o, d, best);

@@ -88,7 +88,7 @@ export class Combat {
         e.dmg += dmg;
         e.head = e.head || r.head;
       } else if (r.hit) {
-        const kind = r.collider ? (r.collider.structure ? 'wood' : r.collider.house ? 'stone' : r.collider.crate ? 'wood' : r.collider.tree ? 'wood' : r.collider.rock ? 'stone' : 'stone') : 'terrain';
+        const kind = r.collider ? (r.collider.structure ? (r.collider.structure.mat === 'wood' ? 'wood' : 'stone') : r.collider.house ? 'stone' : r.collider.crate ? 'wood' : r.collider.tree ? 'wood' : r.collider.rock ? 'stone' : 'stone') : 'terrain';
         if (i < 4) g.effects.impact(_end.addScaledVector(_dir, -0.05), kind, _n.copy(_dir).negate());
         if (r.collider?.structure) r.collider.structure.damage(w.damage * 0.9, shooter);
       }
@@ -144,7 +144,7 @@ export class Combat {
       return true;
     }
     const c = r.collider;
-    if (c?.structure) { c.structure.damage(50, actor); g.effects.impact(_end, 'wood'); g.sound.play('harvest_wood', actor.isPlayer ? null : _end); return true; }
+    if (c?.structure) { const m = c.structure.mat || 'wood'; c.structure.damage(50, actor); g.effects.impact(_end, m === 'wood' ? 'wood' : 'stone'); g.sound.play(`harvest_${m}`, actor.isPlayer ? null : _end); return true; }
     const mat = r.terrain ? null : c?.mat || (c?.tree || c?.crate ? 'wood' : c?.rock || c?.stone ? 'stone' : c?.house ? 'wood' : null);
     g.effects.impact(_end, mat === 'wood' ? 'wood' : 'stone', _n.copy(dir).negate());
     if (mat) {

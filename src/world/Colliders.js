@@ -3,6 +3,7 @@
 //   circle: { kind:'circle', x, z, r, y0, y1 }            (tree trunks, rocks)
 //   box:    { kind:'box', minX, maxX, minZ, maxZ, y0, y1 } (houses, crates, walls)
 //   ramp:   { kind:'ramp', minX, maxX, minZ, maxZ, y0, y1, dirX, dirZ } (walkable slope)
+//   cone:   { kind:'cone', minX, maxX, minZ, maxZ, y0, y1 }             (walkable pyramid roof)
 
 const CELL = 8;
 
@@ -147,6 +148,12 @@ export function raySphere(ox, oy, oz, dx, dy, dz, cx, cy, cz, r, maxT) {
 
 // Ramp = slanted plane inside its footprint rectangle.
 export function rampSurfaceY(r, x, z) {
+  if (r.kind === 'cone') {
+    // four-sided roof: highest at the cell center
+    const hx = (r.maxX - r.minX) / 2, hz = (r.maxZ - r.minZ) / 2;
+    const k = Math.max(Math.abs(x - (r.minX + hx)) / hx, Math.abs(z - (r.minZ + hz)) / hz);
+    return r.y0 + (r.y1 - r.y0) * Math.max(0, 1 - k);
+  }
   // progress 0..1 along dir from the low edge
   let t;
   if (r.dirX > 0) t = (x - r.minX) / (r.maxX - r.minX);

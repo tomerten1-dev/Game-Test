@@ -18,7 +18,7 @@ import { BOT_NAMES, botColors } from '../bots/names.js';
 import { Storm } from '../world/Storm.js';
 import { Bus } from '../world/Bus.js';
 import { Loot } from '../world/Loot.js';
-import { Building } from '../world/Building.js';
+import { Building, PIECES, BUILD_MATS, COST } from '../world/Building.js';
 import { HUD } from '../ui/HUD.js';
 import { Ambient } from '../effects/Ambient.js';
 import { Menus } from '../ui/Menus.js';
@@ -270,16 +270,18 @@ export class Game {
     if (!p.alive) return;
     for (let i = 0; i < 6; i++) if (input.pressed('slot' + (i + 1))) p.switchSlot(i);
     const wheel = input.consumeWheel();
-    if (wheel) {
+    if (wheel && p.buildMode) {
+      const i = PIECES.indexOf(p.buildMode);
+      p.setBuildMode(PIECES[(i + Math.sign(wheel) + PIECES.length) % PIECES.length]);
+    } else if (wheel) {
       for (let k = 1; k <= 6; k++) {
         const i = (p.slot + Math.sign(wheel) * k + 12) % 6;
         if (p.items[i]) { p.switchSlot(i); break; }
       }
     }
-    if (input.pressed('reload')) this.combat.reload(p);
+    if (input.pressed('reload') && !p.buildMode) this.combat.reload(p);
+    if (this.updateBuild(dt)) return;
     if (p.state === 'ground') {
-      if (input.pressed('wall') && !this.building.buildWall(p) && p.wood < 10) this.hud.toast?.('Need 10 wood');
-      if (input.pressed('ramp') && !this.building.buildRamp(p) && p.wood < 10) this.hud.toast?.('Need 10 wood');
       const near = this.loot.nearestInteractable(p.pos);
       const text = !near ? null : near.kind === 'chest' ? 'Open Chest' : near.kind === 'ammobox' ? 'Open Ammo Box' : `Pick up ${this.loot.label(near.pickup)}`;
       this.hud.prompt?.(text, near?.pickup?.weapon?.rarity);
@@ -314,6 +316,63 @@ export class Game {
     p.character.root.updateMatrixWorld(true);
     p.bodyYaw = p.aimYaw;
     this.combat.fire(p, origin, dir, p.muzzleWorld(_muzzle));
+  }
+
+  // Build mode: Q/Z/V/X pick a piece (touch: place it right away), fire places, right-click
+  // cycles the material, B toggles, G edits the wall you look at. Returns true while building.
+  updateBuild(dt) {
+    const p = this.player, input = this.input, b = this.building;
+    this._buildCd = Math.max(0, (this._buildCd || 0) - dt);
+    if (input.pressed('edit') && p.state === 'ground') this.editLookedAtWall();
+    for (const piece of PIECES) {
+      if (!input.pressed(piece)) continue;
+      if (this.touch) { this.placePiece(piece); return false; }
+      p.setBuildMode(piece);
+    }
+    if (input.pressed('build')) p.setBuildMode(p.buildMode ? null : this._lastPiece || 'wall');
+    if (input.pressed('buildmat')) this.cycleBuildMat();
+    if (!p.buildMode || p.state !== 'ground' || !p.alive) {
+      if (p.buildMode && !p.alive) p.setBuildMode(null);
+      b.hideGhost();
+      return false;
+    }
+    this._lastPiece = p.buildMode;
+    if (input.pressed('aim')) this.cycleBuildMat();
+    const plan = b.plan(p, p.buildMode, p.aimYaw, p.aimPitch);
+    const mat = b.pickMat(p, p.buildMat);
+    b.showGhost(plan, b.isValid(plan, p, mat));
+    this.hud.prompt?.(null);
+    if (input.down('fire') && this._buildCd <= 0) this.placePiece(p.buildMode, plan);
+    return true;
+  }
+
+  placePiece(piece, plan) {
+    const p = this.player, b = this.building;
+    if (p.state !== 'ground') return;
+    plan = plan || b.plan(p, piece, p.aimYaw, p.aimPitch);
+    const mat = b.pickMat(p, p.buildMat);
+    if (!mat) { if (!this._buildCd) this.hud.toast?.(`Need ${COST} materials — harvest with the axe`); this._buildCd = 0.4; return; }
+    if (mat !== p.buildMat) { p.buildMat = mat; }
+    if (b.build(p, plan, mat)) this._buildCd = 0.16;
+  }
+
+  cycleBuildMat() {
+    const p = this.player;
+    const i = BUILD_MATS.indexOf(p.buildMat);
+    p.buildMat = BUILD_MATS[(i + 1) % BUILD_MATS.length];
+    this.sound.play('click');
+  }
+
+  // Cut a door / window into the wall under the crosshair (only your own pieces, like the real thing).
+  editLookedAtWall() {
+    const dir = this.camera.getWorldDirection(_dir);
+    const origin = _origin.copy(this.camera.position).addScaledVector(dir, this.rig.curDist * 0.8);
+    const hit = this.world.raycast(origin, dir, 7);
+    const s = hit?.collider?.structure;
+    if (!s || s.type !== 'wall') { this.hud.toast?.('Look at one of your walls to edit it'); return; }
+    if (s.owner !== this.player) { this.hud.toast?.('You can only edit your own walls'); return; }
+    const e = this.building.edit(s);
+    this.hud.toast?.(e === 'door' ? 'Edit: door' : e === 'window' ? 'Edit: window' : 'Edit: reset');
   }
 
   // Channel the held consumable; finishing applies it and uses up one from the stack.

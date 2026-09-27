@@ -10,6 +10,7 @@ const _tp = new THREE.Vector3();
 const _dir = new THREE.Vector3();
 const _muzzle = new THREE.Vector3();
 const _cols = [];
+const _hit = {};
 
 // AI bot: a slow "think" picks goals/targets; a per-frame update steers, aims and shoots.
 export class Bot extends Actor {
@@ -45,6 +46,11 @@ export class Bot extends Actor {
     this.huntPos = new THREE.Vector3();
     this.huntT = 0;
     this.rampCooldown = 0;
+    this.boxed = false;     // sitting in a 1x1 box of our own walls
+    this.boxT = 0;
+    this.peekT = 0;         // window open toward the target
+    this.peekCd = 0;
+    this.shootWall = false; // target hides behind a build: shoot through it
   }
 
   get armed() { return this.items.some((it) => it && it.isGun); }
@@ -64,20 +70,79 @@ export class Bot extends Actor {
     if (this.useT > 0) { this.useT = 0; this._chooseWeapon(attacker ? this.pos.distanceTo(attacker.pos) : 20); }
     const hp = this.health + this.shield;
     const r = Math.random();
-    // badly hurt: throw up a wall and back off to heal
+    const b = this.game.building;
+    if (this.boxed) { if (this.peekT > 0) this._closePeek(); return; }
+    // badly hurt: box up (or wall + run) and heal
     const canHeal = this.findConsumable('heal') > 0 || this.findConsumable('shield') > 0;
+    if (hp < 55 && attacker && b && this.matTotal >= 40 && this.buildCooldown <= 0 && Math.random() < 0.45 + this.skill * 0.5) {
+      this._boxUp();
+      return;
+    }
     if (hp < 45 && canHeal && this.retreatT <= 0 && attacker) {
       this.retreatT = 2.5 + Math.random();
       this.hideYaw = Math.atan2(this.pos.x - attacker.pos.x, this.pos.z - attacker.pos.z);
-      if (this.wood >= 10 && this.game.building) this.game.building.buildWallFacing(this, this.hideYaw + Math.PI);
+      if (b?.canAfford(this)) b.buildWallFacing(this, this.hideYaw + Math.PI);
       return;
     }
     // under fire: box up with a wall (skilled bots do it more), or hop
     const wallChance = 0.2 + this.skill * 0.35;
-    if (r < wallChance && this.buildCooldown <= 0 && this.wood >= 10 && attacker && this.game.building) {
+    if (r < wallChance * 0.35 && this.skill > 0.4 && this.matTotal >= 50 && this.buildCooldown <= 0 && attacker && b) this._boxUp();
+    else if (r < wallChance && this.buildCooldown <= 0 && b?.canAfford(this) && attacker) {
       this.buildCooldown = 3.5;
       this.game.building.buildWallFacing(this, Math.atan2(attacker.pos.x - this.pos.x, attacker.pos.z - this.pos.z));
     } else if (r < wallChance + 0.2 && this.onGround) this.wantJump = true;
+  }
+
+  _boxUp() {
+    const b = this.game.building;
+    this.buildCooldown = 4;
+    if (b.buildBox(this, this.matTotal >= 60) >= 2 || this._inBox() >= 3) {
+      this.boxed = true;
+      this.boxT = 0;
+      this.peekCd = 1.5 + Math.random();
+      this.retreatT = 0;
+    }
+  }
+
+  // How many sides of our cell are walled.
+  _inBox() {
+    const b = this.game.building;
+    let n = 0;
+    for (let k = 0; k < 4; k++) if (b.wallAt(this, (k * Math.PI) / 2)) n++;
+    return n;
+  }
+
+  _yawTo(p) { return Math.atan2(p.x - this.pos.x, p.z - this.pos.z); }
+
+  // Edit a window toward the target to shoot through, then close it again.
+  _openPeek() {
+    const w = this.target && this.game.building.wallAt(this, this._yawTo(this.target.pos));
+    if (!w || w.owner !== this) return false;
+    this.game.building.edit(w, 'window');
+    this.peekWall = w;
+    this.peekT = 1.2 + this.skill * 1.2;
+    return true;
+  }
+
+  _closePeek() {
+    if (this.peekWall && this.peekWall.hp > 0) this.game.building.edit(this.peekWall, null);
+    this.peekWall = null;
+    this.peekT = 0;
+    this.peekCd = 1.2 + Math.random() * 1.5;
+  }
+
+  // Leave the box through a door on the side we want to go.
+  _leaveBox(yaw) {
+    if (this.peekT > 0) this._closePeek();
+    const w = this.game.building.wallAt(this, yaw);
+    if (w) {
+      // our own wall: door it; someone else's: just break it
+      if (w.owner === this) this.game.building.edit(w, 'door'); else w.damage(9999, this);
+      const [dx, dz] = w.alongX ? [0, Math.sign(w.cz - this.pos.z)] : [Math.sign(w.cx - this.pos.x), 0];
+      this.exitPt = new THREE.Vector3(w.cx + dx * 1.8, 0, w.cz + dz * 1.8);
+      this.exitT = 2;
+    }
+    this.boxed = false;
   }
 
   setGoal(x, z) { this.goal.set(x, 0, z); this.hasGoal = true; }
@@ -157,6 +222,40 @@ export class Bot extends Actor {
     const zoneGoal = this._zoneGoal();
     this.zoneUrgent = !!zoneGoal?.urgent;
 
+    // shoot through builds the target hides behind
+    this.shootWall = false;
+    if (this.target && !this.targetVisible && armed && this.target.state === 'ground') {
+      const dd = this.pos.distanceTo(this.target.pos);
+      if (dd < 35) {
+        const tc = this.target.chest(_tp);
+        _dir.copy(tc).sub(eye).normalize();
+        const hit = g.world.raycast(eye, _dir, dd, _hit);
+        this.shootWall = !!hit?.collider?.structure && hit.t > 1.2;
+        if (this.shootWall) { this.lastSeenPos.copy(this.target.pos); this.lastSeenT = g.time; }
+      }
+    }
+
+    // in a box: heal up, peek through windows, leave when it's time
+    if (this.boxed) {
+      this.boxT += THINK;
+      const walls = this._inBox();
+      const needHeal = (this.health < 75 && this.findConsumable('heal') > 0) || (this.shield < 75 && this.findConsumable('shield') > 0);
+      const lost = !this.target || g.time - this.lastSeenT > 5;
+      if (walls < 2) this.boxed = false;
+      else if (zoneGoal?.urgent || this.boxT > 25 || (lost && !needHeal && this.useT <= 0)) {
+        const to = zoneGoal ? { x: zoneGoal.x, z: zoneGoal.z } : this.target ? this.target.pos : this.hasGoal ? this.goal : { x: this.pos.x + 1, z: this.pos.z };
+        this._leaveBox(this._yawTo(to));
+      } else {
+        this.mode = 'boxed';
+        if (this.useT <= 0 && needHeal && this.peekT <= 0) {
+          let slot = this.health < 75 ? this.findConsumable('heal') : -1;
+          if (slot < 0) slot = this.findConsumable('shield');
+          if (slot > 0) { this.switchSlot(slot); this.startUse(); }
+        }
+        return;
+      }
+    }
+
     // retreating to heal
     if (this.retreatT > 0) { this.mode = 'retreat'; return; }
 
@@ -228,7 +327,7 @@ export class Bot extends Actor {
       }
     }
     // gather wood for building when low
-    if (this.wood < 40 && g.time - this.landTime > 8) {
+    if (this.matTotal < 40 && g.time - this.landTime > 8) {
       if (this.tree && Math.hypot(this.tree.x - this.pos.x, this.tree.z - this.pos.z) > 30) this.tree = null;
       if (!this.tree || this.mode !== 'harvest') this.tree = this._nearestTree(26);
       if (this.tree) {
@@ -341,7 +440,13 @@ export class Bot extends Actor {
       const done = this.tickUse(dt);
       if (done && this.distToCam < 40) g.sound.play(done.def.heal ? 'heal' : 'shield', this.pos, { range: 30 });
     }
-    if (this.retreatT > 0) {
+    if (this.exitT > 0) {
+      // walk straight out through the door we just cut
+      this.exitT -= dt;
+      const ex = this.exitPt.x - this.pos.x, ez = this.exitPt.z - this.pos.z, el = Math.hypot(ex, ez);
+      if (el > 0.4) { mx = ex / el; mz = ez / el; } else this.exitT = 0;
+      this.stuckT = 0; this.detourT = 0;
+    } else if (this.retreatT > 0) {
       // run away from the threat, then heal behind cover
       this.retreatT -= dt;
       mx = Math.sin(this.hideYaw); mz = Math.cos(this.hideYaw);
@@ -349,6 +454,17 @@ export class Bot extends Actor {
       if (this.retreatT <= 0) this.noHealT = 2;
     } else if (this.mode === 'heal') {
       mx = mz = 0;
+    } else if (this.boxed) {
+      // hold the middle of the box; peek through a window now and then
+      const cx = (Math.floor(this.pos.x / 4) + 0.5) * 4, cz = (Math.floor(this.pos.z / 4) + 0.5) * 4;
+      const ox = cx - this.pos.x, oz = cz - this.pos.z;
+      if (Math.hypot(ox, oz) > 0.4) { mx = ox; mz = oz; }
+      this.peekCd -= dt;
+      if (this.peekT > 0) { this.peekT -= dt; if (this.peekT <= 0) this._closePeek(); }
+      else if (tgt && this.armed && this.useT <= 0 && this.peekCd <= 0 && this.health + this.shield > 50) {
+        if (!this._openPeek()) this.peekCd = 2;
+        else this._chooseWeapon(this.pos.distanceTo(tgt.pos));
+      }
     } else if (this.mode === 'engage' && tgt) {
       const dx = tgt.pos.x - this.pos.x, dz = tgt.pos.z - this.pos.z;
       const d = Math.hypot(dx, dz) || 1;
@@ -373,7 +489,7 @@ export class Bot extends Actor {
         // crouch-peek at long range for accuracy
         this.crouched = !melee && this.skill > 0.35 && d > 25 && fwd === 0 && this.onGround && this.slideT <= 0;
         // take the high ground with a ramp when the enemy is above us
-        if (tgt.pos.y - this.pos.y > 2.5 && d < 20 && this.wood >= 10 && this.rampCooldown <= 0 && this.onGround && g.building) {
+        if (tgt.pos.y - this.pos.y > 2.5 && d < 20 && g.building?.canAfford(this) && this.rampCooldown <= 0 && this.onGround && g.building) {
           this.rampCooldown = 3 - this.skill;
           const yaw = this.aimYaw;
           this.aimYaw = Math.atan2(dx, dz);
@@ -400,7 +516,7 @@ export class Bot extends Actor {
         if (this.held !== this.items[0]) this.switchSlot(0);
         const r = g.combat.melee(this, this.eye(_eye), _dir.set(tx, 0, tz).normalize(), this.tree.r + 2.2);
         if (r) this.tree.hits++;
-        if (this.tree.hits > 6 || this.wood >= 60) { this.tree = null; this.mode = 'wander'; this._chooseWeapon(30); }
+        if (this.tree.hits > 6 || this.matTotal >= 80) { this.tree = null; this.mode = 'wander'; this._chooseWeapon(30); }
       }
     }
     if (this.mode !== 'engage' || !tgt) this.crouched = false;
@@ -430,7 +546,7 @@ export class Bot extends Actor {
     if (this.wantJump) { it.jump = true; this.wantJump = false; }
 
     // --- aiming & shooting ---
-    if (tgt && this.targetVisible) {
+    if (tgt && (this.targetVisible || this.shootWall)) {
       const eye = this.eye(_eye);
       _tp.set(tgt.pos.x, tgt.pos.y + (tgt.state === 'ground' ? 1.05 : 0.9), tgt.pos.z).add(this.aimErr);
       // slight lead on moving targets (imperfect)

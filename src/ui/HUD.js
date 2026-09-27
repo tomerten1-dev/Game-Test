@@ -50,11 +50,20 @@ export class HUD {
         <div id="bottom-right">
           <div id="ammo"><span id="ammo-cur">0</span><span id="ammo-max">/0</span></div>
           <div id="weapon-name"></div>
+          <div id="build-bar" class="hidden">
+            <div class="build-pieces">
+              <div class="bp" data-p="wall"><span class="key">Q</span><i class="bp-ico wall"></i><b>Wall</b></div>
+              <div class="bp" data-p="floor"><span class="key">Z</span><i class="bp-ico floor"></i><b>Floor</b></div>
+              <div class="bp" data-p="ramp"><span class="key">V</span><i class="bp-ico ramp"></i><b>Ramp</b></div>
+              <div class="bp" data-p="cone"><span class="key">X</span><i class="bp-ico cone"></i><b>Cone</b></div>
+            </div>
+            <div class="build-hint">Click: place · Right-click: material · G: edit · 1–6: exit</div>
+          </div>
           <div id="slots"></div>
           <div id="mats">
-            <div class="mat" title="Wood"><span class="mat-icon wood"></span><span id="mat-wood">0</span></div>
-            <div class="mat" title="Stone"><span class="mat-icon stone"></span><span id="mat-stone">0</span></div>
-            <div class="mat" title="Metal"><span class="mat-icon metal"></span><span id="mat-metal">0</span></div>
+            <div class="mat" data-m="wood" title="Wood"><span class="mat-icon wood"></span><span id="mat-wood">0</span></div>
+            <div class="mat" data-m="stone" title="Stone"><span class="mat-icon stone"></span><span id="mat-stone">0</span></div>
+            <div class="mat" data-m="metal" title="Metal"><span class="mat-icon metal"></span><span id="mat-metal">0</span></div>
           </div>
         </div>
       </div>`);
@@ -72,6 +81,11 @@ export class HUD {
     };
     this.el.slots.innerHTML = [0, 1, 2, 3, 4, 5].map((i) => `<div class="slot${i === 0 ? ' pick' : ''}" data-slot="${i}"><span class="key">${i + 1}</span><span class="icon"></span><span class="count"></span></div>`).join('');
     this.slotEls = [...this.el.slots.querySelectorAll('.slot')];
+    this.buildBar = $('#build-bar');
+    this.bpEls = [...root.querySelectorAll('.bp')];
+    this.matEls = [...root.querySelectorAll('#mats .mat')];
+    this.bpEls.forEach((el) => el.addEventListener('pointerdown', (e) => { e.stopPropagation(); this.game.input.press(el.dataset.p); }));
+    this.matEls.forEach((el) => el.addEventListener('pointerdown', (e) => { e.stopPropagation(); if (this.game.player) this.game.player.buildMat = el.dataset.m; }));
     this.slotEls.forEach((s) => s.addEventListener('pointerdown', (e) => { e.stopPropagation(); this.game.player?.switchSlot(+s.dataset.slot); }));
     this.minimap = new Minimap($('#minimap'), game);
     window.addEventListener('resize', () => this.minimap.resize());
@@ -219,6 +233,17 @@ export class HUD {
       s.querySelector('.count').textContent = it?.isConsumable ? String(it.count) : '';
     });
     for (const k of ['wood', 'stone', 'metal']) this.set('mat' + k, this.el.mats[k], String(p.mats[k]));
+    const bm = p.buildMode || '';
+    if (this.cache.bm !== bm) {
+      this.cache.bm = bm;
+      this.buildBar.classList.toggle('hidden', !bm);
+      this.el.slots.classList.toggle('dim', !!bm);
+      this.bpEls.forEach((el) => el.classList.toggle('active', el.dataset.p === bm));
+    }
+    if (this.cache.bmat !== p.buildMat) {
+      this.cache.bmat = p.buildMat;
+      this.matEls.forEach((el) => el.classList.toggle('sel', el.dataset.m === p.buildMat));
+    }
     const rl = w?.reloading, using = p.useT > 0 && p.useItem;
     this.el.reload.classList.toggle('hidden', !rl && !using);
     if (rl) {

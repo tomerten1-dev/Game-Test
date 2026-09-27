@@ -8,8 +8,8 @@ const KEYMAP = {
   Space: 'jump',
   KeyR: 'reload',
   KeyE: 'interact', KeyF: 'interact',
-  KeyQ: 'wall',
-  KeyV: 'ramp',
+  KeyQ: 'wall', KeyZ: 'floor', KeyV: 'ramp', KeyX: 'cone',
+  KeyB: 'build', KeyG: 'edit',
   Digit1: 'slot1', Digit2: 'slot2', Digit3: 'slot3', Digit4: 'slot4', Digit5: 'slot5', Digit6: 'slot6',
   ShiftLeft: 'sprint', ShiftRight: 'sprint',
   KeyC: 'crouch', ControlLeft: 'crouch',
@@ -47,7 +47,7 @@ export class Input {
       if (!this.enabled) return;
       if (document.pointerLockElement !== canvas) { this.requestLock(); return; }
       if (e.button === 0) { this.held.add('fire'); this.pressedSet.add('fire'); }
-      if (e.button === 2) this.held.add('aim');
+      if (e.button === 2) { this.held.add('aim'); this.pressedSet.add('aim'); }
     });
     window.addEventListener('mouseup', (e) => {
       if (e.button === 0) this.held.delete('fire');

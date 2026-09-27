@@ -32,13 +32,17 @@ Production build: `npm run build` (output in `dist/`), preview it with `npm run 
 | C (or Ctrl) | Crouch · press while sprinting to slide |
 | R | Reload (uses reserve ammo of the matching type) |
 | E (or F) | Open chest / ammo box · pick up |
-| Q | Build wood wall (10 wood) |
-| V | Build wood ramp (10 wood) |
-| 1 – 6 / mouse wheel | Switch slot (1 = harvesting axe) |
+| Q · Z · V · X | Build mode: wall · floor · ramp · cone (ghost preview) |
+| Left click (build mode) | Place the piece (hold to keep placing) |
+| Right click (build mode) | Switch material: wood → stone → metal |
+| Mouse wheel (build mode) | Cycle pieces |
+| B | Toggle build mode |
+| G | Edit the wall you look at: door → window → plain |
+| 1 – 6 / mouse wheel | Switch slot (1 = harvesting axe) · leaves build mode |
 | M | Mute |
 | Esc | Pause |
 
-**Touch devices** get a floating joystick on the left, drag-to-look on the right, and buttons for Fire (hold), Jump, Crouch, Wall, Ramp, Reload and Use. Push the stick all the way to sprint. Tap the inventory slots to switch.
+**Touch devices** get a floating joystick on the left, drag-to-look on the right, and buttons for Fire (hold), Jump, Crouch, Reload, Use and quick-build (Wall, Floor, Ramp, Cone, MAT to switch material). Push the stick all the way to sprint. Tap the inventory slots to switch.
 
 ## Inventory & survival
 
@@ -46,6 +50,18 @@ Production build: `npm run build` (output in `dist/`), preview it with `npm run 
 - **Slots 2–6** hold guns or stacks of heals: Bandages (+15 up to 75), Medkit (full health), Small Shield (+25 up to 50), Shield Potion (+50). Hold still-ish while the ring fills.
 - Guns use **light / medium / shells** ammo; reserve shows after the slash. Green **ammo boxes** near houses and anything dropped on the ground are picked up by walking over it.
 - Sprinting is fast but inaccurate; standing still gives a perfectly accurate first shot. Falls from high up hurt.
+
+## Building
+
+Every piece costs 10 of the selected material and snaps to a 4 m grid, lining up with nearby builds so you can stack walls, floors and ramps. Look up to build a level higher, or look down to put a floor under you.
+
+| Material | Max HP | Time to reach full HP |
+| --- | --- | --- |
+| Wood | 150 | 2.5 s |
+| Stone | 300 | 5 s |
+| Metal | 450 | 8 s |
+
+Pieces start weaker (and see-through) and harden while they build. Anything that loses its connection to the ground collapses. Bots box up (four walls + roof) when hurt, heal inside, open windows to shoot back, shoot through your walls and ramp up to high ground.
 
 ## Graphics settings
 
