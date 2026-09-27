@@ -183,10 +183,16 @@ Each phase ends with a playable build, a screenshot check and a git commit (same
 8. Music: lobby theme, bus/drop sting, victory/defeat jingles.
 
 ### Phase F — Scale & modes · ~3+ days
-1. 40–60 bots with stronger LOD (animation + logic tiers).
+1. ✅ 100 players (you + 99 bots) on a 3× larger island with LOD tiers; 11 POIs incl. Skyline Spires, Rusty Works, Lazy Lake, Salty Pier.
 2. Duo/Squad modes with AI teammates, knock & revive.
 3. Zero Build mode toggle.
-4. NPC boss with keycard vault.
+4. ✅ NPC boss (the Foreman) with keycard vault.
 
 ### Not planned (needs servers / licensing)
 Real online multiplayer, friends/party, real-money purchases of any kind, replays.
+
+
+## Post-phase additions (done)
+Mantling + tactical sprint · gun kick, AR bullet drop, burst rifle, pump vs tactical shotgun · full 3×3 edit grid · turbo build, floors under floating ramps, quick 90s · bot 90s/tunnels/cone caps · in-match day/night cycle · balloon Storm Bus with riders and "thank the bus driver" · beam-up eliminations and victory cinematic · damage vignette, headshot pop, shield breaks · CC0 Kenney sound effects · emote wheel · weekly quests and milestones · Summer / Winter / Desert islands.
+
+Still open: duos/squads with AI teammates and revives, Zero Build mode, vehicles, fishing, killcam replays, creative mode.
