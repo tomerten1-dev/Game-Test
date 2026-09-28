@@ -943,3 +943,68 @@ body.hud-editing #top-right, body.hud-editing #bottom-left, body.hud-editing #bo
   filter: drop-shadow(0 0 1.5px #151a45) drop-shadow(0 4px 0 #151a45) drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35));
 }
 .lb-brand .bolt { -webkit-text-fill-color: #ffd23f; }
+
+/* ---------- Chapter 1 quick bar (bottom right): materials, build pieces, rarity-filled slots ---------- */
+#bottom-right { gap: 8px; }
+#bottom-right > #ammo, #bottom-right > #weapon-name { order: -5; }
+#bottom-right > #mats { order: -4; }
+#bottom-right > #build-bar { order: -3; }
+#bottom-right > #special-slots { order: -2; }
+#mats { gap: 0; padding: 0; border-radius: 3px; background: rgba(40, 46, 60, 0.55); }
+#mats .mat { flex-direction: column; justify-content: center; gap: 2px; width: 72px; height: 76px; padding: 6px 0 4px; border-radius: 0; border: 0; background: transparent; font-family: var(--title); font-size: 22px; font-weight: 400; color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.55); }
+#mats .mat + .mat { border-left: 1px solid rgba(255, 255, 255, 0.12); }
+#mats .mat:nth-child(2) { border-right: 3px solid rgba(255, 255, 255, 0.35); }
+#mats .mat.sel { background: rgba(120, 130, 160, 0.75); border-color: transparent; }
+.mat-icon { width: 44px; height: 36px; border-radius: 0; box-shadow: none; transform: none; background-repeat: no-repeat; background-position: center; background-size: contain; filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.45)); }
+.mat-icon.wood { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 36'%3E%3Cpath d='M8 8 L34 26 L28 34 L2 16Z' fill='%23e4d3a8'/%3E%3Cpath d='M18 2 L44 20 L38 28 L12 10Z' fill='%23f0e2bc'/%3E%3Cellipse cx='5' cy='12' rx='4.5' ry='5' fill='%23c9a15c'/%3E%3Cellipse cx='5' cy='12' rx='2.2' ry='2.5' fill='%23a37c3c'/%3E%3Cellipse cx='15' cy='6' rx='4.5' ry='5' fill='%23c9a15c'/%3E%3Cellipse cx='15' cy='6' rx='2.2' ry='2.5' fill='%23a37c3c'/%3E%3C/svg%3E") center / contain no-repeat; }
+.mat-icon.stone { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 36'%3E%3Cpath d='M4 12 L16 4 L44 12 L44 26 L32 34 L4 26Z' fill='%23b8663a'/%3E%3Cpath d='M4 12 L32 20 L44 12 L16 4Z' fill='%23d9864e'/%3E%3Cpath d='M32 20 L44 12 L44 26 L32 34Z' fill='%23964f2a'/%3E%3Cellipse cx='14' cy='11' rx='3' ry='1.8' fill='%23713a1c'/%3E%3Cellipse cx='22' cy='13' rx='3' ry='1.8' fill='%23713a1c'/%3E%3Cellipse cx='30' cy='15' rx='3' ry='1.8' fill='%23713a1c'/%3E%3C/svg%3E") center / contain no-repeat; }
+.mat-icon.metal { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 36'%3E%3Cpath d='M10 2 L40 2 L40 7 L28 7 L28 29 L40 29 L40 34 L10 34 L10 29 L22 29 L22 7 L10 7Z' fill='%23d9dde6'/%3E%3Cpath d='M40 2 L46 6 L46 11 L40 7Z M40 29 L46 33 L40 34Z M28 7 L34 11 L34 29 L28 29Z' fill='%23939aa8'/%3E%3C/svg%3E") center / contain no-repeat; }
+/* glassy blue build pieces above the quick bar, always on screen */
+#build-bar { gap: 0; }
+#build-bar .build-pieces { gap: 0; padding: 4px; background: rgba(40, 90, 150, 0.35); border-radius: 3px; }
+#build-bar .bp { width: 76px; height: 64px; border-radius: 0; border: 0; background: transparent; transform: none; box-shadow: none; }
+#build-bar .bp b, #build-bar .bp .key { display: none; }
+#build-bar.building .bp .key { display: block; }
+#build-bar .bp.active { transform: none; background: rgba(120, 200, 255, 0.35); box-shadow: inset 0 0 0 2px #cfefff; }
+#build-bar .build-hint { display: none; }
+#build-bar.building .build-hint { display: block; order: 2; }
+#build-bar:not(.building) .build-pieces { opacity: 0.85; }
+.bp-ico { width: 56px !important; height: 48px !important; margin: 0 !important; border-radius: 0 !important; clip-path: none !important; background: center / contain no-repeat; filter: drop-shadow(0 0 3px rgba(150, 220, 255, 0.8)); }
+.bp-ico.wall { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 48'%3E%3Cpath d='M10 8 L36 4 L36 40 L10 44Z' fill='%23bfe6ff' fill-opacity='.55' stroke='%23fff' stroke-width='2.5'/%3E%3Cpath d='M36 4 L44 9 L44 43 L36 40Z' fill='%238ccaf5' fill-opacity='.6' stroke='%23fff' stroke-width='2'/%3E%3C/svg%3E"); }
+.bp-ico.floor { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 48'%3E%3Cpath d='M4 26 L28 14 L52 26 L28 38Z' fill='%23bfe6ff' fill-opacity='.55' stroke='%23fff' stroke-width='2.5'/%3E%3Cpath d='M4 26 L28 38 L52 26 L52 31 L28 43 L4 31Z' fill='%238ccaf5' fill-opacity='.6' stroke='%23fff' stroke-width='2'/%3E%3C/svg%3E"); }
+.bp-ico.ramp { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 48'%3E%3Cpath d='M6 40 L6 34 L14 34 L14 28 L22 28 L22 22 L30 22 L30 16 L38 16 L38 10 L46 10 L46 40Z' fill='%23bfe6ff' fill-opacity='.55' stroke='%23fff' stroke-width='2.5' stroke-linejoin='round'/%3E%3Cpath d='M46 10 L52 14 L52 44 L46 40Z' fill='%238ccaf5' fill-opacity='.6' stroke='%23fff' stroke-width='2'/%3E%3C/svg%3E"); }
+.bp-ico.cone { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 48'%3E%3Cpath d='M28 4 L6 26 L28 42 L50 26Z' fill='%23bfe6ff' fill-opacity='.45' stroke='%23fff' stroke-width='2.5' stroke-linejoin='round'/%3E%3Cpath d='M28 4 L28 42' stroke='%23fff' stroke-width='2'/%3E%3C/svg%3E"); }
+/* slots: square tiles filled with the item's rarity colour, big icon, count bottom right */
+#slots { gap: 6px; }
+.slot { width: 88px; height: 88px; border-radius: 2px; border: 3px solid rgba(0, 0, 0, 0.25); transform: none; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2), 0 3px 8px rgba(0, 0, 0, 0.35);
+  background: radial-gradient(ellipse at 50% 35%, color-mix(in srgb, var(--slotbg, transparent) 70%, #fff 30%) 0%, var(--slotbg, transparent) 55%, color-mix(in srgb, var(--slotbg, transparent) 75%, #000 25%) 100%), rgba(25, 32, 48, 0.45); }
+.slot.pick { width: 88px; }
+.slot.active { transform: translateY(-6px); border: 4px solid #fffbe0; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 0 14px rgba(255, 250, 210, 0.75); }
+.slot .icon img { width: 76px; height: 64px; }
+.slot .key { left: 5px; top: 2px; font-size: 12px; opacity: 0.7; }
+.slot .count { right: 6px; bottom: 3px; display: flex; align-items: center; gap: 2px; font-family: var(--title); font-weight: 400; font-size: 22px; color: #fff; text-shadow: 0 0 3px #000, 0 2px 0 #000; }
+.slot .count .am { display: inline-block; width: 6px; height: 13px; margin-left: 2px; border-radius: 2px 2px 1px 1px; background: var(--c); transform: rotate(20deg); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6); }
+.slot.low .count { color: #ff7a7a; }
+#br-extras { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 14px; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4); }
+#br-extras .gold-chip { display: flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 6px; background: rgba(255, 210, 63, 0.14); border: 2px solid rgba(255, 210, 63, 0.35); color: #ffe08a; }
+body.touch .slot { width: 56px; height: 56px; }
+body.touch .slot .icon img { width: 48px; height: 40px; }
+body.touch .slot .count { font-size: 15px; }
+body.touch #mats .mat { width: 48px; height: 50px; font-size: 15px; }
+body.touch .mat-icon { width: 30px; height: 24px; }
+body.touch #build-bar .bp { width: 50px; height: 44px; }
+body.touch .bp-ico { width: 38px !important; height: 32px !important; }
+/* magazine / reserve and weapon name sit in the free space left of the build pieces, above the slots */
+#bottom-right { position: absolute; }
+#bottom-right > #ammo { position: absolute; right: 332px; bottom: 150px; order: 0; text-align: right; }
+#bottom-right > #weapon-name { position: absolute; right: 332px; bottom: 124px; order: 0; white-space: nowrap; }
+body.touch #bottom-right > #ammo, body.touch #bottom-right > #weapon-name { right: auto; left: 0; }
+/* phones have their own build buttons, so the build-piece row stays off and the materials shrink */
+body.touch #build-bar .build-pieces { display: none; }
+body.touch #mats .mat { width: 42px; height: 38px; font-size: 13px; padding: 2px 0; }
+body.touch .mat-icon { width: 22px; height: 16px; }
+body.touch #bottom-right { gap: 3px; }
+body.touch .slot { width: 46px; height: 46px; }
+body.touch .slot .icon img { width: 40px; height: 34px; }
+body.touch .slot .count { font-size: 13px; right: 3px; bottom: 1px; }
+body.touch #slots { gap: 4px; }

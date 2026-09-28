@@ -15,6 +15,8 @@ const fmtTime = (s) => {
 };
 
 // DOM heads-up display. Built once; update() writes only changed values.
+// Fortnite rarity of the consumables (colours the quick-bar slot like Chapter 1)
+const CONS_RARITY = { bandage: 0, grenade: 0, smallshield: 1, medkit: 1, spicytaco: 1, campfire: 1, trap: 1, bouncer: 1, smoke: 1, bigshield: 2, impulse: 2, shockwave: 2, chugsplash: 2, medmist: 2, crashpad: 2, fire: 2, slurp: 3, flowberry: 2, portafort: 3, bubble: 3, keg: 3, stormflip: 3, oneup: 3, chug: 4, goldfish: 5 };
 const LAYOUT_IDS = ['top-right', 'bottom-left', 'bottom-right', 'killfeed', 'compass'];
 
 export class HUD {
@@ -85,7 +87,12 @@ export class HUD {
         <div id="bottom-right">
           <div id="ammo"><span id="ammo-cur">0</span><span id="ammo-max">/0</span></div>
           <div id="weapon-name"></div>
-          <div id="build-bar" class="hidden">
+          <div id="mats">
+            <div class="mat" data-m="wood" title="Wood"><span class="mat-icon wood"></span><span id="mat-wood">0</span></div>
+            <div class="mat" data-m="stone" title="Brick"><span class="mat-icon stone"></span><span id="mat-stone">0</span></div>
+            <div class="mat" data-m="metal" title="Metal"><span class="mat-icon metal"></span><span id="mat-metal">0</span></div>
+          </div>
+          <div id="build-bar">
             <div class="build-pieces">
               <div class="bp" data-p="wall"><span class="key">Q</span><i class="bp-ico wall"></i><b>Wall</b></div>
               <div class="bp" data-p="floor"><span class="key">Z</span><i class="bp-ico floor"></i><b>Floor</b></div>
@@ -96,10 +103,7 @@ export class HUD {
           </div>
           <div id="special-slots"></div>
           <div id="slots"></div>
-          <div id="mats">
-            <div class="mat" data-m="wood" title="Wood"><span class="mat-icon wood"></span><span id="mat-wood">0</span></div>
-            <div class="mat" data-m="stone" title="Stone"><span class="mat-icon stone"></span><span id="mat-stone">0</span></div>
-            <div class="mat" data-m="metal" title="Metal"><span class="mat-icon metal"></span><span id="mat-metal">0</span></div>
+          <div id="br-extras">
             <div id="ammo-types"></div>
             <div class="gold-chip" title="Gold bars: spend them at vending machines and upgrade benches"><span class="gold-icon"></span><span id="gold-n">0</span></div>
           </div>
@@ -704,19 +708,22 @@ export class HUD {
       const it = who.items[i];
       const code = this.game.input.keyFor('slot' + (i + 1));
       const key = code ? keyLabel(code).replace(' Mouse', '').replace('Mouse ', 'M') : '';
-      const sig = `${it ? it.type + (it.rarity ?? '') + (it.count ?? '') + (it.isGun ? '/' + it.ammo : '') : ''}|${i === who.slot}|${key}`;
+      const sig = `${it ? it.type + (it.rarity ?? '') + (it.count ?? '') + (it.isGun ? '/' + it.ammo + '/' + who.ammoFor(it.def.ammoType) : '') : ''}|${i === who.slot}|${key}`;
       if (this.cache['slot' + i] === sig) return;
       this.cache['slot' + i] = sig;
       s.querySelector('.key').textContent = key;
       s.classList.toggle('active', i === who.slot);
-      const col = !it ? 'rgba(255,255,255,0.15)' : it.isGun ? RARITIES[it.rarity].color : it.isConsumable ? it.def.color : '#e8d7b0';
+      const col = !it ? 'rgba(255,255,255,0.15)' : it.isGun ? RARITIES[it.rarity].color : it.isConsumable ? RARITIES[CONS_RARITY[it.type] ?? 1].color : '#e8d7b0';
       s.style.setProperty('--rar', col);
       const url = itemIcon(it);
       const ic = s.querySelector('.icon');
       if (url) ic.innerHTML = `<img src="${url}" alt="">`;
       else ic.textContent = !it ? '' : it.isGun ? it.def.icon : it.isConsumable ? it.def.icon : '⛏';
       s.classList.toggle('has-img', !!url);
-      s.querySelector('.count').textContent = it?.isConsumable ? String(it.count) : it?.isGun ? String(it.ammo) : '';
+      // Chapter 1 style: guns show the reserve ammo you carry for them (with a tiny ammo mark), items their stack
+      const res = it?.isGun && it.def.ammoType !== 'none' ? who.ammoFor(it.def.ammoType) : null;
+      s.querySelector('.count').innerHTML = it?.isConsumable ? String(it.count) : res !== null && res !== Infinity ? `${res}<i class="am" style="--c:${AMMO[it.def.ammoType]?.color || '#fff'}"></i>` : '';
+      s.style.setProperty('--slotbg', !it ? 'transparent' : i === 0 && !it.isGun && !it.isConsumable ? '#3a8fe0' : col);
       s.classList.toggle('low', !!it?.isGun && it.def.ammoType !== 'none' && it.mag > 1 && it.ammo <= Math.ceil(it.mag * 0.25));
     });
     for (const k of ['wood', 'stone', 'metal']) this.set('mat' + k, this.el.mats[k], String(who.mats[k]));
@@ -745,7 +752,8 @@ export class HUD {
         const hint = this.root.querySelector('.build-hint');
         if (hint) hint.textContent = setting(g, 'simpleBuild', false) ? `Fire: wall · Aim: floor / ramp / cone · ${kl('buildmat', 'KeyL')}: material · ${kl('reload', 'KeyR')}: turn ramp` : `Click: place · Right-click: material · ${kl('reload', 'KeyR')}: turn ramp · ${kl('edit', 'KeyG')}: edit · 1–6: exit`;
       }
-      this.buildBar.classList.toggle('hidden', !bm);
+      // Chapter 1 style: the build pieces always sit above the quick bar and light up in build mode
+      this.buildBar.classList.toggle('building', !!bm);
       this.el.slots.classList.toggle('dim', !!bm);
       this.bpEls.forEach((el) => el.classList.toggle('active', el.dataset.p === bm));
     }
