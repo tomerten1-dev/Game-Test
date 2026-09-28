@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { isModel, customCosmetic } from './CustomCosmetics.js';
 import { makePickaxeMesh } from '../weapons/WeaponModels.js';
 
 // Cosmetic gear built from simple shapes: hats (part of some skins), back blings and harvesting
@@ -158,6 +159,7 @@ const BACK = {
 };
 
 export function makeBackBling(id) {
+  if (isModel(id)) { const g = customCosmetic(id); if (g) g.name = 'backbling'; return g; } // your own back bling model
   const b = BACK[id];
   if (!b) return null;
   const g = new THREE.Group();
@@ -264,6 +266,7 @@ const TOOLS = {
 
 // A harvesting tool mesh for a skin id (null/'default' = the KayKit axe).
 export function makeHarvestTool(id) {
+  if (isModel(id)) return customCosmetic(id, makePickaxeMesh()) || makePickaxeMesh(); // your own pickaxe model
   const t = id && TOOLS[id];
   const m = t ? t() : null;
   if (m) { m.traverse((o) => { if (o.isMesh) o.castShadow = true; }); return m; }

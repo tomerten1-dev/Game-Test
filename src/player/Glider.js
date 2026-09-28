@@ -1,8 +1,10 @@
 import * as THREE from 'three';
+import { isModel, customCosmetic } from './CustomCosmetics.js';
 import { part, merge, mat } from '../world/geomUtils.js';
 
 // Stylized delta-wing glider shown above a character while gliding.
 export function makeGlider(color, accentColor = '#ffd23f') {
+  if (isModel(color)) { const g = customCosmetic(color); if (g) return g; color = '#2ee6c9'; } // your own glider model
   const c = new THREE.Color(color);
   const accent = new THREE.Color(accentColor);
   const wing = new THREE.BufferGeometry();

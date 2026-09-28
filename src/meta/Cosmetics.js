@@ -159,6 +159,17 @@ export function registerCustomSkin(id, name, builtin = false) {
   COSMETIC_LIST.splice(COSMETIC_LIST.findIndex((c) => c.type === 'hero' && !c.custom), 0, item); // before the built-in heroes, in the order you added them
   return cid;
 }
+// Gliders / pickaxes / back blings from the cosmetics folder.
+export function registerCustomCosmetic(type, id, file, value) {
+  const cid = `custom_${id}`;
+  if (COSMETICS[cid]) return cid;
+  const name = file.replace(/\.(glb|gltf)$/i, '').replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  const item = { id: cid, type, name, rarity: 4, value, custom: true, builtin: true, price: 0 };
+  COSMETICS[cid] = item;
+  const at = COSMETIC_LIST.findIndex((c) => c.type === type && !c.custom);
+  COSMETIC_LIST.splice(at < 0 ? COSMETIC_LIST.length : at, 0, item);
+  return cid;
+}
 export function unregisterCustomSkin(id) {
   const cid = `custom_${id}`;
   delete COSMETICS[cid];

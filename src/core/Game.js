@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { World } from '../world/World.js';
 import { TOWNS, MAP_SCALE, VAULT_TOWN } from '../world/Terrain.js';
 import { loadIslandMap } from '../world/IslandMap.js';
+import { loadCosmeticFolder, CUSTOM_BY_KIND } from '../player/CustomCosmetics.js';
+import { makeGlider } from '../player/Glider.js';
 import { CharacterAssets, Q_TYPES } from '../player/Character.js';
 import { Player } from '../player/Player.js';
 import { CameraRig } from '../player/CameraRig.js';
@@ -94,6 +96,7 @@ export class Game {
     setWeaponModels(this.models);
     progress(0.45, 'Shaping the island…');
     await loadIslandMap();
+    await loadCosmeticFolder(); // your gliders / pickaxes / back blings (cosmetics folder)
     await nextFrame();
     this.world = new World(this.scene, this.renderer, this.models);
     progress(0.8, 'Growing trees…');
@@ -478,14 +481,24 @@ export class Game {
     const n = { quick: 29, reload: 39, blitz: 31 }[this.mode] || 99;
     const colors = botColors(n);
     this.bots = [];
+    // your skins-folder models and cosmetics-folder items show up on bots too
+    const folderSkins = (this.assets.customSkins || []).filter((k) => k.builtin && k.ok).map((k) => k.type);
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    const mine = (kind, stock) => (CUSTOM_BY_KIND[kind].length && Math.random() < 0.5 ? pick(CUSTOM_BY_KIND[kind]) : pick(stock));
     for (let i = 0; i < n; i++) {
       // arena bots get sharper as you climb the divisions
       const boost = this.mode === 'arena' ? 0.15 + arenaDivision(this.meta.profile.d.arena?.points || 0).skill : 0;
-      const b = new Bot(this, BOT_NAMES[i], colors[i], Math.min(1, Math.random() * (1 - boost * 0.5) + boost), Q_TYPES[i % Q_TYPES.length]);
+      const type = folderSkins.length && Math.random() < 0.5 ? pick(folderSkins) : Q_TYPES[i % Q_TYPES.length];
+      const b = new Bot(this, BOT_NAMES[i], colors[i], Math.min(1, Math.random() * (1 - boost * 0.5) + boost), type);
       // bots show off random gear too
-      const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-      if (Math.random() < 0.35) b.pickaxeSkin = pick(TOOL_IDS);
-      b.applyGear({ hat: Math.random() < 0.12 ? pick(HAT_IDS) : null, backbling: Math.random() < 0.45 ? pick(BACK_IDS) : null });
+      if (Math.random() < 0.35) b.pickaxeSkin = mine('pickaxe', TOOL_IDS);
+      b.applyGear({ hat: Math.random() < 0.12 && !type.startsWith('Custom:') ? pick(HAT_IDS) : null, backbling: Math.random() < 0.45 ? mine('backbling', BACK_IDS) : null });
+      if (CUSTOM_BY_KIND.glider.length && Math.random() < 0.5) {
+        b.root.remove(b.glider);
+        b.glider = makeGlider(pick(CUSTOM_BY_KIND.glider)[0]);
+        b.glider.visible = false;
+        b.root.add(b.glider);
+      }
       if (Math.random() < 0.25) attachKicks(b.character, pick(COSMETIC_LIST.filter((c) => c.type === 'kicks' && c.value)).value);
       if (Math.random() < 0.3) { b.spriteLevel = 1 + Math.floor(Math.random() * 3); b.sprite = new SpriteCompanion(b, pick(Object.keys(SPRITES))); }
       this.bots.push(b);

@@ -23,6 +23,7 @@ const coin = '<i class="coin"></i>';
 
 export function itemIcon(c) {
   const v = c.value;
+  if (c.custom) return `<i class="ic ic-hero">${c.type === 'glider' ? '🪂' : c.type === 'pickaxe' ? '⛏' : c.type === 'backbling' ? '🎒' : '★'}</i>`; // your own models
   if (c.type === 'hero') return `<i class="ic ic-hero" style="${c.tint ? `--tint:${c.tint}` : ''}">${HAT_ICON[c.hat] || HERO_ICON[v] || '★'}</i>`;
   if (c.type === 'backbling') return `<i class="ic ic-hero">${BACK_ICON[v] || '∅'}</i>`;
   if (c.type === 'pickaxe') return `<i class="ic ic-hero">${TOOL_ICON[v] || '🪓'}</i>`;

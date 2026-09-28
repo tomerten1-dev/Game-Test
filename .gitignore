@@ -26,3 +26,8 @@ dist-ssr
 # your own character models (Locker skins) stay on your computer
 skins/*
 !skins/README.md
+
+# your own cosmetic models (gliders / pickaxes / back blings) stay on your computer
+cosmetics/**/*.*
+!cosmetics/README.md
+!cosmetics/*/.gitkeep
