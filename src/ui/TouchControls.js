@@ -21,7 +21,6 @@ export class TouchControls {
           <button class="tbtn mat" data-a="buildmat">MAT</button>
           <button class="tbtn edit" data-a="edit">EDIT</button>
           <button class="tbtn emote" data-a="emote">♪</button>
-          <button class="tbtn sprite" data-a="sprite">SPR</button>
           <button class="tbtn ping" data-a="ping">PING</button>
           <button class="tbtn inv" data-a="inventory">BAG</button>
         </div>

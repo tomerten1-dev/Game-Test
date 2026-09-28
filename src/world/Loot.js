@@ -469,9 +469,7 @@ export class Loot {
     out.push(Loot.ammoFor(w));
     // like Fortnite: a weapon + ammo + materials, and sometimes a heal / utility item
     if (c.rare || Math.random() < 0.6) out.push(Loot.randomConsumable());
-    // Earth Sprite: sometimes an extra rare item
-    if (actor.sprite?.bonusChest()) { const w3 = new Weapon(rollWeaponType('rare'), 3 + (Math.random() < 0.3 ? 1 : 0)).withRandomMods(); out.push({ type: 'weapon', weapon: w3 }, Loot.ammoFor(w3)); }
-    if (actor.isPlayer) { this.game.addSpriteXp?.(5); actor.sidekick?.hop(1.4); }
+    if (actor.isPlayer) actor.sidekick?.hop(1.4);
     // Fortnite chests: 30 of each material
     for (const m of ['wood', 'stone', 'metal']) out.push({ type: 'mat', matType: m, amount: 30 });
     out.push({ type: 'gold', amount: c.rare ? 70 + Math.floor(Math.random() * 40) : 25 + Math.floor(Math.random() * 25) });

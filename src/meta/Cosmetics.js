@@ -10,7 +10,6 @@ export const SLOTS = [
   { key: 'trail', name: 'Contrail' },
   { key: 'emote', name: 'Emote' },
   { key: 'wrap', name: 'Weapon Wrap' },
-  { key: 'sprite', name: 'Sprite' },
   { key: 'kicks', name: 'Kicks' },
   { key: 'sidekick', name: 'Sidekick' },
   { key: 'spray', name: 'Spray' },
@@ -106,11 +105,6 @@ const items = [
   { id: 'emote_confetti', type: 'emote', name: 'Confetti Toss', rarity: 3, value: 'Throw', fx: 'confetti' },
   { id: 'emote_summon', type: 'emote', name: 'Grand Summon', rarity: 4, value: 'Spellcast_Long', fx: 'sparkle' },
   // weapon wraps
-  // sprites: companions with a power (they level up as you play)
-  { id: 'sp_none', type: 'sprite', name: 'No Sprite', rarity: 0, value: null, starter: true },
-  { id: 'sp_water', type: 'sprite', name: 'Water Sprite', rarity: 2, value: 'water', starter: true },
-  { id: 'sp_earth', type: 'sprite', name: 'Earth Sprite', rarity: 2, value: 'earth', starter: true },
-  { id: 'sp_fire', type: 'sprite', name: 'Fire Sprite', rarity: 2, value: 'fire', starter: true },
   // kicks (shoes over the outfit's boots)
   { id: 'kick_none', type: 'kicks', name: 'Outfit Default', rarity: 0, value: null, starter: true },
   { id: 'kick_white', type: 'kicks', name: 'Clean Whites', rarity: 1, value: { base: '#f4f6f8', sole: '#d8dde4', accent: '#3a86ff' }, starter: true },

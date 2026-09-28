@@ -1,7 +1,6 @@
 import { setting } from '../ui/Settings.js';
 import * as THREE from 'three';
 import { Actor } from './Actor.js';
-import { SPRITES, SpriteCompanion, spriteLevel } from './Sprites.js';
 import { attachKicks } from './Gear.js';
 import { Sidekick } from './Sidekick.js';
 import { TOWNS } from '../world/Terrain.js';
@@ -25,8 +24,6 @@ export class Player extends Actor {
     if (prof) attachKicks(this.character, look('kicks'));
     const skv = look('sidekick');
     if (skv) this.sidekick = new Sidekick(this, skv);
-    const sp = look('sprite');
-    if (sp && SPRITES[sp]) { this.spriteLevel = spriteLevel(prof.d.spriteXp?.[sp]); this.sprite = new SpriteCompanion(this, sp); }
     this._equip?.();
   }
 
@@ -71,7 +68,8 @@ export class Player extends Actor {
     } else sprintOn = input.down('sprint');
     this.intent.sprint = sprintOn || Math.hypot(input.touchMove.x, input.touchMove.y) > 0.95;
     if (input.pressed('crouch') && this.state === 'ground') {
-      if (this.sprinting && this.onGround) { this.crouchHeld = false; this.startSlide(); }
+      // like Fortnite: crouch while running (sprinting or not) slides
+      if (this.onGround && Math.hypot(this.vel.x, this.vel.z) > 4.2 && Math.hypot(m.x, my) > 0.3) { this.crouchHeld = false; this.startSlide(); }
       else { this.crouchHeld = !this.crouchHeld; this.crouched = this.crouchHeld; }
     }
     if (this.intent.sprint && input.down('sprint') && this.crouchHeld && this.slideT <= 0) this.crouchHeld = this.crouched = false;

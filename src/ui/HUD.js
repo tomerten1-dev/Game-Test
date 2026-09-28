@@ -77,7 +77,6 @@ export class HUD {
 
         <div id="bottom-left">
           <div id="medals"></div>
-          <div id="sprite-chip" class="hidden"><i></i><span></span><b></b></div>
           <div class="bar-row overshield hidden" id="os-row"><span class="bar-ico">◈</span><div class="bar"><div class="fill" id="os-fill"></div></div><span class="bar-num" id="os-num">0</span></div>
           <div class="bar-row shield"><span class="bar-ico">⛊</span><div class="bar"><div class="fill" id="shield-fill"></div></div><span class="bar-num" id="shield-num">0</span></div>
           <div class="bar-row stamina" id="stamina-row"><span class="bar-ico">⚡</span><div class="bar"><div class="fill" id="stamina-fill"></div></div></div>
@@ -789,15 +788,6 @@ export class HUD {
       this.set('ringNum', this.el.ringNum, String(Math.max(1, Math.ceil(left - 0.05))));
     }
 
-    // equipped sprite: name, level and power cooldown
-    const spr = who === p ? p.sprite : null; // your own sprite only (not while spectating)
-    const spTxt = spr ? `${spr.def.name} · Lv ${spr.level}|${spr.kind === 'water' ? (spr.cooldownLeft > 0 ? `${Math.ceil(spr.cooldownLeft)}s` : `${keyLabel(g.input.keyFor('sprite') || 'KeyK')} ready`) : 'passive'}` : '';
-    if (this.cache.sprite !== spTxt) {
-      this.cache.sprite = spTxt;
-      const el = document.getElementById('sprite-chip');
-      el.classList.toggle('hidden', !spr);
-      if (spr) { el.style.setProperty('--sp', spr.def.color); const [a, b] = spTxt.split('|'); el.querySelector('span').textContent = a; el.querySelector('b').textContent = b; }
-    }
 
     // speed lines while skydiving
     const sl = p.state === 'skydive' ? Math.min(1, -p.vel.y / 30) : p.state === 'glide' ? 0.25 : 0;

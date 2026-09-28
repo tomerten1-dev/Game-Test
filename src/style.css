@@ -183,7 +183,6 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1830; col
 .tbtn.mat { right: 104px; bottom: 176px; font-size: 11px; width: 50px; height: 50px; }
 .tbtn.edit { right: 160px; bottom: 196px; font-size: 11px; width: 50px; height: 50px; }
 .tbtn.emote { right: 18px; bottom: 272px; font-size: 20px; width: 50px; height: 50px; }
-.tbtn.sprite { right: 76px; bottom: 272px; font-size: 11px; width: 50px; height: 50px; }
 .tbtn.ping { right: 134px; bottom: 272px; font-size: 11px; width: 50px; height: 50px; }
 .tbtn.inv { right: 18px; bottom: 330px; font-size: 11px; width: 50px; height: 50px; }
 
@@ -808,10 +807,6 @@ body.hud-editing #top-right, body.hud-editing #bottom-left, body.hud-editing #bo
 .mb-opt[disabled] { opacity: 0.4; cursor: default; }
 
 /* sprite companion chip */
-#sprite-chip { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; font-family: var(--title); font-size: 14px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.7); }
-#sprite-chip.hidden { display: none; }
-#sprite-chip i { width: 14px; height: 14px; border-radius: 50%; background: var(--sp); box-shadow: 0 0 10px var(--sp); }
-#sprite-chip b { font-size: 12px; background: rgba(0,0,0,0.45); border-radius: 5px; padding: 1px 6px; font-weight: 700; }
 
 #storm-bolt { position: fixed; inset: 0; pointer-events: none; z-index: 4; background: radial-gradient(ellipse at 50% 20%, rgba(235,220,255,0.55), rgba(190,150,255,0.18) 60%, transparent); opacity: 0; }
 #storm-bolt.on { animation: stormBolt 0.45s ease-out; }

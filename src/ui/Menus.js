@@ -2,7 +2,6 @@ import { saveSkin, deleteSkin, newSkinId, addCustomType, blobFiles, isModelFile,
 import BLEND_STATUS from 'virtual:blend-status';
 const esc = (t) => String(t).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 import { SLOTS, COSMETIC_LIST, COSMETICS, registerCustomSkin, unregisterCustomSkin } from '../meta/Cosmetics.js';
-import { SPRITES, spriteLevel } from '../player/Sprites.js';
 import { RARITIES } from '../weapons/WeaponDefs.js';
 import { TRACK, SEASON, xpForLevel, QUEST_REWARD, WEEKLY_REWARD, milestoneReward, arenaDivision, PASS_PAGES, PAGE_UNLOCK, passState, claimPass } from '../meta/Progression.js';
 import { renderSettings } from './Settings.js';
@@ -38,7 +37,6 @@ export function itemIcon(c) {
   if (c.type === 'spray') return `<i class="ic ic-swatch" style="background:linear-gradient(135deg,${v.a},${v.b});color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:${v.text.length > 3 ? 10 : 18}px">${v.text}</i>`;
   if (c.type === 'loading') return `<i class="ic ic-swatch" style="background:linear-gradient(160deg,${v.a},${v.b})"></i>`;
   if (c.type === 'lobbymusic') return '<i class="ic ic-emote">♫</i>';
-  if (c.type === 'sprite') return `<i class="ic ic-hero" style="${v ? `color:${SPRITES[v].color}` : ''}">${v ? { water: '💧', earth: '🌿', fire: '🔥' }[v] : '∅'}</i>`;
   return `<i class="ic ic-wrap" style="background:${v ? v.color : '#4a505c'}"></i>`;
 }
 
@@ -208,7 +206,7 @@ export class Menus {
     $('#locker-grid').innerHTML = items.map((c) => {
       const owned = prof.owns(c.id), eq = prof.d.equipped[c.type] === c.id;
       const lock = owned ? '' : trackLevel(c.id) ? 'Battle Pass' : 'Item Shop';
-      const sub = c.type === 'sprite' && c.value ? `Level ${spriteLevel(prof.d.spriteXp?.[c.value])} · ${SPRITES[c.value].desc}` : null;
+      const sub = null;
       return `<button class="card ${owned ? '' : 'locked'} ${eq ? 'eq' : ''}" data-id="${c.id}" style="--rar:${RARITIES[c.rarity].color}" ${sub ? `title="${sub}"` : ''}>${itemIcon(c)}<b>${c.name}</b><small>${eq ? 'Equipped' : lock || (sub ? sub.split(' · ')[0] : RARITIES[c.rarity].name)}</small></button>`;
     }).join('');
     // outfit styles for the equipped hero

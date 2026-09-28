@@ -15,7 +15,7 @@ export const DEFAULT_KEYMAP = {
   KeyC: 'crouch', // (no Ctrl: Ctrl+W would close the browser tab)
   Escape: 'pause',
   KeyM: 'map', KeyN: 'mute',
-  KeyP: 'ping', KeyJ: 'drop', Tab: 'inventory', KeyY: 'shoulder', Equal: 'autorun', KeyK: 'sprite', KeyL: 'buildmat', KeyU: 'resetEdit',
+  KeyP: 'ping', KeyJ: 'drop', Tab: 'inventory', KeyY: 'shoulder', Equal: 'autorun', KeyL: 'buildmat', KeyU: 'resetEdit',
   // mouse buttons are bindable like keys: Mouse0 left, Mouse1 middle, Mouse2 right, Mouse3/4 side buttons
   Mouse0: 'fire', Mouse2: 'aim', Mouse1: 'ping',
 };

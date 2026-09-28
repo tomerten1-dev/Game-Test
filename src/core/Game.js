@@ -52,7 +52,6 @@ import { Fire } from '../world/Fire.js';
 import { Gadgets } from '../world/Gadgets.js';
 import { Overrides, OVERRIDES } from '../world/Overrides.js';
 import { RiftZones } from '../world/RiftZones.js';
-import { SPRITES, SpriteCompanion, spriteLevel } from '../player/Sprites.js';
 import { ModBench } from '../ui/ModBench.js';
 import { WEAPONS } from '../weapons/WeaponDefs.js';
 
@@ -287,19 +286,6 @@ export class Game {
     }
   }
 
-  // The equipped sprite levels up from chests and eliminations (kept in your profile).
-  addSpriteXp(n) {
-    const p = this.player, sp = p?.sprite;
-    if (!sp || this.warmup > 0) return;
-    const d = this.meta.profile.d;
-    d.spriteXp ||= {};
-    const before = spriteLevel(d.spriteXp[sp.kind]);
-    d.spriteXp[sp.kind] = (d.spriteXp[sp.kind] || 0) + n;
-    const after = spriteLevel(d.spriteXp[sp.kind]);
-    if (after > before) { p.spriteLevel = after; this.hud.banner?.(`${SPRITES[sp.kind].name} reached level ${after}!`, 3); }
-    this.meta.profile.save();
-  }
-
   // Override console: pick one of three rule changes for the whole lobby (keys 1-3 or click).
   openOverridePick(c) {
     let el = document.getElementById('ovr-pick');
@@ -502,7 +488,6 @@ export class Game {
         b.root.add(b.glider);
       }
       if (Math.random() < 0.25) attachKicks(b.character, pick(COSMETIC_LIST.filter((c) => c.type === 'kicks' && c.value)).value);
-      if (Math.random() < 0.3) { b.spriteLevel = 1 + Math.floor(Math.random() * 3); b.sprite = new SpriteCompanion(b, pick(Object.keys(SPRITES))); }
       this.bots.push(b);
       this.actors.push(b);
     }
@@ -786,12 +771,6 @@ export class Game {
       for (const a of this.actors) if (a.alive && !a.npc && this.time - (a.lastHurtTime || 0) > 5 && this.time - (a.lastFireTime || 0) > 5) { if (a.health < 100) a.health = Math.min(100, a.health + 3); else a.shield = Math.min(100, a.shield + 3); }
     }
     this.player?.sidekick?.update(dt);
-    for (const a of this.actors) {
-      if (!a.sprite) continue;
-      if (a.distToCam === undefined || a.distToCam < 80 || a.isPlayer) a.sprite.update(dt); else a.sprite.mesh.visible = false;
-      // bots with a Water Sprite heal with it when hurt
-      if (!a.isPlayer && a.alive && a.sprite.kind === 'water' && a.health < 50 && a.sprite.cooldownLeft <= 0 && this.warmup <= 0) a.sprite.useAbility();
-    }
     this.combat.updateBursts(dt);
     this.world.traversal.update(dt, this.time, this.actors);
     if (this.warmup <= 0) this.events.update(dt, this.time);
@@ -874,7 +853,6 @@ export class Game {
       }
     }
     if (input.pressed('reload') && !p.buildMode) this.combat.reload(p);
-    if (input.pressed('sprite')) { const msg = p.sprite ? p.sprite.useAbility() : 'Equip a Sprite in the Locker'; if (msg) this.hud.toast?.(msg); }
     if (input.pressed('drop') && !p.buildMode && p.state === 'ground') this.dropFromSlot(p.slot, Infinity);
     if (input.pressed('ping') && p.state !== 'bus' && !this.map.open) {
       const dir = this.camera.getWorldDirection(_dir);
@@ -1506,7 +1484,6 @@ export class Game {
       }
       return;
     }
-    if (killer?.isPlayer && actor !== killer) this.addSpriteXp(20);
     if (killer?.isPlayer && actor !== killer) {
       this.meta.track('kill', 1, { dist: killer.pos.distanceTo(actor.pos), first: !this._firstBlood });
       if (killer.crowned) this.meta.track('crownKill');

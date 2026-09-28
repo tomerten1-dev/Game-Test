@@ -16,7 +16,7 @@ export const SPRINT_SPEED = RUN_SPEED * 1.3; // Fortnite Chapter 5: sprint is 1.
 export const TAC_SPRINT_SPEED = SPRINT_SPEED * 1.18; // tactical sprint (uses stamina)
 const STAMINA_DRAIN = 22, STAMINA_REGEN = 26;
 const CROUCH_SPEED = 3.4;
-const SLIDE_TIME = 0.85;
+const SLIDE_TIME = 1.1; // flat-ground slide; slopes keep it going
 // Fortnite fall damage by height: none below ~12.5 m (a bit over 3 walls), 11 at 3⅓ walls,
 // 49 at 5 walls and 100 at 6 walls (23 m). We land with speed v, so height = v² / 2g.
 const FALL_CURVE = [[12.5, 0], [12.8, 11], [19.2, 49], [23.04, 100], [40, 250]];
@@ -474,7 +474,7 @@ export class Actor {
   startSlide() {
     if (this.slideT > 0 || !this.onGround) return;
     const hs = Math.hypot(this.vel.x, this.vel.z);
-    if (hs < 5) return;
+    if (hs < 4.2) return;
     this.slideT = SLIDE_TIME;
     this.powerSlide = !!this.held?.def?.sliders && (this.sliderHeat || 0) < 4.5;
     if (this.powerSlide) this.game.sound?.play('launch', this.isPlayer ? null : this.pos, { vol: 0.4 });
@@ -1034,7 +1034,6 @@ export class Actor {
     this.lastHurtTime = this.game.time;
     this.lastAttacker = attacker;
     if (attacker && attacker !== this && !this.npc) attacker.dmgDealt = (attacker.dmgDealt || 0) + amount;
-    if (attacker?.sprite && attacker !== this) attacker.sprite.onDealt(this, amount);
     this.flashT = 0.25;
     if (attacker?.isPlayer && attacker !== this) {
       this.game.meta?.track('damage', amount);
@@ -1116,7 +1115,6 @@ export class Actor {
   }
 
   destroy() {
-    this.sprite?.dispose();
     this.sidekick?.dispose();
     this.game.scene.remove(this.root);
     this.character.dispose();
