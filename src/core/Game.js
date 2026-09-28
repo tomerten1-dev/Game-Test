@@ -1543,7 +1543,7 @@ export class Game {
     if (this.state !== 'playing' || p.victory) return;
     if (p.alive && this.aliveCount === 1) {
       p.victory = true;
-      this.hud.banner('#1 VICTORY!', 4);
+      this.hud.banner('#1 VICTORY ROYALE', 4);
       this.sound.music(null);
       this.effects.confetti(p.pos);
       setTimeout(() => this.effects.confetti(p.pos), 700);

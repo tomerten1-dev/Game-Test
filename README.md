@@ -55,6 +55,14 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 ## Inventory & survival
 
 - **Slot 1** is the harvesting axe: hit trees, crates and wooden houses for wood, rocks and walls for stone, cars, lamps and city props for metal. Trees and rocks show a glowing blue **weak point**; hit it for double materials. Trees and rocks have HP: chop a tree down and it **topples over**, and rocks **crumble**. Bullets and explosions wear them down too. Everything grows back next match.
+- **Fortnite-style look (Chapter 5+):**
+  - Heavy condensed uppercase type (Anton, a free stand-in for Burbank; Barlow Condensed for numbers). Both are bundled, so nothing loads from Google Fonts.
+  - Straight health and shield bars, square quick-bar slots with rarity glow, and a square minimap.
+  - Under the minimap: storm timer (grey stopwatch while the circle waits, purple storm cloud while it closes), players left and eliminations.
+  - The lobby shows one selected-mode card with **Change** above a big yellow **PLAY!** button.
+  - The Item Shop uses wide tiles: art on a rarity gradient, a dark name band and the price.
+  - A win reads **#1 VICTORY ROYALE**.
+  - Rarity colours follow Fortnite: grey, green, blue, purple, orange legendary, gold mythic.
 - **HUD details:**
   - Each gun slot shows its ammo (red when low), and ammo by type sits beside your materials.
   - The Vault Keycard has its own slot beside the quick bar.

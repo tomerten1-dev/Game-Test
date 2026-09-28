@@ -1,12 +1,12 @@
 :root {
-  --title: 'Lilita One', 'Arial Rounded MT Bold', system-ui, sans-serif;
+  --title: 'Anton', 'Impact', 'Arial Narrow', system-ui, sans-serif;
   --num: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
   --teal: #2ee6c9;
   --shield: #3fa7ff;
   --health: #5fe04a;
   --storm: #b44cff;
 }
-* { box-sizing: border-box; }
+* { box-sizing: border-box; font-synthesis-weight: none; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1830; color: #fff; font-family: var(--num); -webkit-user-select: none; user-select: none; touch-action: none; -webkit-tap-highlight-color: transparent; }
 #app { position: fixed; inset: 0; }
 #app canvas { display: block; width: 100%; height: 100%; }
@@ -862,3 +862,74 @@ body.hud-editing #top-right, body.hud-editing #bottom-left, body.hud-editing #bo
 
 #watchers { position: static; align-self: flex-end; margin-top: 6px; font-family: var(--title); font-size: 14px; color: #fff; background: rgba(8,14,36,0.55); border-radius: 8px; padding: 3px 9px; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
 #watchers.hidden { display: none; }
+
+/* ---------- Fortnite look pass (Chapter 5+ HUD, lobby, shop, results) ---------- */
+/* heavy condensed uppercase type everywhere a title shows */
+.logo, .rank, .btn, .lb-brand, .lb-tabs button, #banner, .mode b, .card-h.big, .bm-title, #spectate .sp-name, .lvlup { text-transform: uppercase; }
+.btn { font-style: italic; letter-spacing: 0.5px; }
+.logo { -webkit-text-stroke: 0; letter-spacing: 1px; }
+.lb-brand { font-size: 28px; letter-spacing: 1.5px; }
+.lb-tabs button { font-size: 20px; letter-spacing: 1px; }
+.card-h { font-family: var(--num); font-weight: 800; }
+
+/* HUD: straight health/shield bars (Chapter 5 dropped the slant) with big numbers */
+.bar { transform: none; border-radius: 3px; border: 2px solid rgba(255,255,255,0.28); }
+.bar-num { font-size: 28px; width: 52px; }
+/* inventory: straight rounded squares, rarity glow from the bottom, selected slot lifts with a white frame */
+.slot { transform: none; border-radius: 6px; }
+.slot.active { transform: translateY(-8px) scale(1.08); border: 3px solid #fff; box-shadow: inset 0 -4px 0 var(--rar), 0 0 0 2px rgba(0,0,0,0.35), 0 8px 18px rgba(0,0,0,0.45); }
+.slot .icon img { transform: none; }
+/* square minimap (Fortnite has always used a square one) */
+#minimap-wrap { border-radius: 4px; border: 3px solid rgba(255,255,255,0.85); box-shadow: 0 0 0 2px rgba(10,16,40,0.55), 0 8px 22px rgba(0,0,0,0.35); }
+/* storm / players / eliminations row: plain icons + numbers, no pills */
+#stats { gap: 14px; justify-content: flex-end; }
+.stat { background: none; border: 0; padding: 0; font-size: 22px; text-shadow: 0 2px 3px rgba(0,0,0,0.7); }
+.stat .ico { width: 20px; height: 20px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7)); }
+.stat.storm { color: #fff; }
+.stat.storm .ico-storm { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='13.5' r='8.5' fill='none' stroke='%23d8dde6' stroke-width='2.6'/%3E%3Cpath d='M12 13.5V8.5' stroke='%23d8dde6' stroke-width='2.6' stroke-linecap='round'/%3E%3Cpath d='M9 2h6' stroke='%23d8dde6' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E"); }
+.stat.storm.closing { color: #e3b3ff; }
+.stat.storm.closing .ico-storm { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6.5 18a4.5 4.5 0 0 1-.4-9A6 6 0 0 1 17.6 7.6 4.3 4.3 0 0 1 18 18z' fill='%23c46bff'/%3E%3Cpath d='M12.5 13 10 19h3l-1.5 4.5 4.5-6.5h-3l1.5-4z' fill='%23fff3a8'/%3E%3C/svg%3E"); }
+
+/* lobby: the selected-mode card with CHANGE sits above a big yellow PLAY! button */
+.play-right { gap: 10px; }
+.play-right .modes { display: none; }
+.play-right.picking .modes { display: grid; animation: rise 0.2s ease-out; padding: 12px; border-radius: 14px; background: rgba(6,12,34,0.88); border: 1px solid var(--edge); box-shadow: 0 16px 40px rgba(0,0,0,0.5); }
+.mode-card { cursor: pointer; position: relative; width: 340px; text-align: left; display: flex; flex-direction: column; gap: 0; padding: 10px 16px 12px; border-radius: 6px; border: 2px solid rgba(255,255,255,0.18); color: #fff; background: linear-gradient(135deg, #2458d6 0%, #13307e 60%, #0c1c52 100%); box-shadow: 0 8px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.25); transition: transform 0.12s, border-color 0.12s; }
+.mode-card:hover { transform: translateY(-2px); border-color: #fff; }
+.mode-card small { font-weight: 800; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.75; }
+.mode-card b { font-family: var(--title); font-weight: 400; font-size: 34px; line-height: 1.05; text-transform: uppercase; letter-spacing: 0.5px; }
+.mode-card span { font-size: 14px; font-weight: 700; opacity: 0.85; }
+.mode-card span i { font-style: normal; }
+.mode-card em { position: absolute; right: 12px; top: 12px; font-style: normal; font-family: var(--title); font-size: 15px; letter-spacing: 1px; text-transform: uppercase; padding: 3px 10px; border-radius: 4px; background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.35); }
+.play-right.picking .mode-card em { background: #fff; color: #14204a; }
+#play-btn { width: 340px; padding: 10px 0 12px; font-size: 52px; line-height: 1; border-radius: 6px; transform: none; color: #1a1400; background: linear-gradient(180deg, #fff27a 0%, #ffe13b 45%, #ffc400 100%); box-shadow: 0 6px 0 #b98300, 0 12px 26px rgba(0,0,0,0.45); }
+#play-btn:hover { filter: brightness(1.06); transform: translateY(-2px); }
+#play-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #b98300, 0 6px 14px rgba(0,0,0,0.4); }
+.play-right .sub { width: 340px; text-align: center; }
+@media (max-width: 700px) { .mode-card, #play-btn, .play-right .sub { width: 260px; } #play-btn { font-size: 40px; } }
+
+/* item shop: wide, Fortnite-style tiles (art on a rarity gradient, dark name band, price underneath) */
+.lb-panel.side[data-panel="shop"] { width: min(920px, 70vw); }
+.card.shop { justify-content: flex-end; min-height: 170px; padding: 14px 0 0; overflow: hidden; border-radius: 6px; gap: 0; }
+.card.shop .ic { margin: auto 0; transform: scale(1.35); }
+.card.shop b { width: 100%; margin-top: 10px; padding: 6px 8px 0; background: rgba(4,8,24,0.72); font-family: var(--title); font-weight: 400; font-size: 18px; letter-spacing: 0.5px; text-transform: uppercase; }
+.card.shop small { width: 100%; padding: 0 8px 2px; background: rgba(4,8,24,0.72); opacity: 1; color: #b7c4e0; }
+.card.shop .price { width: 100%; justify-content: center; padding: 4px 8px 7px; background: rgba(4,8,24,0.9); font-family: var(--title); font-weight: 400; font-size: 18px; color: #fff; }
+.featured .card.shop { min-height: 210px; }
+.card.bundle { border-radius: 6px; }
+.card.bundle b { font-family: var(--title); font-weight: 400; font-size: 22px; text-transform: uppercase; }
+.lb-panel.side[data-panel="shop"] .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+@media (max-width: 900px) { .lb-panel.side[data-panel="shop"] { width: auto; } }
+
+/* locker tiles: square corners like Fortnite's grid */
+.card, .lslot { border-radius: 6px; }
+
+/* results: "#1 VICTORY ROYALE" banner */
+#end .rank { font-size: clamp(34px, 7vh, 80px); }
+#end.victory .logo { font-size: clamp(44px, 11vh, 120px); color: #ffe13b; text-shadow: 0 5px 0 #b98300, 0 0 40px rgba(255,210,63,0.55); letter-spacing: 2px; }
+#end .logo.red { color: #fff; text-shadow: 0 5px 0 rgba(120,16,32,0.9), 0 0 30px rgba(255,60,80,0.4); }
+#play-btn { animation: none; background-blend-mode: normal; background-size: 100% 100%; }
+#play-btn::after { display: none; }
+.play-right .modes { order: -1; }
+@media (max-width: 1000px) { .lb-tabs { flex-wrap: nowrap; } .lb-tabs button { font-size: 15px; padding: 7px 6px; letter-spacing: 0.4px; } .lb-brand { font-size: 20px; } .lb-level small { display: none; } }
+@media (max-width: 1000px) and (max-height: 500px) { .mode-card, #play-btn, .play-right .sub { width: 280px; } .mode-card b { font-size: 28px; } #play-btn { font-size: 42px; } }

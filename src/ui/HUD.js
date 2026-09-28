@@ -65,9 +65,9 @@ export class HUD {
         <div id="top-right">
           <div id="minimap-wrap"><canvas id="minimap"></canvas></div>
           <div id="stats">
+            <div class="stat storm" id="st-storm-box" title="Storm"><span class="ico ico-storm"></span><span id="st-storm">0:00</span></div>
             <div class="stat" title="Players left"><span class="ico ico-players"></span><span id="st-alive">20</span></div>
             <div class="stat" title="Eliminations"><span class="ico ico-kills"></span><span id="st-kills">0</span></div>
-            <div class="stat storm" title="Storm"><span class="ico ico-storm"></span><span id="st-storm">0:00</span></div>
           </div>
           <div id="storm-label"></div>
           <div id="quest-track"></div>
@@ -823,6 +823,8 @@ export class HUD {
       this.set('stormLabel', this.el.stormLabel, `Warm-up · bus leaves in ${fmtTime(g.warmup)}`);
     } else {
       this.set('storm', this.el.storm, storm.stage === 'done' ? '0:00' : fmtTime(storm.timer));
+      // Fortnite: grey stopwatch while the circle waits, purple storm cloud while it closes in
+      this.set('stormBox', this.el.storm.parentElement, storm.stage === 'shrink' ? 'stat storm closing' : 'stat storm', 'className');
       const base = storm.stage === 'done' ? 'Final storm circle' : storm.stage === 'wait' ? (storm.phase === 0 ? `Storm eye forming · shrinks in ${fmtTime(storm.timer)}` : `Storm eye shrinks in ${fmtTime(storm.timer)}`) : 'Storm eye shrinking';
       const s = g.surge;
       // distance to the safe zone when you're outside it

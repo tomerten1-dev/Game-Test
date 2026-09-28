@@ -36,7 +36,7 @@ export class LobbyStage {
     // nameplate over the hero (name, level, wins)
     this.plate = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false }));
     this.plate.scale.set(1.7, 0.43, 1);
-    this.plate.position.set(0, 2.35, 0);
+    this.plate.position.set(0, 2.75, 0); // clear of hats and the Victory Crown
     this.group.add(this.plate);
     this.idleT = 0;
     const wake = () => { this.idleT = 0; if (this.idleDance) { this.idleDance = false; this.emoteT = 0; } };
@@ -93,8 +93,8 @@ export class LobbyStage {
     x.fillStyle = 'rgba(10,18,40,0.6)';
     x.beginPath(); x.roundRect(8, 12, 496, 104, 26); x.fill();
     x.textAlign = 'center';
-    x.fillStyle = '#ffffff'; x.font = 'bold 44px sans-serif'; x.fillText(name, 256, 62);
-    x.fillStyle = '#ffd23f'; x.font = 'bold 28px sans-serif'; x.fillText(`LEVEL ${level}${wins ? `  ·  ${wins} WIN${wins === 1 ? '' : 'S'}` : ''}`, 256, 100);
+    x.fillStyle = '#ffffff'; x.font = '50px Anton, sans-serif'; x.fillText(name.toUpperCase(), 256, 66);
+    x.fillStyle = '#ffd23f'; x.font = '800 30px "Barlow Condensed", sans-serif'; x.fillText(`LEVEL ${level}${wins ? `  ·  ${wins} WIN${wins === 1 ? '' : 'S'}` : ''}`, 256, 100);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
     this.plate.material.map?.dispose();
     this.plate.material.map = t;

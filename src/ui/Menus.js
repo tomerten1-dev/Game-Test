@@ -69,7 +69,8 @@ export class Menus {
               <div class="lb-card quests-mini"><div class="card-h">Daily quests</div><div id="qmini"></div></div>
               <button class="lb-btn" id="emote-btn">Emote</button>
             </div>
-            <div class="play-right">
+            <div class="play-right" id="play-right">
+              <button class="mode-card" id="mode-card"><small>Battle Royale</small><b id="mc-name">Solo</b><span id="mc-sub"></span><em>Change</em></button>
               <div class="modes">
                 <button class="mode m-solo" data-mode="solo"><i class="mi">⚔</i><b>Solo</b><span>You vs 99 bots</span></button>
                 <button class="mode m-quick" data-mode="quick"><i class="mi">⚡</i><b>Quick Match</b><span>29 bots · faster storm</span></button>
@@ -78,7 +79,7 @@ export class Menus {
                 <button class="mode m-blitz" data-mode="blitz"><i class="mi">⏱</i><b>Blitz Royale</b><span>32 players · same kit · ~5 min</span></button>
                 <button class="mode arena" data-mode="arena"><i class="mi">🏆</i><b>Ranked</b><span id="arena-div">Bronze I</span></button>
               </div>
-              <button id="play-btn" class="btn big">PLAY</button>
+              <button id="play-btn" class="btn big">PLAY!</button>
               <div class="sub">Straight onto the Storm Bus</div>
             </div>
           </section>
@@ -127,7 +128,9 @@ export class Menus {
     tap('#mm-cancel', () => game.cancelMatchmaking());
     tap('#emote-btn', () => game.stage.emote(this.meta.profile.equippedItem('emote').value));
     root.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); game.sound.ensure(); game.sound.play('click'); this.setTab(b.dataset.tab); }));
-    root.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); this.mode = b.dataset.mode; this.refresh(); }));
+    root.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); game.sound.play('click'); this.mode = b.dataset.mode; $('#play-right').classList.remove('picking'); this.refresh(); }));
+    // Fortnite-style: one card for the selected mode above PLAY; "Change" opens the mode list
+    tap('#mode-card', () => $('#play-right').classList.toggle('picking'));
     this.refresh();
   }
 
@@ -166,6 +169,8 @@ export class Menus {
     const ad = arenaDivision(d.arena?.points || 0);
     $('#arena-div').innerHTML = `<i style="color:${ad.color}">${ad.name}</i> · ${d.arena?.points || 0} pts`;
     $('#lb-arena').innerHTML = `<span style="background:${ad.color}"></span>${ad.name}`;
+    const mb = this.el.lobby.querySelector(`[data-mode="${this.mode}"]`);
+    if (mb) { $('#mc-name').textContent = mb.querySelector('b').textContent; $('#mc-sub').innerHTML = mb.querySelector('span').innerHTML; }
     const quests = this.meta.quests();
     $('#qmini').innerHTML = quests.map((q) => `<div class="qrow ${q.done ? 'done' : ''}"><div class="qline"><span>${q.def.text}</span><b>${q.done ? '✓' : `${Math.floor(q.progress)}/${q.def.target}`}</b></div><div class="qbar"><i style="width:${Math.min(100, (q.progress / q.def.target) * 100)}%"></i></div></div>`).join('');
     // battle pass: claims waiting, or the next unclaimed reward
@@ -351,7 +356,7 @@ export class Menus {
   showEnd({ victory, place, killer, kills, time, cause, rewards }) {
     const $ = (id) => document.getElementById(id);
     $('end-rank').textContent = `#${place}`;
-    $('end-title').textContent = victory ? 'VICTORY!' : 'ELIMINATED';
+    $('end-title').textContent = victory ? 'VICTORY ROYALE' : 'ELIMINATED';
     $('end-title').className = 'logo' + (victory ? ' gold' : ' red');
     $('end-sub').textContent = victory ? 'Last hero standing on Stormbound Island' : (killer ? `Eliminated by ${killer}` : cause === 'fall' ? 'You fell to your death' : cause === 'left' ? 'You left the match' : 'Eliminated by the storm') + ` — placed #${place}`;
     $('end-kills').textContent = kills;
