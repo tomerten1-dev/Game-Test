@@ -23,6 +23,7 @@ export class World {
   constructor(scene, renderer, models) {
     this.models = models;
     this.scene = scene;
+    this.renderer = renderer;
     this.smokes = []; // active smoke clouds {x, y, z, r}, kept by Projectiles
     this.colliders = new Colliders();
     this.terrain = new Terrain();
@@ -66,6 +67,13 @@ export class World {
     updateStreamed(camera.position);
     cullScene(this.scene, camera.position, t);
     this.lighting.follow(focus);
+    // high in the air (bus, skydiving) the sharp shadows around you are far too small to see, so skip
+    // redrawing them: from the bus that is millions of triangles a frame
+    const sm = this.renderer?.shadowMap;
+    if (sm) {
+      const high = focus.y - Math.max(0, this.terrain.heightAt(focus.x, focus.z)) > 90;
+      if (high === sm.autoUpdate) { sm.autoUpdate = !high; sm.needsUpdate = !high; }
+    }
   }
 
   heightAt(x, z) { return this.terrain.heightAt(x, z); }
