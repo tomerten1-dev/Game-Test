@@ -23,8 +23,6 @@ export const PRICES = [200, 300, 600, 1000, 1500];
 const items = [
   // heroes: Quaternius outfit characters (the default look for you and the bots)
   // styles: alternate looks for an outfit (picked in the Locker)
-  // your own .glb character (Locker: Load custom skin), stored in this browser only
-  { id: 'hero_custom', type: 'hero', name: 'Custom Skin', rarity: 4, value: 'Custom', starter: true },
   { id: 'hero_ranger_m', type: 'hero', name: 'Trail Ranger', rarity: 1, value: 'Male_Ranger', starter: true, styles: [['Classic', null], ['Night Watch', '#34406b'], ['Autumn', '#b8642f']] },
   { id: 'hero_ranger_f', type: 'hero', name: 'Forest Ranger', rarity: 1, value: 'Female_Ranger', starter: true, styles: [['Classic', null], ['Frost', '#9fd8ff'], ['Crimson', '#b8323f']] },
   { id: 'hero_peasant_m', type: 'hero', name: 'Village Hand', rarity: 1, value: 'Male_Peasant', starter: true, styles: [['Classic', null], ['Harvest', '#d9a13a'], ['Slate', '#5a6475']] },
@@ -149,6 +147,22 @@ const items = [
 
 export const COSMETICS = Object.fromEntries(items.map((i) => [i.id, { ...i, price: PRICES[i.rarity] }]));
 export const COSMETIC_LIST = items.map((i) => COSMETICS[i.id]);
+
+// Custom skins (your own models, saved in this browser) become hero items at start-up.
+export function registerCustomSkin(id, name) {
+  const cid = `custom_${id}`;
+  if (COSMETICS[cid]) return cid;
+  const item = { id: cid, type: 'hero', name: name.replace(/\.(glb|gltf)$/i, ''), rarity: 4, value: `Custom:${id}`, custom: true, price: 0 };
+  COSMETICS[cid] = item;
+  COSMETIC_LIST.splice(COSMETIC_LIST.findIndex((c) => c.type === 'hero' && !c.custom), 0, item); // before the built-in heroes, in the order you added them
+  return cid;
+}
+export function unregisterCustomSkin(id) {
+  const cid = `custom_${id}`;
+  delete COSMETICS[cid];
+  const i = COSMETIC_LIST.findIndex((c) => c.id === cid);
+  if (i >= 0) COSMETIC_LIST.splice(i, 1);
+}
 export const STARTERS = items.filter((i) => i.starter).map((i) => i.id);
 export const DEFAULT_EQUIPPED = { hero: 'hero_ranger_m', tint: 'tint_teal', backbling: 'bb_antenna', pickaxe: 'pick_default', glider: 'glider_teal', trail: 'trail_none', emote: 'emote_cheer', wrap: 'wrap_none', sprite: 'sp_water', kicks: 'kick_none', sidekick: 'sk_none', spray: 'spray_gg', loading: 'load_default', lobbymusic: 'lm_shuffle' };
 // emote clip -> particle effect played with it

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { readCustomSkin, addCustomType } from './CustomSkin.js';
+import { listSkins, addCustomType } from './CustomSkin.js';
+import { registerCustomSkin } from '../meta/Cosmetics.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { addRim, addHueSwap } from '../effects/Shaders.js';
@@ -115,11 +116,13 @@ export class CharacterAssets {
         a.types[t] = { scene: g.scene, scale: HEIGHT / h, footOffset: (-box.min.y * HEIGHT) / h, q: true, head, headAbove: (head?.userData.headAbove ?? 0.2) + (t.includes('Ranger') ? 0.06 : 0) };
       });
     }
-    // your own custom skin (Locker), kept in this browser only
-    try {
-      const saved = await readCustomSkin();
-      if (saved?.buf) { const res = await addCustomType(a, saved.buf, 1.92); a.customInfo = { ...res, name: saved.name }; }
-    } catch (e) { console.warn('custom skin', e); }
+    // your own custom skins (Locker), saved in this browser and loaded every start
+    a.customSkins = [];
+    for (const sk of await listSkins()) {
+      const res = await addCustomType(a, sk.buf, 1.92, sk.id);
+      a.customSkins.push({ id: sk.id, name: sk.name, ...res });
+      if (res.ok) registerCustomSkin(sk.id, sk.name);
+    }
     // legacy fields used elsewhere
     const first = a.types[CHARACTER_TYPES[0]];
     a.scale = first.scale;
@@ -150,7 +153,7 @@ export class Character {
     this.q = !!src.q;
     this.headAbove = (src.headAbove || 0) * src.scale; // Quaternius rig: head bone -> top of head (hood)
     this.custom = !!src.custom;
-    this.clips = this.custom && assets.qc ? assets.qc : this.q ? assets.q : assets;
+    this.clips = src.clips || (this.q ? assets.q : assets);
     const tintColor = new THREE.Color(1, 1, 1).lerp(this.color, tint);
     const skin = new THREE.Color(Q_SKIN[Math.floor(Math.random() * Q_SKIN.length)]);
     model.traverse((o) => {

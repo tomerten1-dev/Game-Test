@@ -1,5 +1,5 @@
-import { saveCustomSkin, clearCustomSkin, addCustomType } from '../player/CustomSkin.js';
-import { SLOTS, COSMETIC_LIST, COSMETICS } from '../meta/Cosmetics.js';
+import { saveSkin, deleteSkin, newSkinId, addCustomType } from '../player/CustomSkin.js';
+import { SLOTS, COSMETIC_LIST, COSMETICS, registerCustomSkin, unregisterCustomSkin } from '../meta/Cosmetics.js';
 import { SPRITES, spriteLevel } from '../player/Sprites.js';
 import { RARITIES } from '../weapons/WeaponDefs.js';
 import { TRACK, SEASON, xpForLevel, QUEST_REWARD, WEEKLY_REWARD, milestoneReward, arenaDivision, PASS_PAGES, PAGE_UNLOCK, passState, claimPass } from '../meta/Progression.js';
@@ -213,17 +213,24 @@ export class Menus {
       $('#locker-grid').querySelectorAll('[data-style]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); (prof.d.heroStyles ||= {})[hero.id] = +b.dataset.style; prof.save(); this.game.sound.play('click'); this.refresh(); }));
     }
     if (this.lockerSlot === 'hero') {
-      // your own character model, loaded from this computer and kept in this browser only
-      const info = this.game.assets?.customInfo;
-      const status = info?.ok ? `${info.name}${info.animated ? '' : ' · no matching skeleton, so it won\'t animate'}` : info ? `Couldn't load ${info.name}: ${info.error}` : 'Load a .glb / .gltf character from your computer (kept in this browser only)';
-      $('#locker-grid').insertAdjacentHTML('afterbegin', `<div class="custom-skin-row"><b>Custom Skin</b><small>${status}</small><button class="lb-btn" id="cs-load">Load model…</button>${info ? '<button class="lb-btn" id="cs-clear">Remove</button>' : ''}<input type="file" id="cs-file" accept=".glb,.gltf,model/gltf-binary" hidden></div>`);
+      // your own character models: each one you load is saved in this browser and gets its own card
+      const skins = this.game.assets?.customSkins || [];
+      const eq = COSMETICS[prof.d.equipped.hero];
+      const cur = eq?.custom ? skins.find((k) => `custom_${k.id}` === eq.id) : null;
+      const bad = skins.filter((k) => !k.ok);
+      const status = cur ? `${cur.name}${cur.animated ? '' : ' · no matching skeleton, so it won\'t animate'}` : skins.length ? `${skins.length} saved in this browser - they load on their own every time` : 'Load a .glb / .gltf character from your computer - it stays saved in this browser';
+      $('#locker-grid').insertAdjacentHTML('afterbegin', `<div class="custom-skin-row"><b>Custom Skins</b><small>${status}${bad.length ? ` · couldn't read ${bad.map((k) => k.name).join(', ')}` : ''}</small><button class="lb-btn" id="cs-load">Load model…</button>${cur || bad.length ? `<button class="lb-btn" id="cs-del">Delete ${cur ? 'this skin' : 'broken'}</button>` : ''}<input type="file" id="cs-file" accept=".glb,.gltf,model/gltf-binary" multiple hidden></div>`);
       $('#cs-load').addEventListener('click', (e) => { e.stopPropagation(); $('#cs-file').click(); });
-      $('#cs-file').addEventListener('change', (e) => { const f = e.target.files?.[0]; if (f) this.loadCustomSkin(f); });
-      $('#cs-clear')?.addEventListener('click', async (e) => {
+      $('#cs-file').addEventListener('change', async (e) => { for (const f of e.target.files || []) await this.loadCustomSkin(f); });
+      $('#cs-del')?.addEventListener('click', async (e) => {
         e.stopPropagation();
-        await clearCustomSkin();
-        delete this.game.assets.types.Custom; this.game.assets.customInfo = null;
-        if (prof.d.equipped.hero === 'hero_custom') prof.equip('hero', 'hero_ranger_m');
+        for (const k of cur ? [cur] : bad) {
+          await deleteSkin(k.id);
+          unregisterCustomSkin(k.id);
+          delete this.game.assets.types[`Custom:${k.id}`];
+          this.game.assets.customSkins = this.game.assets.customSkins.filter((x) => x.id !== k.id);
+        }
+        if (cur) prof.equip('hero', 'hero_ranger_m');
         if (this.game.stage) this.game.stage._key = null;
         this.refresh();
       });
@@ -233,7 +240,6 @@ export class Menus {
       e.stopPropagation();
       const c = COSMETICS[b.dataset.id];
       if (!prof.owns(c.id)) { this.flash('Claim it in the Battle Pass (Quests tab) or buy it in the Item Shop'); return; }
-      if (c.id === 'hero_custom' && !this.game.assets?.types?.Custom) { $('#cs-file')?.click(); return; }
       prof.equip(c.type, c.id);
       this.game.sound.play('click');
       if (c.type === 'lobbymusic') { const s = this.game.sound; s.lobbyPick = c.value; s.musicName = null; s._plIdx = undefined; s.music('lobby'); }
@@ -242,17 +248,19 @@ export class Menus {
     }));
   }
 
-  // Read a model file, keep it in this browser, and wear it.
+  // Read a model file, save it in this browser (it loads by itself next time) and wear it.
   async loadCustomSkin(file) {
-    if (file.size > 60e6) { this.flash('That file is over 60 MB - try a smaller .glb'); return; }
+    if (file.size > 60e6) { this.flash(`${file.name} is over 60 MB - try a smaller .glb`); return; }
     const buf = await file.arrayBuffer();
-    const res = await addCustomType(this.game.assets, buf, 1.92);
-    this.game.assets.customInfo = { ...res, name: file.name };
-    if (!res.ok) { this.flash(`Couldn't load that model: ${res.error}`); this.refresh(); return; }
-    await saveCustomSkin(buf, file.name).catch(() => this.flash('Loaded, but the browser would not save it for next time'));
-    this.meta.profile.equip('hero', 'hero_custom');
+    const id = newSkinId();
+    const res = await addCustomType(this.game.assets, buf, 1.92, id);
+    if (!res.ok) { this.flash(`Couldn't load ${file.name}: ${res.error}`); return; }
+    try { await saveSkin(id, file.name, buf); } catch { this.flash('Loaded, but the browser would not save it for next time (storage full?)'); }
+    (this.game.assets.customSkins ||= []).push({ id, name: file.name, ...res });
+    const cid = registerCustomSkin(id, file.name);
+    this.meta.profile.equip('hero', cid);
     if (this.game.stage) this.game.stage._key = null; // rebuild the lobby hero
-    this.flash(res.animated ? 'Custom skin loaded' : 'Loaded - but its skeleton does not match our animations, so it will not animate');
+    this.flash(res.animated ? `${file.name} saved and equipped` : `${file.name} saved - its skeleton doesn't match our animations, so it won't animate`);
     this.refresh();
   }
 

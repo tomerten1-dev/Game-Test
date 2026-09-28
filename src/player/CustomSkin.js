@@ -1,34 +1,48 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-// Custom skin: a .glb / .gltf character you load from your own computer (Locker -> Outfit -> Custom Skin).
-// The file is kept in this browser only (IndexedDB) - it is never part of the game files or the repo.
+// Custom skins: .glb / .gltf characters you load from your own computer (Locker -> Hero -> Load model...).
+// The files are kept in this browser only (IndexedDB) - never part of the game files or the repo.
 // Our animations come from the Quaternius Universal Animation Library, whose skeleton uses the Unreal
 // mannequin bone names (pelvis, spine_01, thigh_l, hand_r…). Fortnite-style and Unreal rigs use the same
 // names, so their bones are driven directly; Mixamo rigs are renamed to match.
 
-const DB = 'stormbound', STORE = 'files', KEY = 'customSkin';
+// Every model you load is saved in this browser (IndexedDB, store "skins") and comes back on its own
+// each time the game starts - one Locker card per model.
+const DB = 'stormbound', OLD = 'files', STORE = 'skins';
 
 function openDb() {
   return new Promise((res, rej) => {
-    const r = indexedDB.open(DB, 1);
-    r.onupgradeneeded = () => r.result.createObjectStore(STORE);
+    const r = indexedDB.open(DB, 2);
+    r.onupgradeneeded = () => {
+      if (!r.result.objectStoreNames.contains(OLD)) r.result.createObjectStore(OLD);
+      if (!r.result.objectStoreNames.contains(STORE)) r.result.createObjectStore(STORE);
+    };
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error);
   });
 }
-async function tx(mode, fn) {
+async function tx(store, mode, fn) {
   const db = await openDb();
   return new Promise((res, rej) => {
-    const t = db.transaction(STORE, mode);
-    const req = fn(t.objectStore(STORE));
+    const t = db.transaction(store, mode);
+    const req = fn(t.objectStore(store));
     t.oncomplete = () => res(req?.result);
     t.onerror = () => rej(t.error);
   });
 }
-export const saveCustomSkin = (buf, name) => tx('readwrite', (s) => s.put({ buf, name, at: Date.now() }, KEY));
-export const readCustomSkin = () => tx('readonly', (s) => s.get(KEY)).catch(() => null);
-export const clearCustomSkin = () => tx('readwrite', (s) => s.delete(KEY));
+export const newSkinId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+export const saveSkin = (id, name, buf) => tx(STORE, 'readwrite', (s) => s.put({ id, name, buf, at: Date.now() }, id));
+export const deleteSkin = (id) => tx(STORE, 'readwrite', (s) => s.delete(id));
+// all saved skins, oldest first (a skin saved by the first version of this feature is moved over)
+export async function listSkins() {
+  try {
+    const old = await tx(OLD, 'readonly', (s) => s.get('customSkin'));
+    if (old?.buf) { await saveSkin('first', old.name, old.buf); await tx(OLD, 'readwrite', (s) => s.delete('customSkin')); }
+    const all = (await tx(STORE, 'readonly', (s) => s.getAll())) || [];
+    return all.sort((x, y) => (x.at || 0) - (y.at || 0));
+  } catch (e) { console.warn('custom skins', e); return []; }
+}
 
 // bone names the animations drive
 const UAL = ['root', 'pelvis', 'spine_01', 'spine_02', 'spine_03', 'neck_01', 'Head', 'clavicle_l', 'upperarm_l', 'lowerarm_l', 'hand_l', 'clavicle_r', 'upperarm_r', 'lowerarm_r', 'hand_r',
@@ -70,8 +84,8 @@ function rotationOnly(clips, bones) {
   return out;
 }
 
-// Parse a model file and register it as character type 'Custom'. Returns { ok, animated, matched, error }.
-export async function addCustomType(assets, buf, height) {
+// Parse a model file and register it as character type `Custom:<id>`. Returns { ok, animated, matched, error, type }.
+export async function addCustomType(assets, buf, height, id) {
   try {
     const g = await new GLTFLoader().parseAsync(buf, '');
     const scene = g.scene;
@@ -87,9 +101,10 @@ export async function addCustomType(assets, buf, height) {
     if (!(h > 0)) return { ok: false, error: 'The model has no visible geometry' };
     const bones = new Set();
     scene.traverse((o) => { if (o.isBone) bones.add(o.name); });
-    if (assets.q) assets.qc = { upper: rotationOnly(assets.q.upper, bones), lower: rotationOnly(assets.q.lower, bones) };
-    assets.types.Custom = { scene, scale: height / h, footOffset: (-box.min.y * height) / h, q: true, custom: true, head: null, headAbove: 0.12 * (h / height) };
-    return { ok: true, animated: skinned && matched >= 10, matched };
+    const clips = assets.q ? { upper: rotationOnly(assets.q.upper, bones), lower: rotationOnly(assets.q.lower, bones) } : null;
+    const type = `Custom:${id}`;
+    assets.types[type] = { scene, scale: height / h, footOffset: (-box.min.y * height) / h, q: true, custom: true, clips, head: null, headAbove: 0.12 * (h / height) };
+    return { ok: true, animated: skinned && matched >= 10, matched, type };
   } catch (e) {
     return { ok: false, error: e.message || String(e) };
   }

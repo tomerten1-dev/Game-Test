@@ -50,7 +50,7 @@ export class Profile {
   }
 
   get d() { return this.data; }
-  owns(id) { return this.data.owned.includes(id); }
+  owns(id) { return this.data.owned.includes(id) || (id?.startsWith('custom_') && !!COSMETICS[id]); }
   grant(id) { if (COSMETICS[id] && !this.owns(id)) { this.data.owned.push(id); this.save(); return true; } return false; }
   equip(slot, id) { if (this.owns(id)) { this.data.equipped[slot] = id; this.save(); } }
   equippedItem(slot) { return COSMETICS[this.data.equipped[slot]]; }
