@@ -62,7 +62,7 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
   - Rarity steps follow Fortnite, about +5.5% damage per rarity.
   - Fall damage follows Fortnite's heights: none below ~12.5 m (3⅓ walls), 49 at 5 walls, 100 at 6 walls. Rolling doesn't reduce it.
   - Storm damage climbs 1 → 1 → 2 → 5 → 8 → 12 → 15 → 20. The first circle waits 3 minutes (Fortnite: 3:20) and closes to 1.6 km across; a full match lasts about 22 minutes.
-  - The island is Fortnite-sized: about 2.3 km of land across (~4–5 km²) with 22 named towns. The Storm Bus flies at 320 m and 72 m/s, and you can skydive and glide roughly 400 m out from its path.
+  - The island is Fortnite-sized, about 2.3 km of land across, and laid out like the Chapter 1 Season 3 map with its 17 named places. The Storm Bus flies at 320 m and 72 m/s, and you can skydive and glide roughly 400 m out from its path.
 - **Fortnite-style look (Chapter 5+):**
   - Heavy condensed uppercase type (Anton, a free stand-in for Burbank; Barlow Condensed for numbers). Both are bundled, so nothing loads from Google Fonts.
   - Straight health and shield bars, square quick-bar slots with rarity glow, and a square minimap.
@@ -171,7 +171,9 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 
 ## Seasons
 
-**The island** is about 2.3 km of land across (Fortnite-sized, ~4–5 km²) with 22 named towns and **three biomes** on the default Summer island: snowy pine forests in the north (Windy Farms, Pebble City), grassland in the middle and a cactus desert in the south (Salty Pier). There are three **offshore islands** (Gull Isle, Coral Cay, Lone Rock) with chests, eighteen small **named landmarks** between the towns (three each of camps, windmills, water towers, lumber camps, flag hills and ruins, like Camp Cod, Old Windmill, Water Tower, Lumber Camp, Flag Hill and Lookout Ruin), each with a chest, and a lantern-lit **Mountain Tunnel** running under the mountain. Landmark names show on the map when you zoom in.
+**The island** follows the Fortnite Chapter 1 Season 3 map (February 2018): the same coastline, a lake with an island in the middle-north, a river running from it north to the coast and another winding south to the sea, dense woods in the north-east, yellow fields in the north and a swamp in the south-east. It's about 2.3 km of land across. The layout comes from a data map (`public/maps/island.png`, made from the user-provided map image by `tools/build-island-map.py`): coastline, lake and rivers, forest density, fields, swamp and dirt. Hills, trees and towns are generated on top. On the full map, the A–J / 1–10 grid lines up with Fortnite's.
+
+The named places sit where the Season 3 ones were, under our own names: Scrap Junction (Junk Junction, B2), Spooky Hills (Haunted Hills, C2), Sunny Park (Pleasant Park, C3), Rowdy Acres (Anarchy Acres, F3), Treasure Lake (Loot Lake, D4), Pepper Town (Tomato Town, G3), Lonesome Lodge (Lonely Lodge, I5), Market Row (Retail Row, H6), Rusty Depot (Dusty Depot, F5), Sandy Springs (Salty Springs, F7), Leaning Towers (Tilted Towers, D5), Posh Shores (Snobby Shores, A5), Burger Grove (Greasy Grove, C7), Shaky Shafts (Shifty Shafts, D7), Fateful Fields (Fatal Fields, F8), Plumbing Plant (Flush Factory, D9) and Lucky Lagoon (Lucky Landing, F10). Smaller spots include a roadside motel, a dirt track, an old prison in the swamp, the lake island, Whispering Woods, Soggy Swamp and a river bridge. Each has a chest. A lantern-lit **Hill Tunnel** runs through the big round hill in the west.
 
 **Settings → Island season** picks the island: *Summer*, *Winter* (snow, frosted trees, falling snow, pale sky) or *Desert* (sand, dry scrub, saguaro cacti, warm sky). *Auto* uses Winter from December to February and Summer otherwise. The island is generated on load, so the change applies after the reload button.
 

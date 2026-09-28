@@ -1,16 +1,35 @@
 import * as THREE from 'three';
-import { TOWNS, ISLANDS, TUNNELS, MOUNTAIN, MAP_SCALE } from './Terrain.js';
+import { TOWNS, ISLANDS, TUNNELS, MOUNTAIN } from './Terrain.js';
+import { fromMap } from './IslandMap.js';
 import { mulberry32 } from '../core/noise.js';
 
 // Named spots between the towns: small landmarks (a camp, a windmill, a water tower…), the offshore
 // islands and the roof of the mountain tunnel. Each landmark gets a chest spot and a map label.
 const SMALL = [
-  { name: 'Camp Cod', more: ['Camp Trout', 'Camp Perch'], props: [['kk/tent', 2.6, 0, 0], ['kk/tent', 2.4, 4.5, 2], ['kk/barrel', 1.1, -2.5, 2], ['kk/sack', 0.8, 2, -2.5]] },
-  { name: 'Old Windmill', more: ['Twin Mills', 'Creaky Mill'], props: [['kk/windmill_green', 10, 0, 0], ['kk/wheelbarrow', 1.1, 5, 3], ['kk/sack', 0.8, 4, -3]] },
-  { name: 'Water Tower', more: ['Rusty Tank', 'High Tank'], props: [['kk/city_watertower', 11, 0, 0], ['kk/crate_A_big', 1.3, 5, 1], ['kk/crate_A_big', 1.3, 5.5, 2.6]] },
-  { name: 'Lumber Camp', more: ['Sawdust Yard', 'Timber Post'], props: [['kk/resource_lumber', 1.4, 0, 0], ['kk/resource_lumber', 1.4, 3, 2], ['kk/tent', 2.5, -4, 3], ['kk/weaponrack', 1.6, 2, -3]] },
-  { name: 'Flag Hill', more: ['Banner Knoll', 'Pennant Point'], props: [['kk/flag_red', 4, 0, 0], ['kk/flag_blue', 4, 3.5, 1], ['kk/barrel', 1.1, -2, -2]] },
-  { name: 'Lookout Ruin', more: ['Watch Ruin', 'Broken Keep'], props: [['kk/tower_A_red', 9, 0, 0], ['kk/crate_A_big', 1.3, 4, 3]] },
+  { name: 'Camp Cod', props: [['kk/tent', 2.6, 0, 0], ['kk/tent', 2.4, 4.5, 2], ['kk/barrel', 1.1, -2.5, 2], ['kk/sack', 0.8, 2, -2.5]] },
+  { name: 'Old Windmill', props: [['kk/windmill_green', 10, 0, 0], ['kk/wheelbarrow', 1.1, 5, 3], ['kk/sack', 0.8, 4, -3]] },
+  { name: 'Water Tower', props: [['kk/city_watertower', 11, 0, 0], ['kk/crate_A_big', 1.3, 5, 1], ['kk/crate_A_big', 1.3, 5.5, 2.6]] },
+  { name: 'Lumber Camp', props: [['kk/resource_lumber', 1.4, 0, 0], ['kk/resource_lumber', 1.4, 3, 2], ['kk/tent', 2.5, -4, 3], ['kk/weaponrack', 1.6, 2, -3]] },
+  { name: 'Flag Hill', props: [['kk/flag_red', 4, 0, 0], ['kk/flag_blue', 4, 3.5, 1], ['kk/barrel', 1.1, -2, -2]] },
+  { name: 'Lookout Ruin', props: [['kk/tower_A_red', 9, 0, 0], ['kk/crate_A_big', 1.3, 4, 3]] },
+];
+
+// [name, prop set, pixel on the 1024 px Season 3 map]
+const S3_SPOTS = [
+  ['Roadside Motel', 'Lumber Camp', [245, 492]],
+  ['Dirt Track', 'Flag Hill', [910, 600]],
+  ['Riverside Cabins', 'Camp Cod', [437, 823]],
+  ['Hilltop Houses', 'Old Windmill', [748, 408]],
+  ['North Farmstead', 'Water Tower', [760, 190]],
+  ['Lookout Post', 'Lookout Ruin', [405, 175]],
+  ['Old Prison', 'Lookout Ruin', [775, 745]],
+  ['Whispering Woods', 'Camp Cod', [822, 292]],
+  ['Soggy Swamp', 'Lumber Camp', [845, 830]],
+  ['Lake Isle', 'Flag Hill', [446, 378]],
+  ['River Bridge', 'Flag Hill', [415, 712]],
+  ['Pine Camp', 'Camp Cod', [880, 445]],
+  ['Western Outpost', 'Water Tower', [160, 268]],
+  ['Mine Entrance', 'Lumber Camp', [370, 752]],
 ];
 
 export class Landmarks {
@@ -47,23 +66,19 @@ export class Landmarks {
     return !this.list.some((l) => Math.hypot(l.x - x, l.z - z) < 70);
   }
 
+  // The smaller Season 3 spots, at their places on the map; each borrows a prop set from SMALL.
   _small() {
     const r = mulberry32(7331);
-    // each kind of landmark shows up three times across the big island, each with its own name
-    const jobs = [];
-    for (let pass = 0; pass < 3; pass++) for (const L of SMALL) jobs.push({ ...L, name: pass ? L.more[pass - 1] : L.name });
-    for (const L of jobs) {
-      for (let i = 0; i < 400; i++) {
-        const a = r() * Math.PI * 2, d = (60 + r() * 250) * MAP_SCALE;
-        const x = Math.cos(a) * d, z = Math.sin(a) * d;
-        if (!this._clear(x, z, 45)) continue;
-        const rot = r() * Math.PI * 2, c = Math.cos(rot), s = Math.sin(rot);
-        for (const [name, h, px, pz] of L.props) this._prop(name, h, x + px * c + pz * s, z - px * s + pz * c, rot + r() * 0.6);
-        this.towns.chestSpots.push({ x: x + 3 * s, z: z + 3 * c, rot });
-        this.towns.landmarks.push({ name: L.name, x, z });
-        this.list.push({ name: L.name, x, z });
-        break;
-      }
+    const T = Object.fromEntries(SMALL.map((L) => [L.name, L]));
+    for (const [name, kit, at] of S3_SPOTS) {
+      let [x, z] = fromMap(...at);
+      // nudge off water / steep ground if the exact spot doesn't fit
+      for (let i = 0; i < 60 && !this._clear(x, z, 0); i++) { const a = r() * Math.PI * 2, d = 4 + i * 0.8; [x, z] = [fromMap(...at)[0] + Math.cos(a) * d, fromMap(...at)[1] + Math.sin(a) * d]; }
+      const rot = r() * Math.PI * 2, c = Math.cos(rot), s = Math.sin(rot);
+      for (const [pn, h, px, pz] of T[kit].props) this._prop(pn, h, x + px * c + pz * s, z - px * s + pz * c, rot + r() * 0.6);
+      this.towns.chestSpots.push({ x: x + 3 * s, z: z + 3 * c, rot });
+      this.towns.landmarks.push({ name, x, z });
+      this.list.push({ name, x, z });
     }
   }
 

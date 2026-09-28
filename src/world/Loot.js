@@ -150,8 +150,10 @@ export class Loot {
     // like Fortnite, most chests are in named places: the town buildings get a spot each
     for (const h of this.world.towns.houses) {
       if (h.home) continue; // enterable homes already have indoor spots
-      const side = r() < 0.5 ? -1 : 1;
-      spots.push({ x: h.x + side * ((h.maxX - h.minX) / 2 + 1.4), z: h.z + (r() - 0.5) * 2, rot: r() * 6 });
+      // big buildings (city blocks, towers, warehouses, barns) get a spot on each side
+      const w = h.maxX - h.minX, d = h.maxZ - h.minZ, big = w * d > 120;
+      for (const side of big ? [-1, 1] : [r() < 0.5 ? -1 : 1]) spots.push({ x: h.x + side * (w / 2 + 1.4), z: h.z + (r() - 0.5) * 2, rot: r() * 6 });
+      if (big) spots.push({ x: h.x + (r() - 0.5) * 2, z: h.z + (r() < 0.5 ? -1 : 1) * (d / 2 + 1.4), rot: r() * 6 });
     }
     for (let i = 0; i < 5 * GROW; i++) {
       const a = r() * Math.PI * 2, d = (25 + r() * 250) * MAP_SCALE;

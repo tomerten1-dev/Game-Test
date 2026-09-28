@@ -7,6 +7,7 @@ import { mulberry32, smoothstep } from '../core/noise.js';
 import { jitter, gradientY } from './geomUtils.js';
 import { TOWNS, WORLD_HALF, ISLAND_RADIUS, PALETTE, AREA_SCALE, BIOMES, biomeAt, TUNNELS } from './Terrain.js';
 import { quality } from '../core/device.js';
+import { ISLAND_MAP, mapAt } from './IslandMap.js';
 import { Nature } from './Nature.js';
 import { VARIANT, VARIANTS, tint } from './Variant.js';
 
@@ -138,12 +139,17 @@ export class Foliage {
     const up = new THREE.Vector3(0, 1, 0);
     const col = new THREE.Color();
     const forest = this.terrain.noise;
-    for (let i = 0; i < count * 4 && nT + nK < count; i++) {
+    for (let i = 0; i < count * 8 && nT + nK < count; i++) {
       const c = this._candidate(2.6, 34, 0.8);
       if (!c) continue;
-      // cluster trees into forests
-      const f = forest.fbm(c.x * 0.018 + 100, c.z * 0.018, 3);
-      if (f < -0.15 && r() > 0.15) continue;
+      if (ISLAND_MAP.ready) {
+        // forests where the island map has them (dense woods, tree lines), a few trees elsewhere
+        if (r() > 0.08 + 0.92 * mapAt('forest', c.x, c.z)) continue;
+      } else {
+        // cluster trees into forests
+        const f = forest.fbm(c.x * 0.018 + 100, c.z * 0.018, 3);
+        if (f < -0.15 && r() > 0.15) continue;
+      }
       if (!this._free(c.x, c.z, 4)) continue;
       const bio = biomeAt(c.x, c.z);
       if (bio.desert > 0.5 && r() < 0.75) continue; // few trees in the desert

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { World } from '../world/World.js';
 import { TOWNS, MAP_SCALE } from '../world/Terrain.js';
+import { loadIslandMap } from '../world/IslandMap.js';
 import { CharacterAssets, Q_TYPES } from '../player/Character.js';
 import { Player } from '../player/Player.js';
 import { CameraRig } from '../player/CameraRig.js';
@@ -92,6 +93,7 @@ export class Game {
     await this.models.load(undefined, (k) => progress(0.2 + k * 0.2));
     setWeaponModels(this.models);
     progress(0.45, 'Shaping the island…');
+    await loadIslandMap();
     await nextFrame();
     this.world = new World(this.scene, this.renderer, this.models);
     progress(0.8, 'Growing trees…');

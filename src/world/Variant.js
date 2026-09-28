@@ -39,6 +39,8 @@ export const VARIANT = VARIANTS[VARIANT_KEY];
 
 // Apply colour overrides before the terrain / foliage are generated.
 if (VARIANT.palette) for (const [k, v] of Object.entries(VARIANT.palette)) PALETTE[k]?.set(v);
-BIOMES.on = VARIANT_KEY === 'summer';
+// the Season 3 island has no snow or desert: summer shows its fields and swamp instead
+BIOMES.on = false;
+BIOMES.zones = VARIANT_KEY === 'summer';
 if (VARIANT.day) Object.assign(MOODS.day, VARIANT.day);
 export const tint = (list, fallback) => (list ? list.map((c) => new THREE.Color(c)) : fallback);

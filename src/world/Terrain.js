@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Simplex2D, smoothstep, lerp, clamp } from '../core/noise.js';
 import { SHADOW } from './Bake.js';
+import { ISLAND_MAP, mapAt, fromMap } from './IslandMap.js';
 
 // Smooth fbm island. Heights live in a grid; heightAt() is bilinear so gameplay
 // and the rendered mesh always agree.
@@ -15,34 +16,29 @@ export const AREA_SCALE = (ISLAND_RADIUS / 170) ** 2; // vs. the original 20-pla
 export const GROW = (MAP_SCALE / 1.3) ** 2; // land area vs. the previous (780 m) island, for fixed counts
 export const WATER_LEVEL = 0;
 
-// Named places. `kind` picks the builder in Towns.js (village by default).
-const RAW_TOWNS = [
-  { name: 'Candy Corners', x: -14, z: 30, r: 28 },
-  { name: 'Breezy Bay', x: 172, z: 70, r: 26 },
-  { name: 'Maple Hollow', x: -165, z: -62, r: 27 },
-  { name: 'Pebble City', x: 30, z: -178, r: 27, kind: 'city' },
-  { name: 'Sunset Springs', x: 160, z: -118, r: 24 },
-  { name: 'Skyline Spires', x: -72, z: -84, r: 40, kind: 'spires' },
-  { name: 'Rusty Works', x: 215, z: -12, r: 30, kind: 'factory' },
-  { name: 'Lazy Lake', x: 62, z: 128, r: 36, kind: 'lake' },
-  { name: 'Salty Pier', x: -20, z: 238, r: 24, kind: 'pier' },
-  { name: 'Windy Farms', x: 110, z: -238, r: 28, kind: 'farm' },
-  { name: 'Pine Hollow', x: -238, z: 70, r: 24 },
-  // the big island has room for more named places, like Fortnite's ~20 POIs
-  { name: 'Brick Plaza', x: 95, z: 40, r: 27, kind: 'city' },
-  { name: 'Mossy Mills', x: 80, z: -60, r: 26 },
-  { name: 'Hilltop Hamlet', x: -40, z: 120, r: 24 },
-  { name: 'Frosty Flats', x: -60, z: -232, r: 26 },
-  { name: 'Snowpeak Lodge', x: 40, z: -262, r: 24 },
-  { name: 'Oak Ridge', x: -205, z: -150, r: 26 },
-  { name: 'Harvest Fields', x: -258, z: -28, r: 28, kind: 'farm' },
-  { name: 'Coral Cove', x: 228, z: 150, r: 25 },
-  { name: 'Sandy Shores', x: 120, z: 228, r: 25 },
-  { name: 'Dusty Dunes', x: -118, z: 250, r: 26 },
-  { name: 'Cliffside', x: 250, z: -150, r: 24 },
+// Named places, laid out like the Fortnite Chapter 1 Season 3 island (Feb 2018): positions are pixels on
+// that map (1024 px image), converted by fromMap(). `kind` picks the builder in Towns.js (village by
+// default); villages with r >= 36 get two rings of buildings. Names are our own takes on the originals.
+const S3_TOWNS = [
+  { name: 'Scrap Junction', at: [205, 125], r: 30, kind: 'factory' },   // Junk Junction
+  { name: 'Spooky Hills', at: [268, 170], r: 26 },                      // Haunted Hills
+  { name: 'Sunny Park', at: [290, 298], r: 44 },                        // Pleasant Park
+  { name: 'Rowdy Acres', at: [540, 232], r: 30, kind: 'farm' },         // Anarchy Acres
+  { name: 'Treasure Lake', at: [372, 398], r: 22 },                     // Loot Lake
+  { name: 'Pepper Town', at: [672, 322], r: 28 },                       // Tomato Town
+  { name: 'Lonesome Lodge', at: [852, 500], r: 26 },                    // Lonely Lodge
+  { name: 'Market Row', at: [760, 540], r: 30, kind: 'city' },          // Retail Row
+  { name: 'Rusty Depot', at: [597, 462], r: 30, kind: 'factory' },      // Dusty Depot
+  { name: 'Sandy Springs', at: [575, 622], r: 40 },                     // Salty Springs
+  { name: 'Leaning Towers', at: [378, 505], r: 40, kind: 'spires' },    // Tilted Towers
+  { name: 'Posh Shores', at: [88, 465], r: 30 },                        // Snobby Shores
+  { name: 'Burger Grove', at: [232, 628], r: 38 },                      // Greasy Grove
+  { name: 'Shaky Shafts', at: [382, 634], r: 28 },                      // Shifty Shafts
+  { name: 'Fateful Fields', at: [610, 772], r: 30, kind: 'farm' },      // Fatal Fields
+  { name: 'Plumbing Plant', at: [362, 878], r: 28, kind: 'factory' },   // Flush Factory
+  { name: 'Lucky Lagoon', at: [578, 922], r: 30 },                      // Lucky Landing
 ];
-// plain villages get a bigger footprint (two rings of houses, like a Fortnite named place)
-export const TOWNS = RAW_TOWNS.map((t) => ({ ...t, r: t.kind ? t.r : Math.round(t.r * 1.6), x: Math.round(t.x * MAP_SCALE), z: Math.round(t.z * MAP_SCALE) }));
+export const TOWNS = S3_TOWNS.map(({ at, ...t }) => { const [x, z] = fromMap(...at); return { ...t, x, z }; });
 // dirt roads: every town links to its two nearest neighbours
 export const ROADS = (() => {
   const out = [], seen = new Set();
@@ -55,15 +51,12 @@ export const ROADS = (() => {
   }
   return out;
 })();
-export const MOUNTAIN = { x: -125 * MAP_SCALE, z: 150 * MAP_SCALE, r: 230, h: 88 };
-// small islands off the coast (reach them by gliding, swimming or a launch)
-export const ISLANDS = [
-  { name: 'Gull Isle', x: 1320, z: 450, r: 34 },
-  { name: 'Coral Cay', x: -450, z: -1335, r: 30 },
-  { name: 'Lone Rock', x: -1365, z: -360, r: 28 },
-];
-// a tunnel cut through the mountain (floor heights are filled in when the terrain is generated)
-export const TUNNELS = [{ name: 'Mountain Tunnel', ax: MOUNTAIN.x - 290, az: MOUNTAIN.z, bx: MOUNTAIN.x + 280, bz: MOUNTAIN.z, w: 6 }]; // runs along x (axis-aligned roof colliders)
+// the big round hill west of the middle (B5-B6), with a tunnel through it
+export const MOUNTAIN = (() => { const [x, z] = fromMap(150, 522); return { x, z, r: 150, h: 26 }; })();
+// no offshore islands on this map
+export const ISLANDS = [];
+// a tunnel cut through the hill (floor heights are filled in when the terrain is generated)
+export const TUNNELS = [{ name: 'Hill Tunnel', ax: MOUNTAIN.x - 185, az: MOUNTAIN.z, bx: MOUNTAIN.x + 180, bz: MOUNTAIN.z, w: 6 }]; // runs along x (axis-aligned roof colliders)
 
 // Biomes on the default (summer) island: snowy north, grassland in the middle, desert south.
 // Variant.js switches them off for the all-winter / all-desert islands.
@@ -73,6 +66,9 @@ export function biomeAt(x, z) {
   const R = ISLAND_RADIUS;
   return { snow: 1 - smoothstep(-0.66 * R, -0.46 * R, z), desert: smoothstep(0.46 * R, 0.66 * R, z) };
 }
+const FIELD = new THREE.Color('#b9b84a'), FIELD2 = new THREE.Color('#a6ad3f');
+const SWAMP = new THREE.Color('#5a6327'), SWAMP2 = new THREE.Color('#4a5420');
+const DIRT_W = new THREE.Color('#8a6a45'), FOREST_FLOOR = new THREE.Color('#3f7a2c');
 const SNOW_GROUND = [new THREE.Color('#eef4fb'), new THREE.Color('#dbe7f3')];
 const DESERT_GROUND = [new THREE.Color('#e3c58a'), new THREE.Color('#d6b274')];
 
@@ -104,8 +100,9 @@ export class Terrain {
   rawHeight(x, z) {
     const nz = this.noise;
     const d = Math.hypot(x, z);
-    const coast = ISLAND_RADIUS + nz.fbm(x * 0.0017 + 11.3, z * 0.0017 - 4.1, 3) * 110;
-    const mask = 1 - smoothstep(0.86, 1.02, d / coast);
+    let mask;
+    if (ISLAND_MAP.ready) mask = smoothstep(0.3, 0.85, mapAt('land', x, z)); // coastline from the map
+    else { const coast = ISLAND_RADIUS + nz.fbm(x * 0.0017 + 11.3, z * 0.0017 - 4.1, 3) * 110; mask = 1 - smoothstep(0.86, 1.02, d / coast); }
     const hills = (nz.fbm(x * 0.0042, z * 0.0042, 4) * 0.5 + 0.5) * 16 + (nz.fbm(x * 0.011 + 3, z * 0.011, 3) * 0.5 + 0.5) * 4;
     const detail = nz.fbm(x * 0.05, z * 0.05, 3) * 1.1;
     const md = Math.hypot(x - MOUNTAIN.x, z - MOUNTAIN.z) / MOUNTAIN.r;
@@ -114,7 +111,25 @@ export class Terrain {
       const fall = 1 - smoothstep(0, 1, md);
       mt = Math.pow(fall, 1.2) * MOUNTAIN.h * (0.78 + 0.34 * nz.ridged(x * 0.006, z * 0.006, 3)) + nz.fbm(x * 0.06, z * 0.06, 2) * 1.2 * fall;
     }
-    let h = lerp(-7.5, 3.2 + hills + detail + mt, mask);
+    let flat = 1;
+    if (ISLAND_MAP.ready) {
+      // fields and the swamp are flatter, forests a little hillier
+      flat = 1 - 0.65 * mapAt('field', x, z) - 0.8 * mapAt('swamp', x, z) + 0.25 * mapAt('forest', x, z);
+    }
+    // gentle banks: the ground eases down toward the lake and rivers instead of ending in a cliff
+    let bank = 0;
+    if (ISLAND_MAP.ready) {
+      const ring = (d) => Math.max(mapAt('water', x + d, z), mapAt('water', x - d, z), mapAt('water', x, z + d), mapAt('water', x, z - d),
+        mapAt('water', x + d * 0.7, z + d * 0.7), mapAt('water', x - d * 0.7, z - d * 0.7), mapAt('water', x + d * 0.7, z - d * 0.7), mapAt('water', x - d * 0.7, z + d * 0.7));
+      bank = Math.max(smoothstep(0.15, 0.6, ring(10)), 0.75 * smoothstep(0.15, 0.6, ring(26)), 0.4 * smoothstep(0.15, 0.6, ring(45)));
+      flat *= 1 - 0.9 * bank;
+    }
+    let h = lerp(-7.5, 3.2 - 1.6 * bank + hills * flat + detail * (1 - 0.6 * bank) + mt, mask);
+    if (ISLAND_MAP.ready) {
+      // lake and rivers: shallow at the banks and in the rivers, deeper in the lake
+      const w = mapAt('water', x, z);
+      if (w > 0.2) h = lerp(h, lerp(-0.9, -3.2, smoothstep(0.85, 1, w)), smoothstep(0.2, 0.55, w));
+    }
     for (const is of ISLANDS) {
       const d = Math.hypot(x - is.x, z - is.z) / is.r;
       if (d >= 1.25) continue;
@@ -174,6 +189,14 @@ export class Terrain {
           const k = j * n + i;
           if (h[k] > floor) h[k] = lerp(h[k], floor, 1 - smoothstep(t.w - 2.5, t.w, side));
         }
+      }
+    }
+    // keep the lake and rivers open where a town plateau or the tunnel spilled over them
+    if (ISLAND_MAP.ready) {
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+        const x = -WORLD_HALF + i * CELL, z = -WORLD_HALF + j * CELL;
+        const w = mapAt('water', x, z);
+        if (w > 0.35) { const k = j * n + i; h[k] = Math.min(h[k], lerp(-0.9, -3.2, smoothstep(0.85, 1, w))); }
       }
     }
     // biome masks
@@ -273,6 +296,14 @@ export class Terrain {
     const bio = biomeAt(x, z);
     if (bio.snow > 0) out.lerp(_tmp.copy(SNOW_GROUND[0]).lerp(SNOW_GROUND[1], this.variation[k]), bio.snow);
     if (bio.desert > 0) out.lerp(_tmp.copy(DESERT_GROUND[0]).lerp(DESERT_GROUND[1], this.variation[k]), bio.desert);
+    // the Season 3 map's zones: yellow fields in the north, the swamp in the south-east, dirt patches
+    if (ISLAND_MAP.ready && BIOMES.zones) {
+      const fld = mapAt('field', x, z), sw = mapAt('swamp', x, z), dt = mapAt('dirt', x, z), fo = mapAt('forest', x, z);
+      if (fld > 0.02) out.lerp(_tmp.copy(FIELD).lerp(FIELD2, this.variation[k]), Math.min(1, fld * 1.2));
+      if (sw > 0.02) out.lerp(_tmp.copy(SWAMP).lerp(SWAMP2, this.variation[k]), Math.min(1, sw * 1.1));
+      if (dt > 0.02) out.lerp(_tmp.copy(DIRT_W), dt * 0.55);
+      if (fo > 0.05) out.lerp(_tmp.copy(FOREST_FLOOR), fo * 0.45);
+    }
     // dry / dirt patches where there is little grass
     const g = this.grass[k];
     out.lerp(P.dirt, (1 - smoothstep(0.15, 0.6, g)) * 0.35 * smoothstep(2.5, 3.5, y));

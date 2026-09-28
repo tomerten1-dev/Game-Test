@@ -1,6 +1,8 @@
 import { TOWNS, WORLD_HALF } from '../world/Terrain.js';
+import { MAP_N, MAP_CELL } from '../world/IslandMap.js';
 
-const EXT = WORLD_HALF; // world half-extent covered by the terrain image
+// half-extent shown at zoom 1: the island map's square, so the A-J / 1-10 grid lines up with Fortnite's
+const EXT = (MAP_N * MAP_CELL) / 2;
 const COLS = 'ABCDEFGHIJ';
 
 const fmt = (s) => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
@@ -123,8 +125,8 @@ export class MapScreen {
     ctx.clearRect(0, 0, W, W);
     ctx.fillStyle = '#3cb4e6';
     ctx.fillRect(0, 0, W, W);
-    const [ox, oy] = this.toScreen(-EXT, -EXT);
-    ctx.drawImage(this.terrain, ox, oy, EXT * 2 * s, EXT * 2 * s);
+    const [ox, oy] = this.toScreen(-WORLD_HALF, -WORLD_HALF); // the terrain image covers the whole world
+    ctx.drawImage(this.terrain, ox, oy, WORLD_HALF * 2 * s, WORLD_HALF * 2 * s);
 
     // grid A-J / 1-10
     ctx.strokeStyle = 'rgba(255,255,255,0.22)';
