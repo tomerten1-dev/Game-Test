@@ -268,7 +268,8 @@ export class Bot extends Actor {
         const hs = Math.hypot(a.vel.x, a.vel.z);
         const heard = (g.time - a.lastFireTime < 1 && d < 60) || (hs > 2 && !a.crouched && d < (a.sprinting ? 30 : 20));
         const shotMe = this.lastAttacker === a && g.time - this.lastHurtTime < 2;
-        if (!shotMe && (!(inView || heard) || Math.random() > (heard ? 0.6 : 0.4) * (1.25 - d / (SIGHT * 1.4)))) continue;
+        // anyone within 15 m in plain sight is noticed straight away (like a player would); further out it's a chance
+        if (!shotMe && d > 15 && (!(inView || heard) || Math.random() > (heard ? 0.6 : 0.4) * (1.25 - d / (SIGHT * 1.4)))) continue;
       }
       checks++;
       if (!g.world.lineOfSight(eye, a.chest(_tp))) continue;
