@@ -1,4 +1,5 @@
-import { saveSkin, deleteSkin, newSkinId, addCustomType } from '../player/CustomSkin.js';
+import { saveSkin, deleteSkin, newSkinId, addCustomType, blobFiles, isModelFile, MODEL_EXT, EXTRA_EXT, skinColors, setSkinColor } from '../player/CustomSkin.js';
+const esc = (t) => String(t).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 import { SLOTS, COSMETIC_LIST, COSMETICS, registerCustomSkin, unregisterCustomSkin } from '../meta/Cosmetics.js';
 import { SPRITES, spriteLevel } from '../player/Sprites.js';
 import { RARITIES } from '../weapons/WeaponDefs.js';
@@ -220,10 +221,22 @@ export class Menus {
       const cur = eq?.custom ? skins.find((k) => `custom_${k.id}` === eq.id) : null;
       const fromFolder = skins.filter((k) => k.builtin && k.ok).length;
       const bad = skins.filter((k) => !k.ok);
-      const status = cur ? `${cur.name}${cur.builtin ? ' (skins folder)' : ''}${cur.animated ? '' : ' · no matching skeleton, so it won\'t animate'}` : skins.length ? `${fromFolder} from your skins folder · ${skins.length - fromFolder} saved in this browser` : 'Put .glb files in the project\'s skins/ folder, or load one here (saved in this browser)';
-      $('#locker-grid').insertAdjacentHTML('afterbegin', `<div class="custom-skin-row"><b>Custom Skins</b><small>${status}${bad.length ? ` · couldn't read ${bad.map((k) => k.name).join(', ')}` : ''}</small><button class="lb-btn" id="cs-load">Load model…</button>${(cur && !cur.builtin) || bad.length ? `<button class="lb-btn" id="cs-del">Delete ${cur && !cur.builtin ? 'this skin' : 'broken'}</button>` : ''}<input type="file" id="cs-file" accept=".glb,.gltf,model/gltf-binary" multiple hidden></div>`);
+      const status = cur ? `${cur.name}${cur.builtin ? ' (skins folder)' : ''}${cur.animated ? '' : ' · no matching skeleton, so it won\'t animate'}` : skins.length ? `${fromFolder} from your skins folder · ${skins.length - fromFolder} saved in this browser` : 'Put models (.glb .gltf .fbx .dae .obj) in the project\'s skins/ folder, or load one here (saved in this browser)';
+      $('#locker-grid').insertAdjacentHTML('afterbegin', `<div class="custom-skin-row"><b>Custom Skins</b><small>${status}${bad.length ? ` · couldn't read ${bad.map((k) => k.name).join(', ')}` : ''}</small><button class="lb-btn" id="cs-load">Load model…</button>${(cur && !cur.builtin) || bad.length ? `<button class="lb-btn" id="cs-del">Delete ${cur && !cur.builtin ? 'this skin' : 'broken'}</button>` : ''}<input type="file" id="cs-file" accept="${[...MODEL_EXT, ...EXTRA_EXT].map((x) => `.${x}`).join(',')}" multiple hidden><small class="cs-hint">Tip: select the model together with its texture files (.png / .jpg) and .bin so it keeps its colours</small></div>`);
       $('#cs-load').addEventListener('click', (e) => { e.stopPropagation(); $('#cs-file').click(); });
-      $('#cs-file').addEventListener('change', async (e) => { for (const f of e.target.files || []) await this.loadCustomSkin(f); });
+      $('#cs-file').addEventListener('change', (e) => this.loadCustomSkins([...(e.target.files || [])]));
+      // colour each part of your model yourself (handy for models that come without textures)
+      if (cur?.ok && cur.parts?.length) {
+        const cid = `custom_${cur.id}`, picked = skinColors(cid);
+        const parts = cur.parts.slice(0, 16);
+        $('#locker-grid').querySelector('.custom-skin-row').insertAdjacentHTML('beforeend', `<div class="cs-colors"><b>Colours</b>${parts.map((p, i) => `<label title="${esc(p.name)}${p.textured ? ' (has a texture - the colour tints it)' : ''}"><input type="color" data-part="${i}" value="${picked[p.name] || p.color}"><span>${esc(p.name)}</span></label>`).join('')}<button class="lb-btn" id="cs-reset">Reset colours</button></div>`);
+        const rebuild = () => { if (this.game.stage) this.game.stage._key = null; };
+        $('#locker-grid').querySelectorAll('.cs-colors input').forEach((inp) => {
+          inp.addEventListener('click', (e) => e.stopPropagation());
+          inp.addEventListener('change', (e) => { setSkinColor(cid, parts[+inp.dataset.part].name, e.target.value); rebuild(); });
+        });
+        $('#cs-reset').addEventListener('click', (e) => { e.stopPropagation(); for (const p of cur.parts) setSkinColor(cid, p.name, null); rebuild(); this.refresh(); });
+      }
       $('#cs-del')?.addEventListener('click', async (e) => {
         e.stopPropagation();
         for (const k of cur && !cur.builtin ? [cur] : bad.filter((x) => !x.builtin)) {
@@ -250,14 +263,25 @@ export class Menus {
     }));
   }
 
+  // Files picked with "Load model…": every model file becomes a skin; the other files (textures,
+  // .bin, .mtl) go with them.
+  async loadCustomSkins(files) {
+    const models = files.filter((f) => isModelFile(f.name));
+    if (!models.length) { this.flash(`Pick a model file too (${MODEL_EXT.map((x) => `.${x}`).join(' ')})`); return; }
+    const extras = [];
+    for (const f of files) if (!isModelFile(f.name) && EXTRA_EXT.includes(f.name.split('.').pop().toLowerCase())) extras.push({ name: f.name, buf: await f.arrayBuffer() });
+    for (const f of models) await this.loadCustomSkin(f, extras);
+  }
+
   // Read a model file, save it in this browser (it loads by itself next time) and wear it.
-  async loadCustomSkin(file) {
-    if (file.size > 60e6) { this.flash(`${file.name} is over 60 MB - try a smaller .glb`); return; }
+  async loadCustomSkin(file, extras = []) {
+    const size = file.size + extras.reduce((n, x) => n + x.buf.byteLength, 0);
+    if (size > 150e6) { this.flash(`${file.name} and its files are over 150 MB - try a smaller model`); return; }
     const buf = await file.arrayBuffer();
     const id = newSkinId();
-    const res = await addCustomType(this.game.assets, buf, 1.92, id);
+    const res = await addCustomType(this.game.assets, buf, 1.92, id, { name: file.name, files: blobFiles(extras) });
     if (!res.ok) { this.flash(`Couldn't load ${file.name}: ${res.error}`); return; }
-    try { await saveSkin(id, file.name, buf); } catch { this.flash('Loaded, but the browser would not save it for next time (storage full?)'); }
+    try { await saveSkin(id, file.name, buf, extras); } catch { this.flash('Loaded, but the browser would not save it for next time (storage full?)'); }
     (this.game.assets.customSkins ||= []).push({ id, name: file.name, ...res });
     const cid = registerCustomSkin(id, file.name);
     this.meta.profile.equip('hero', cid);

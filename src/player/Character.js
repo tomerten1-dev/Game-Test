@@ -1,9 +1,11 @@
 import * as THREE from 'three';
-import { listSkins, addCustomType } from './CustomSkin.js';
+import { listSkins, addCustomType, blobFiles, baseName } from './CustomSkin.js';
 import { registerCustomSkin } from '../meta/Cosmetics.js';
 
-// every .glb / .gltf in <project>/skins becomes a built-in skin
-const SKIN_FILES = import.meta.glob('/skins/*.{glb,gltf,GLB,GLTF}', { query: '?url', import: 'default', eager: true });
+// every model in <project>/skins (or a sub-folder of it) becomes a built-in skin; textures / .bin /
+// .mtl files next to a model are found by name
+const SKIN_FILES = import.meta.glob('/skins/**/*.{glb,gltf,fbx,dae,obj,GLB,GLTF,FBX,DAE,OBJ}', { query: '?url', import: 'default', eager: true });
+const SKIN_EXTRAS = import.meta.glob('/skins/**/*.{bin,png,jpg,jpeg,webp,tga,bmp,gif,mtl,BIN,PNG,JPG,JPEG,WEBP,TGA,BMP,GIF,MTL}', { query: '?url', import: 'default', eager: true });
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { addRim, addHueSwap } from '../effects/Shaders.js';
@@ -119,21 +121,28 @@ export class CharacterAssets {
         a.types[t] = { scene: g.scene, scale: HEIGHT / h, footOffset: (-box.min.y * HEIGHT) / h, q: true, head, headAbove: (head?.userData.headAbove ?? 0.2) + (t.includes('Ranger') ? 0.06 : 0) };
       });
     }
+    // our rig's rest pose: custom skins' animations are retargeted from it
+    if (ual1) a.qRig = { scene: ual1.scene, slot: Q_SLOT };
     // your own models: files in the project's skins/ folder are built-in skins (git-ignored, local only)
     a.customSkins = [];
     for (const [path, url] of Object.entries(SKIN_FILES)) {
-      const file = path.split('/').pop();
-      const id = 'file_' + file.replace(/\.[^.]+$/, '').replace(/[^\w-]/g, '_');
+      const parts = path.split('/'), file = parts.pop(), dir = parts.join('/') + '/';
+      // "skins/fishstick/scene.gltf" is called Fishstick
+      const label = parts.length > 2 && /^(scene|model|mesh|untitled)$/i.test(file.replace(/\.[^.]+$/, '')) ? `${parts[parts.length - 1]}.${file.split('.').pop()}` : file;
+      const id = 'file_' + path.slice(7).replace(/\.[^.]+$/, '').replace(/[^\w-]/g, '_');
+      const files = {};
+      for (const [p, u] of Object.entries(SKIN_EXTRAS)) if (p.startsWith(dir)) files[baseName(p)] = u;
+      for (const [p, u] of Object.entries(SKIN_EXTRAS)) if (p.slice(0, p.lastIndexOf('/') + 1) === dir) files[baseName(p)] = u; // same folder wins
       try {
         const buf = await (await fetch(url)).arrayBuffer();
-        const res = await addCustomType(a, buf, 1.92, id);
-        a.customSkins.push({ id, name: file, builtin: true, ...res });
-        if (res.ok) registerCustomSkin(id, file, true);
+        const res = await addCustomType(a, buf, 1.92, id, { name: file, files });
+        a.customSkins.push({ id, name: label, builtin: true, ...res });
+        if (res.ok) registerCustomSkin(id, label, true);
       } catch (e) { console.warn('skin file', file, e); }
     }
     // ...and models loaded in the Locker, saved in this browser and loaded every start
     for (const sk of await listSkins()) {
-      const res = await addCustomType(a, sk.buf, 1.92, sk.id);
+      const res = await addCustomType(a, sk.buf, 1.92, sk.id, { name: sk.name, files: blobFiles(sk.extras) });
       a.customSkins.push({ id: sk.id, name: sk.name, ...res });
       if (res.ok) registerCustomSkin(sk.id, sk.name);
     }
@@ -175,6 +184,19 @@ export class Character {
         o.castShadow = true;
         o.receiveShadow = false;
         o.frustumCulled = false;
+        if (this.custom) {
+          // your own model keeps its own colours and textures (and the colours you picked in the
+          // Locker); .fbx / .obj meshes can have several materials
+          const own = (orig) => {
+            const m = orig.clone();
+            const pick = src.colors?.[m.name];
+            if (pick && m.color) m.color.set(pick);
+            if (m.emissive) { addRim(m, '#e6f4ff', 0.3); this.materials.push(m); }
+            return m;
+          };
+          o.material = Array.isArray(o.material) ? o.material.map(own) : own(o.material);
+          return;
+        }
         const m = o.material.clone();
         if (m.name === 'MI_QHead') {
           // skin-toned head from the mannequin: drop everything below the neck
@@ -186,9 +208,6 @@ export class Character {
           };
           m.customProgramCacheKey = () => `qhead${cut.toFixed(3)}`;
           o.castShadow = false;
-        } else if (this.custom) {
-          // your own model keeps its own colours and textures
-          addRim(m, '#e6f4ff', 0.3);
         } else {
           m.color.copy(tintColor);
           m.roughness = this.q ? Math.max(0.55, m.roughness) : 0.6;
@@ -213,9 +232,10 @@ export class Character {
     if (this.q && this.handBone) {
       this.handR = new THREE.Object3D();
       this.handR.name = 'handslot_q';
-      this.handR.position.fromArray(Q_SLOT.pos);
-      this.handR.quaternion.fromArray(Q_SLOT.quat).normalize();
-      this.handR.scale.setScalar(Q_SLOT.scale);
+      const slot = src.slot || Q_SLOT; // custom skins: our slot moved into their hand bone
+      this.handR.position.fromArray(slot.pos);
+      this.handR.quaternion.fromArray(slot.quat).normalize();
+      this.handR.scale.setScalar(slot.scale);
       this.handBone.add(this.handR);
     }
 

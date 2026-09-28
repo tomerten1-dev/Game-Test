@@ -1,6 +1,7 @@
 # Your cosmetics
 
-Put `.glb` models (`.gltf` works on the dev server) in these folders:
+Put models (`.glb`, `.gltf`, `.fbx`, `.dae` or `.obj`) in these folders. Texture / `.bin` / `.mtl` files
+next to a model are found by name; a model can also sit in its own sub-folder (`gliders/umbrella/scene.gltf`).
 
 - `gliders/`    - gliders (sized to a ~4.4 m wingspan, shown above you while gliding)
 - `pickaxes/`   - harvesting tools (the longest side becomes the handle; sized like the default axe)

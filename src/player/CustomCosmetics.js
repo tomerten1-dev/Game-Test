@@ -1,35 +1,39 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { registerCustomCosmetic } from '../meta/Cosmetics.js';
+import { readScene, baseName } from './CustomSkin.js';
 
-// Your own cosmetic models: .glb / .gltf files in <project>/cosmetics/gliders, /pickaxes and /backblings
+// Your own cosmetic models: .glb / .gltf / .fbx / .dae / .obj files in <project>/cosmetics/gliders, /pickaxes and /backblings
 // become Locker items (always owned, named after the file). The folder is git-ignored, so the models
 // stay on your computer. Each model is sized to fit the slot (glider span, pickaxe length, back bling
-// height) and centred; orientation comes from the file.
-const FILES = import.meta.glob('/cosmetics/*/*.{glb,gltf,GLB,GLTF}', { query: '?url', import: 'default', eager: true });
+// height) and centred; orientation comes from the file. Textures / .bin / .mtl files next to a model
+// are found by name.
+const FILES = import.meta.glob('/cosmetics/*/**/*.{glb,gltf,fbx,dae,obj,GLB,GLTF,FBX,DAE,OBJ}', { query: '?url', import: 'default', eager: true });
+const EXTRAS = import.meta.glob('/cosmetics/*/**/*.{bin,png,jpg,jpeg,webp,tga,bmp,gif,mtl,BIN,PNG,JPG,JPEG,WEBP,TGA,BMP,GIF,MTL}', { query: '?url', import: 'default', eager: true });
 const KINDS = { gliders: 'glider', glider: 'glider', pickaxes: 'pickaxe', pickaxe: 'pickaxe', backblings: 'backbling', backbling: 'backbling', backpacks: 'backbling', backpack: 'backbling' };
 
 export const CUSTOM_MODELS = {}; // id -> { kind, scene, size, box }
 export const CUSTOM_BY_KIND = { glider: [], pickaxe: [], backbling: [] }; // cosmetic values, for bots
 
 export async function loadCosmeticFolder() {
-  const loader = new GLTFLoader();
   for (const [path, url] of Object.entries(FILES)) {
-    const parts = path.split('/'), folder = parts[parts.length - 2].toLowerCase(), file = parts[parts.length - 1];
-    const kind = KINDS[folder];
+    const parts = path.split('/'), file = parts[parts.length - 1], dir = parts.slice(0, -1).join('/') + '/';
+    const kind = KINDS[parts[2].toLowerCase()];
     if (!kind) continue;
+    const files = {};
+    for (const [p, u] of Object.entries(EXTRAS)) if (p.startsWith(dir)) files[baseName(p)] = u;
     try {
-      const g = await loader.loadAsync(url);
-      const scene = g.scene;
+      const scene = await readScene(await (await fetch(url)).arrayBuffer(), file, files);
       scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
       scene.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(scene);
       if (box.isEmpty()) continue;
-      const id = `${kind}_${file.replace(/\.[^.]+$/, '').replace(/[^\w-]/g, '_')}`;
+      const id = `${kind}_${parts.slice(3).join('/').replace(/\.[^.]+$/, '').replace(/[^\w-]/g, '_')}`;
+      // "gliders/umbrella/scene.gltf" is called Umbrella
+      const label = parts.length > 4 && /^(scene|model|mesh|untitled)$/i.test(file.replace(/\.[^.]+$/, '')) ? `${parts[parts.length - 2]}.${file.split('.').pop()}` : file;
       CUSTOM_MODELS[id] = { kind, scene, box, size: box.getSize(new THREE.Vector3()) };
       const value = kind === 'glider' ? [`model:${id}`, '#ffffff'] : `model:${id}`;
       CUSTOM_BY_KIND[kind].push(value);
-      registerCustomCosmetic(kind, id, file, value);
+      registerCustomCosmetic(kind, id, label, value);
     } catch (e) { console.warn('cosmetic file', path, e); }
   }
 }

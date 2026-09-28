@@ -1012,3 +1012,9 @@ body.touch #slots { gap: 4px; }
 .custom-skin-row b { font-family: var(--title); font-weight: 400; font-size: 17px; letter-spacing: 0.5px; text-transform: uppercase; }
 .custom-skin-row small { flex: 1 1 200px; opacity: 0.85; font-weight: 600; }
 .custom-skin-row .lb-btn { padding: 5px 12px; font-size: 14px; }
+.custom-skin-row .cs-hint { flex: 1 1 100%; font-size: 12px; opacity: 0.7; }
+.cs-colors { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding-top: 6px; border-top: 1px solid rgba(200, 140, 255, 0.3); }
+.cs-colors b { font-size: 15px !important; }
+.cs-colors label { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.cs-colors label span { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-colors input[type=color] { width: 30px; height: 24px; padding: 0; border: 2px solid rgba(255, 255, 255, 0.7); border-radius: 4px; background: none; cursor: pointer; }

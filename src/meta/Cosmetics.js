@@ -153,7 +153,7 @@ export function registerCustomSkin(id, name, builtin = false) {
   const cid = `custom_${id}`;
   if (COSMETICS[cid]) return cid;
   // "fishstick_skin.glb" -> "Fishstick Skin"
-  const nice = name.replace(/\.(glb|gltf)$/i, '').replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  const nice = name.replace(/\.(glb|gltf|fbx|dae|obj)$/i, '').replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   const item = { id: cid, type: 'hero', name: nice, rarity: builtin ? 4 : 3, value: `Custom:${id}`, custom: true, builtin, price: 0 };
   COSMETICS[cid] = item;
   COSMETIC_LIST.splice(COSMETIC_LIST.findIndex((c) => c.type === 'hero' && !c.custom), 0, item); // before the built-in heroes, in the order you added them
@@ -163,7 +163,7 @@ export function registerCustomSkin(id, name, builtin = false) {
 export function registerCustomCosmetic(type, id, file, value) {
   const cid = `custom_${id}`;
   if (COSMETICS[cid]) return cid;
-  const name = file.replace(/\.(glb|gltf)$/i, '').replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  const name = file.replace(/\.(glb|gltf|fbx|dae|obj)$/i, '').replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   const item = { id: cid, type, name, rarity: 4, value, custom: true, builtin: true, price: 0 };
   COSMETICS[cid] = item;
   const at = COSMETIC_LIST.findIndex((c) => c.type === type && !c.custom);
