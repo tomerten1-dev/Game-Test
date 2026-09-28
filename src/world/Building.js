@@ -116,14 +116,16 @@ function wallRects(mask = 0) {
 }
 
 // Solid rectangles of an edited floor (local x and z -HG..HG).
+// floors edit on a 2x2 grid (Fortnite): each set bit removes a quarter
+export const FLOOR_FULL = 15;
 function floorRects(mask = 0) {
-  const out = [];
-  for (let r = 0; r < 3; r++) {
+  const out = [], T = GRID / 2;
+  for (let r = 0; r < 2; r++) {
     let run = null;
-    for (let c = 0; c <= 3; c++) {
-      const kept = c < 3 && !(mask & (1 << (r * 3 + c)));
+    for (let c = 0; c <= 2; c++) {
+      const kept = c < 2 && !(mask & (1 << (r * 2 + c)));
       if (kept && run === null) run = c;
-      if (!kept && run !== null) { out.push([-HG + run * TILE, -HG + c * TILE, -HG + r * TILE, -HG + (r + 1) * TILE]); run = null; }
+      if (!kept && run !== null) { out.push([-HG + run * T, -HG + c * T, -HG + r * T, -HG + (r + 1) * T]); run = null; }
     }
   }
   return out;
@@ -452,10 +454,10 @@ export class Building {
   edit(s, edit) {
     if (!s || s.falling || (s.type !== 'wall' && s.type !== 'floor')) return null;
     const mask = edit == null ? 0 : typeof edit === 'number' ? edit : EDIT_PRESETS[edit] ?? 0;
-    if (mask === FULL_MASK) return s.edit;
+    if (mask === (s.type === 'wall' ? FULL_MASK : FLOOR_FULL)) return s.edit;
     if (mask === s.editMask) return s.edit;
     s.editMask = mask;
-    s.edit = !mask ? null : Object.keys(EDIT_PRESETS).find((k) => EDIT_PRESETS[k] === mask) || 'custom';
+    s.edit = !mask ? null : (s.type === 'wall' && Object.keys(EDIT_PRESETS).find((k) => EDIT_PRESETS[k] === mask)) || 'custom';
     for (const c of s.cols) this.world.colliders.remove(c);
     s.cols = this._colliders(s);
     for (const c of s.cols) { c.dynamic = true; c.structure = s; this.world.colliders.add(c); }
@@ -465,24 +467,76 @@ export class Building {
     return s.edit;
   }
 
-  // Ramp edits cycle: full -> left half -> right half -> turned around (Fortnite's ramp tile edits).
-  editRamp(s) {
+  // Set a ramp's shape: climbing direction (a grid axis) and half (0 full, +-1 one side of the tile).
+  setRamp(s, dirX, dirZ, half) {
     if (!s || s.type !== 'ramp' || s.falling) return;
-    if (!s.half) s.half = 1;
-    else if (s.half === 1) s.half = -1;
-    else { s.half = 0; s.dirX = -s.dirX; s.dirZ = -s.dirZ; }
-    s.mesh.geometry = s.half ? (this.geo.halfRamp ||= new THREE.BoxGeometry(GRID / 2, 0.2, Math.hypot(GRID, HEIGHT))) : this.geo.ramp;
+    s.dirX = dirX; s.dirZ = dirZ; s.half = half;
+    s.mesh.geometry = half ? (this.geo.halfRamp ||= new THREE.BoxGeometry(GRID / 2, 0.2, Math.hypot(GRID, HEIGHT))) : this.geo.ramp;
     this._refit(s);
   }
 
-  // Cone edits: a full cone <-> a half cone (one slope) rising the way you look.
-  editCone(s, yaw) {
+  // Set a cone's shape: null (full cone) or a half cone rising toward (dirX, dirZ).
+  setCone(s, shape, dirX = s.dirX, dirZ = s.dirZ) {
     if (!s || s.type !== 'cone' || s.falling) return;
-    if (s.shape === 'half') s.shape = null;
-    else { s.shape = 'half'; [s.dirX, s.dirZ] = Building.dirFromYaw(yaw); }
-    s.mesh.geometry = s.shape === 'half' ? (this.geo.halfCone ||= new THREE.BoxGeometry(GRID, 0.2, Math.hypot(GRID, CONE_H))) : this.geo.cone;
+    s.shape = shape;
+    if (shape) { s.dirX = dirX; s.dirZ = dirZ; }
+    s.mesh.geometry = shape === 'half' ? (this.geo.halfCone ||= new THREE.BoxGeometry(GRID, 0.2, Math.hypot(GRID, CONE_H))) : this.geo.cone;
     s.mesh.rotation.set(0, 0, 0);
     this._refit(s);
+  }
+
+  // Grid edit of a ramp (Fortnite): drag across all four tiles to turn it (it climbs the way you
+  // dragged), or along two tiles to make a half-width ramp on that side. Other selections: no change.
+  editRampTiles(s, mask, from, to) {
+    const tiles = [0, 1, 2, 3].filter((i) => mask & (1 << i));
+    const cx = s.cx, cz = s.cz;
+    const at = (i) => this.tileCenter(s, i);
+    const axis = (x, z) => (Math.abs(x) >= Math.abs(z) ? [Math.sign(x) || 1, 0] : [0, Math.sign(z) || 1]);
+    const drag = from >= 0 && to >= 0 && from !== to ? at(to).sub(at(from)) : null;
+    if (tiles.length === 4) {
+      const [dx, dz] = drag ? axis(drag.x, drag.z) : [s.dirX, s.dirZ];
+      this.setRamp(s, dx, dz, 0);
+    } else if (tiles.length === 2) {
+      const a = at(tiles[0]), b = at(tiles[1]);
+      const strip = b.clone().sub(a);
+      if (Math.abs(strip.x) > 0.1 && Math.abs(strip.z) > 0.1) return; // diagonal: not a ramp edit
+      let [dx, dz] = axis(strip.x, strip.z);
+      if (drag && drag.x * dx + drag.z * dz < 0) { dx = -dx; dz = -dz; } // climbs the way you dragged
+      else if (!drag && dx * s.dirX + dz * s.dirZ < 0) { dx = -dx; dz = -dz; }
+      const mx = (a.x + b.x) / 2 - cx, mz = (a.z + b.z) / 2 - cz;
+      this.setRamp(s, dx, dz, Math.sign(mx * dz - mz * dx) || 1); // side along (dirZ, -dirX)
+    }
+  }
+
+  // Grid edit of a cone: two tiles on one side make a half cone that is low on that side.
+  editConeTiles(s, mask) {
+    const tiles = [0, 1, 2, 3].filter((i) => mask & (1 << i));
+    if (!tiles.length) return this.setCone(s, null);
+    if (tiles.length !== 2) return;
+    const a = this.tileCenter(s, tiles[0]), b = this.tileCenter(s, tiles[1]);
+    if (Math.abs(a.x - b.x) > 0.1 && Math.abs(a.z - b.z) > 0.1) return;
+    const mx = (a.x + b.x) / 2 - s.cx, mz = (a.z + b.z) / 2 - s.cz;
+    const [dx, dz] = Math.abs(mx) >= Math.abs(mz) ? [-Math.sign(mx), 0] : [0, -Math.sign(mz)];
+    this.setCone(s, 'half', dx, dz);
+  }
+
+  // Tiles of the edit grid: walls 3x3, floors / ramps / cones 2x2.
+  gridSize(s) { return s.type === 'wall' ? 3 : 2; }
+
+  // World centre of edit tile i (row-major: rows go along the ramp / +z, columns across / +x).
+  tileCenter(s, i, out = new THREE.Vector3()) {
+    const n = this.gridSize(s), r = Math.floor(i / n), c = i % n, T = GRID / n;
+    const u = -HG + (c + 0.5) * T, v = -HG + (r + 0.5) * T;
+    if (s.type === 'wall') {
+      const h = HEIGHT - (r + 0.5) * (HEIGHT / 3);
+      return s.alongX ? out.set(s.cx + u, s.y0 + h, s.cz) : out.set(s.cx, s.y0 + h, s.cz - u);
+    }
+    if (s.type === 'ramp') {
+      // v runs up the slope (dir), u across it (lateral (dirZ, -dirX))
+      const lx = s.dirZ, lz = -s.dirX;
+      return out.set(s.cx + s.dirX * v + lx * u, s.y0 + ((v + HG) / GRID) * HEIGHT + 0.12, s.cz + s.dirZ * v + lz * u);
+    }
+    return out.set(s.cx + u, s.y0 + (s.type === 'cone' ? CONE_H * 0.55 : 0.12), s.cz + v);
   }
 
   _refit(s) {
@@ -494,45 +548,34 @@ export class Building {
     this.game.sound.play('click', s.mesh.position);
   }
 
-  // Ramps don't have tiles: editing flips which way they climb.
-  flipRamp(s) {
-    if (!s || s.type !== 'ramp' || s.falling) return;
-    s.dirX = -s.dirX; s.dirZ = -s.dirZ;
-    for (const c of s.cols) this.world.colliders.remove(c);
-    s.cols = this._colliders(s);
-    for (const c of s.cols) { c.dynamic = true; c.structure = s; this.world.colliders.add(c); }
-    this._place(s.mesh, s);
-    s.base.copy(s.mesh.position);
-    this.game.sound.play('click', s.mesh.position);
-  }
-
-  // Edit-mode overlay: 9 tiles over the structure, selected ones in red.
+  // Edit-mode overlay: the piece's tiles (3x3 wall, 2x2 floor / ramp / cone), selected ones in red.
   showEditGrid(s, mask) {
     const g = this.editGrid;
     g.visible = !!s;
     if (!s) return;
+    const n = this.gridSize(s), k = 3 / n; // tile meshes are built 1/3 of the grid wide
+    const X = new THREE.Vector3(), Y = new THREE.Vector3(), Z = new THREE.Vector3(), M = new THREE.Matrix4();
+    if (s.type === 'wall') { if (s.alongX) { X.set(1, 0, 0); Z.set(0, 0, 1); } else { X.set(0, 0, -1); Z.set(1, 0, 0); } Y.set(0, 1, 0); }
+    else if (s.type === 'ramp') {
+      Y.set(s.dirX * GRID, HEIGHT, s.dirZ * GRID).normalize(); X.set(s.dirZ, 0, -s.dirX); Z.crossVectors(X, Y);
+    } else { X.set(1, 0, 0); Y.set(0, 0, 1); Z.set(0, -1, 0); }
+    const q = new THREE.Quaternion().setFromRotationMatrix(M.makeBasis(X, Y, Z));
     g.children.forEach((m, i) => {
-      const r = Math.floor(i / 3), c = i % 3;
-      const u = -HG + (c + 0.5) * TILE;
-      m.scale.set(1, s.type === 'wall' ? TILE_H / TILE : 1, 1);
-      if (s.type === 'wall') {
-        const v = HEIGHT - (r + 0.5) * TILE_H;
-        m.rotation.set(0, s.alongX ? 0 : Math.PI / 2, 0);
-        if (s.alongX) m.position.set(s.cx + u, s.y0 + v, s.cz);
-        else m.position.set(s.cx, s.y0 + v, s.cz - u);
-      } else {
-        m.rotation.set(-Math.PI / 2, 0, 0);
-        m.position.set(s.cx + u, s.y0 + 0.12, s.cz - HG + (r + 0.5) * TILE);
-      }
+      m.visible = i < n * n;
+      if (!m.visible) return;
+      this.tileCenter(s, i, m.position);
+      m.quaternion.copy(q);
+      m.scale.set(k, s.type === 'wall' ? (HEIGHT / 3) / TILE : s.type === 'ramp' ? k * (Math.hypot(GRID, HEIGHT) / GRID) : k, 1);
       m.material = mask & (1 << i) ? this.tileSelMat : this.tileMat;
-    });    g.updateMatrixWorld(true);
+    });
+    g.updateMatrixWorld(true);
   }
 
   // Which tile of the edit grid is under a ray (or -1).
   pickTile(origin, dir) {
     this._ray.set(origin, dir);
     this._ray.far = 9;
-    const hit = this._ray.intersectObjects(this.editGrid.children, false)[0];
+    const hit = this._ray.intersectObjects(this.editGrid.children.filter((m) => m.visible), false)[0];
     return hit ? hit.object.userData.tile : -1;
   }
 

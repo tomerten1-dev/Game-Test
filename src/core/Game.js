@@ -1092,11 +1092,11 @@ export class Game {
   // Reset-edit key: your looked-at build goes back to its plain shape (or clears a pre-edit).
   resetEditLooked() {
     const b = this.building;
-    if (this.editing) { b.edit(this.editing.s, null); this.stopEdit(); this.hud.toast?.('Edit reset'); return; }
+    if (this.editing) { this._resetPiece(this.editing.s); this.stopEdit(); this.hud.toast?.('Edit reset'); return; }
     const s = this._lookedBuild();
     if (s?.type === 'wall' || s?.type === 'floor') { b.edit(s, null); return; }
-    if (s?.type === 'ramp' && s.half) { s.half = -1; b.editRamp(s); s.dirX = -s.dirX; s.dirZ = -s.dirZ; b._refit(s); return; }
-    if (s?.type === 'cone' && s.shape) { b.editCone(s, 0); return; }
+    if (s?.type === 'ramp' && s.half) { b.setRamp(s, s.dirX, s.dirZ, 0); return; }
+    if (s?.type === 'cone' && s.shape) { b.setCone(s, null); return; }
     const piece = this.player.buildMode;
     if (piece && this.preEdits?.[piece]) { this.preEdits[piece] = 0; this.hud.toast?.('Pre-edit cleared'); }
   }
@@ -1123,7 +1123,7 @@ export class Game {
     const bit = 1 << tile;
     if (e.paint === null) e.paint = !(e.mask & bit);
     const next = e.paint ? e.mask | bit : e.mask & ~bit;
-    if (next !== e.mask && next !== 511) { e.mask = next; this.building.showEditGrid(e.s, e.mask); this.sound.play('click'); }
+    if (next !== e.mask && next !== (e.type === 'wall' ? 511 : 15)) { e.mask = next; this.building.showEditGrid(e.s, e.mask); this.sound.play('click'); }
   }
 
   finishPreEdit(cancel = false) {
@@ -1136,12 +1136,25 @@ export class Game {
     this.hud.toast?.(e.mask ? `Pre-edit saved: every ${e.type} comes out edited (reset-edit key clears it)` : 'Pre-edit cleared');
   }
 
-  // Edit mode (G): pick tiles on your own wall / floor, G again to confirm. Ramps and cones change shape.
+  // A piece back to its plain shape.
+  _resetPiece(s) {
+    const b = this.building;
+    if (s.type === 'ramp') b.setRamp(s, s.dirX, s.dirZ, 0);
+    else if (s.type === 'cone') b.setCone(s, null);
+    else b.edit(s, null);
+  }
+
+  // Edit mode (G), as in Fortnite: every piece shows its tile grid (walls 3x3, floors / stairs / cones
+  // 2x2); pick or drag across tiles, G again to confirm.
   toggleEdit() {
     const b = this.building, p = this.player;
     if (this.editing) {
-      const { s, mask } = this.editing;
-      if (s.hp > 0) b.edit(s, mask);
+      const { s, mask, from, to } = this.editing;
+      if (s.hp > 0) {
+        if (s.type === 'ramp') b.editRampTiles(s, mask, from, to);
+        else if (s.type === 'cone') b.editConeTiles(s, mask);
+        else b.edit(s, mask);
+      }
       this.stopEdit();
       return;
     }
@@ -1151,10 +1164,9 @@ export class Game {
     const s = hit?.collider?.structure;
     if (!s) { this.hud.toast?.('Look at one of your builds to edit it'); return; }
     if (s.owner !== p) { this.hud.toast?.('You can only edit your own builds'); return; }
-    if (s.type === 'cone') { b.editCone(s, p.aimYaw); return; }
-    if (s.type === 'ramp') { b.editRamp(s); return; }
     p.setBuildMode(null);
-    this.editing = { s, mask: s.editMask || 0, paint: null };
+    // walls / floors show their current edit; stairs and cones start from an empty grid
+    this.editing = { s, mask: s.type === 'wall' || s.type === 'floor' ? s.editMask || 0 : 0, paint: null, from: -1, to: -1 };
     b.showEditGrid(s, this.editing.mask);
     this.hud.editHint?.(true);
   }
@@ -1168,16 +1180,20 @@ export class Game {
   updateEdit() {
     const e = this.editing, p = this.player, input = this.input;
     if (!e.s || e.s.hp <= 0 || e.s.falling || !p.alive || p.pos.distanceTo(e.s.mesh.position) > 9) { this.stopEdit(); return; }
-    if (input.pressed('aim')) { this.building.edit(e.s, null); this.stopEdit(); this.hud.toast?.('Edit reset'); return; }
+    if (input.pressed('aim')) { this._resetPiece(e.s); this.stopEdit(); this.hud.toast?.('Edit reset'); return; }
     if (!input.down('fire')) { e.paint = null; return; }
     const dir = this.camera.getWorldDirection(_dir);
     const tile = this.building.pickTile(this.camera.position, dir);
     if (tile < 0) return;
     const bit = 1 << tile;
-    // the first tile you press decides whether the drag selects or deselects
-    if (e.paint === null) e.paint = !(e.mask & bit);
+    // the first tile you press decides whether the drag selects or deselects; stairs remember where
+    // the drag started and ended (that's the way they will climb)
+    if (e.paint === null) { e.paint = !(e.mask & bit); if (e.paint) e.from = tile; }
+    if (e.paint) e.to = tile;
+    // walls / floors can't lose every tile; stairs and cones use all four for turning
+    const full = e.s.type === 'wall' ? 511 : e.s.type === 'floor' ? 15 : -1;
     const next = e.paint ? e.mask | bit : e.mask & ~bit;
-    if (next !== e.mask && next !== 511) { e.mask = next; this.building.showEditGrid(e.s, e.mask); this.sound.play('click'); }
+    if (next !== e.mask && next !== full) { e.mask = next; this.building.showEditGrid(e.s, e.mask); this.sound.play('click'); }
   }
 
   // Channel the held consumable; finishing applies it and uses up one from the stack.
