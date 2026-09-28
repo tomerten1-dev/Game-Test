@@ -714,9 +714,9 @@ export class HUD {
       if (url) ic.innerHTML = `<img src="${url}" alt="">`;
       else ic.textContent = !it ? '' : it.isGun ? it.def.icon : it.isConsumable ? it.def.icon : '⛏︎';
       s.classList.toggle('has-img', !!url);
-      // Chapter 1 style: guns show the reserve ammo you carry for them (with a tiny ammo mark), items their stack
+      // guns show all the ammo you have for them - loaded plus carried - (with a tiny ammo mark), items their stack
       const res = it?.isGun && it.def.ammoType !== 'none' ? who.ammoFor(it.def.ammoType) : null;
-      s.querySelector('.count').innerHTML = it?.isConsumable ? String(it.count) : res !== null && res !== Infinity ? `${res}<i class="am" style="--c:${AMMO[it.def.ammoType]?.color || '#fff'}"></i>` : '';
+      s.querySelector('.count').innerHTML = it?.isConsumable ? String(it.count) : res !== null && res !== Infinity ? `${res + it.ammo}<i class="am" style="--c:${AMMO[it.def.ammoType]?.color || '#fff'}"></i>` : '';
       s.style.setProperty('--slotbg', !it ? 'transparent' : i === 0 && !it.isGun && !it.isConsumable ? '#3a8fe0' : col);
       s.classList.toggle('low', !!it?.isGun && it.def.ammoType !== 'none' && it.mag > 1 && it.ammo <= Math.ceil(it.mag * 0.25));
     });
