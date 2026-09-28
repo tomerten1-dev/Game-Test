@@ -230,7 +230,7 @@ export class Menus {
         const cid = `custom_${cur.id}`, picked = skinColors(cid);
         const parts = cur.parts.slice(0, 16);
         $('#locker-grid').querySelector('.custom-skin-row').insertAdjacentHTML('beforeend', `<div class="cs-colors"><b>Colours</b>${parts.map((p, i) => `<label title="${esc(p.name)}${p.textured ? ' (has a texture - the colour tints it)' : ''}"><input type="color" data-part="${i}" value="${picked[p.name] || p.color}"><span>${esc(p.name)}</span></label>`).join('')}<button class="lb-btn" id="cs-reset">Reset colours</button></div>`);
-        const rebuild = () => { if (this.game.stage) this.game.stage._key = null; };
+        const rebuild = () => { const st = this.game.stage; if (!st) return; st._key = null; if (st.look) st.setLook(st.look); }; // redraw the hero now
         $('#locker-grid').querySelectorAll('.cs-colors input').forEach((inp) => {
           inp.addEventListener('click', (e) => e.stopPropagation());
           inp.addEventListener('change', (e) => { setSkinColor(cid, parts[+inp.dataset.part].name, e.target.value); rebuild(); });
