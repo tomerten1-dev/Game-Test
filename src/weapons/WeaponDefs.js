@@ -2,11 +2,11 @@
 
 export const RARITIES = [
   { key: 'common', name: 'Common', color: '#b9bec7', mult: 1.0 },
-  { key: 'uncommon', name: 'Uncommon', color: '#5bd43b', mult: 1.08 },
-  { key: 'rare', name: 'Rare', color: '#3d8dff', mult: 1.16 },
-  { key: 'epic', name: 'Epic', color: '#b64cff', mult: 1.25 },
-  { key: 'legendary', name: 'Legendary', color: '#f5890e', mult: 1.34 },
-  { key: 'mythic', name: 'Mythic', color: '#ffe94d', mult: 1.5 }, // boss & vault only
+  { key: 'uncommon', name: 'Uncommon', color: '#5bd43b', mult: 1.055 },
+  { key: 'rare', name: 'Rare', color: '#3d8dff', mult: 1.11 },
+  { key: 'epic', name: 'Epic', color: '#b64cff', mult: 1.165 },
+  { key: 'legendary', name: 'Legendary', color: '#f5890e', mult: 1.22 },
+  { key: 'mythic', name: 'Mythic', color: '#ffe94d', mult: 1.35 }, // boss & vault only
   { key: 'exotic', name: 'Exotic', color: '#4ff4ff', mult: 1.0 }, // bought from dealers; stats are in the gun itself
 ];
 export const EXOTIC = 6;
@@ -32,8 +32,9 @@ export const WEAPONS = {
   },
   ar: {
     key: 'ar', name: 'Assault Rifle', icon: 'AR', ammoType: 'medium',
-    draw: 0.3, headMult: 2, firstShot: true,
-    damage: 30, pellets: 1, rate: 5.5, mag: 30, reload: 2.2,
+    // Fortnite (Holo Twister): 27 common -> 33 legendary, 5.1 shots/s, 25 rounds, 2.97 s -> 2.43 s reload
+    draw: 0.3, headMult: 1.5, firstShot: true,
+    damage: 27, pellets: 1, rate: 5.1, mag: 25, reload: 2.97,
     spread: 0.007, bloom: 0.011, maxSpread: 0.055, recover: 0.18,
     range: 230, falloffStart: 60, recoil: 0.014, idealRange: 34, shake: 0.14, drop: 380,
   },
@@ -54,7 +55,8 @@ export const WEAPONS = {
   pump: {
     key: 'pump', name: 'Pump Shotgun', icon: 'PMP', ammoType: 'shells',
     draw: 0.45, shellReload: 0.55,
-    damage: 11.5, pellets: 10, rate: 0.8, mag: 5, reload: 4.6, headMult: 2,
+    // Fortnite (Sentinel Pump): 12 pellets, 92 common -> 114 legendary, 0.85 shots/s, 4 shells, 1.75x heads
+    damage: 7.7, pellets: 12, rate: 0.85, mag: 4, reload: 3.6, headMult: 1.75,
     spread: 0.058, bloom: 0, maxSpread: 0.058, recover: 1,
     range: 31, falloffStart: 7, cap: 165, recoil: 0.09, idealRange: 6, shake: 0.5,
   },

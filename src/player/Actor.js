@@ -17,7 +17,19 @@ export const TAC_SPRINT_SPEED = 10.6; // tactical sprint (uses stamina)
 const STAMINA_DRAIN = 22, STAMINA_REGEN = 26;
 const CROUCH_SPEED = 3.4;
 const SLIDE_TIME = 0.85;
-const FALL_SAFE = 17; // landing speed (m/s) before fall damage
+// Fortnite fall damage by height: none below ~12.5 m (a bit over 3 walls), 11 at 3⅓ walls,
+// 49 at 5 walls and 100 at 6 walls (23 m). We land with speed v, so height = v² / 2g.
+const FALL_CURVE = [[12.5, 0], [12.8, 11], [19.2, 49], [23.04, 100], [40, 250]];
+const FALL_SAFE = Math.sqrt(2 * 24 * 12.5); // landing speed (m/s) before fall damage
+function fallDamageFor(speed, g = 24) {
+  const h = (speed * speed) / (2 * g);
+  if (h <= FALL_CURVE[0][0]) return 0;
+  for (let i = 1; i < FALL_CURVE.length; i++) {
+    const [h0, d0] = FALL_CURVE[i - 1], [h1, d1] = FALL_CURVE[i];
+    if (h <= h1) return Math.round(d0 + ((h - h0) / (h1 - h0)) * (d1 - d0));
+  }
+  return 250;
+}
 const JUMP_VEL = 8.2;
 const GLIDE_HEIGHT = 35;
 const REDEPLOY_HEIGHT = 14;
@@ -570,7 +582,12 @@ export class Actor {
     r.acc += r.rate * dt;
     while (r.acc >= 1 && r.left > 0) {
       r.acc -= 1; r.left--;
-      if (r.both) {
+      if (r.only) {
+        // Med Kit / Shield Potion over time: just the one bar, up to the item's cap
+        const k = r.only;
+        if (this[k] >= r.cap) { r.left = 0; break; }
+        this[k] = Math.min(r.cap, this[k] + 1);
+      } else if (r.both) {
         // Slurp: health and shield together
         if (this.health >= 100 && this.shield >= 100) r.left = 0;
         this.health = Math.min(100, this.health + 1); this.shield = Math.min(100, this.shield + 1);
@@ -691,13 +708,11 @@ export class Actor {
         // Roll Landing: hold or tap Jump just before landing to roll out of it, keep your speed and
         // get some stamina back (bots roll automatically on big drops)
         const wantRoll = this.isPlayer ? it.rollReady : this.landSpeed > 11;
-        let dmgK = 1;
         if (wantRoll && this.landSpeed > 9 && Math.hypot(this.vel.x, this.vel.z) > 2) {
           this.rollT = 0.5; this.character.setPose('Dodge_Forward', null, 0.06, 1.3);
           this.stamina = Math.min(100, this.stamina + 16);
-          dmgK = 0.6;
         }
-        if (this.landSpeed > FALL_SAFE && !(this.noFallT > 0) && !this.game.events?.softLanding?.(this.pos)) this.fallDamage(Math.round((this.landSpeed - FALL_SAFE) * 5.5 * dmgK));
+        if (this.landSpeed > FALL_SAFE && !(this.noFallT > 0) && !this.game.events?.softLanding?.(this.pos)) this.fallDamage(fallDamageFor(this.landSpeed));
       }
       // shoulder bash: sprint, slide or roll into a closed door to burst through it
       this._bashCheck(dt);

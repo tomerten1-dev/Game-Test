@@ -11,7 +11,7 @@ export const OVERRIDES = {
   headshot: { name: 'Headshot', desc: 'Headshots deal 25% more damage' },
   overshield: { name: 'Overshield', desc: 'Everyone gets +50 shield right now' },
   speedshot: { name: 'Speed Shooter', desc: 'Guns fire and reload 20% faster' },
-  siphon: { name: 'Health Siphon', desc: 'Eliminations siphon twice as much' },
+  siphon: { name: 'Health Siphon', desc: 'Eliminations give 75 health, then shield (like Ranked)' },
   bigfish: { name: 'Big Fish', desc: 'Every cast fishes like a fishing spot' },
   extralife: { name: 'Extra Life', desc: 'Everyone alive comes back once when eliminated' },
   morexp: { name: 'More XP', desc: '+50% XP from this match' },

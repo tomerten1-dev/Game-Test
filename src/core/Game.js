@@ -1495,18 +1495,11 @@ export class Game {
       if (killer.crowned) this.meta.track('crownKill');
     }
     if (killer && killer !== actor) this._firstBlood = true;
-    // siphon: the eliminator regains 75 health, then shield, over 5 s (arena: an instant +50)
-    if (killer && killer !== actor && killer.alive) {
-      if (this.mode === 'arena') {
-        let give = 50;
-        const h = Math.min(give, 100 - killer.health); killer.health += h; give -= h;
-        killer.shield = Math.min(100, killer.shield + give);
-        if (killer.isPlayer) this.hud.pickupNote?.('+50 Siphon', '#7dff8a');
-      } else {
-        const sip = this.overrides.has('siphon') ? 150 : 75;
-        killer.regen = { rate: 15, left: sip + (killer.regen?.left || 0), acc: 0 };
-        if (killer.isPlayer) this.hud.pickupNote?.(`+${sip} Siphon`, '#7dff8a');
-      }
+    // siphon like Fortnite: only Ranked has it (75 health, then shield, over 5 s);
+    // elsewhere only the Health Siphon override turns it on
+    if (killer && killer !== actor && killer.alive && (this.mode === 'arena' || this.overrides.has('siphon'))) {
+      killer.regen = { rate: 15, left: 75 + (killer.regen?.left || 0), acc: 0 };
+      if (killer.isPlayer) this.hud.pickupNote?.('+75 Siphon', '#7dff8a');
     }
     if (killer && killer !== actor) killer.kills++;
     this.hud.killFeed?.(killer, actor);

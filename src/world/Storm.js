@@ -3,11 +3,11 @@ import * as THREE from 'three';
 // 12 zones like Fortnite: 1 damage a second for the early circles, 12 a second by circle 6 and 20 by circle 8;
 // the last four circles move instead of just shrinking.
 export const STORM_PHASES = [
-  { wait: 60, shrink: 50, radius: 290, dmg: 1 },
-  { wait: 45, shrink: 40, radius: 210, dmg: 1 },
-  { wait: 40, shrink: 34, radius: 145, dmg: 1 },
-  { wait: 35, shrink: 30, radius: 95, dmg: 1 },
-  { wait: 30, shrink: 25, radius: 62, dmg: 5 },
+  { wait: 90, shrink: 60, radius: 290, dmg: 1 },
+  { wait: 60, shrink: 45, radius: 210, dmg: 1 },
+  { wait: 45, shrink: 36, radius: 145, dmg: 2 },
+  { wait: 35, shrink: 30, radius: 95, dmg: 5 },
+  { wait: 30, shrink: 25, radius: 62, dmg: 8 },
   { wait: 25, shrink: 22, radius: 44, dmg: 12 },
   { wait: 22, shrink: 20, radius: 30, dmg: 15 },
   { wait: 20, shrink: 18, radius: 20, dmg: 20 },

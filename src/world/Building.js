@@ -12,10 +12,10 @@ export const PIECES = ['wall', 'floor', 'ramp', 'cone'];
 export const BUILD_MATS = ['wood', 'stone', 'metal'];
 // Stronger materials start weaker and take longer to reach full health.
 export const MAT_STATS = {
-  // Fortnite: wood 90 -> 150 in 4 s, stone 99 -> 300 in 11.5 s, metal 110 -> 500 in 25 s
+  // Fortnite: wood 90 -> 150 in 4 s, stone 99 -> 300 in 11.5 s, metal 110 -> 450 in 25 s
   wood: { hp: 150, start: 0.6, time: 4, color: '#b07a45' },
   stone: { hp: 300, start: 0.33, time: 11.5, color: '#a9adb5' },
-  metal: { hp: 500, start: 0.22, time: 25, color: '#7f93a8' },
+  metal: { hp: 450, start: 0.245, time: 25, color: '#7f93a8' },
 };
 const CONE_H = 1.75;
 const FLOOR_T = 0.22;

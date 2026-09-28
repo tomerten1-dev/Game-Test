@@ -13,7 +13,7 @@ export const MATS = {
   stone: { name: 'Stone', color: '#b9bec7' },
   metal: { name: 'Metal', color: '#8fb4d9' },
 };
-export const MAT_CAP = 999;
+export const MAT_CAP = 500; // Fortnite lowered the cap from 999 to 500 per material
 
 // Boss medallions: a perk while you carry one, but every carrier shows up on everyone's map.
 export const MEDALLIONS = {
@@ -25,9 +25,9 @@ export const MEDALLIONS = {
 
 export const CONSUMABLES = {
   bandage: { name: 'Bandages', heal: 15, cap: 75, time: 4, max: 15, stack: 5, icon: '✚', color: '#f2efe6' },
-  medkit: { name: 'Medkit', heal: 100, cap: 100, time: 10, max: 3, stack: 1, icon: '✚', color: '#ff5a5f' },
+  medkit: { name: 'Medkit', heal: 100, cap: 100, time: 1, hot: 9, max: 3, stack: 1, desc: '1 s to start, then heals up to 100 health over 9 s · you can move while it works', icon: '✚', color: '#ff5a5f' },
   smallshield: { name: 'Small Shield', shield: 25, cap: 50, time: 2, max: 6, stack: 3, icon: '◆', color: '#6fd0ff' },
-  bigshield: { name: 'Shield Potion', shield: 50, cap: 100, time: 5, max: 3, stack: 1, icon: '⛊', color: '#3d8dff' },
+  bigshield: { name: 'Shield Potion', shield: 50, cap: 100, time: 1, hot: 4, max: 3, stack: 1, desc: '1 s to drink, then +50 shield over 4 s', icon: '⛊', color: '#3d8dff' },
   medmist: { name: 'Med-Mist', throw: 'medmist', max: 3, stack: 1, icon: 'MST', color: '#7dffb2', radius: 4.5, fuse: 1, duration: 8, desc: 'Throw it: a healing mist (+10 health a second) for 8 s' },
   slurp: { name: 'Slurp Juice', heal: 75, shield: 75, cap: 100, time: 2, max: 2, stack: 1, overTime: 2, both: true, icon: 'SLP', color: '#b86bff', desc: '+1 health and +1 shield every half second, up to 75 each' },
   chugsplash: { name: 'Chug Splash', throw: 'chugsplash', max: 6, stack: 2, icon: 'SPL', color: '#39d0ff', radius: 3.5, fuse: 3, impact: true, heal: 20, desc: 'Throw it: +20 health or shield to everyone splashed' },
@@ -98,6 +98,7 @@ export class Consumable {
     const d = this.def;
     if (d.throw || d.place || d.key || d.grapple || d.rift || d.trap || d.fizz || d.sos || d.scan) return true;
     if (d.speed && d.heal) return true; // foods with a boost are fine at full health
+    if (d.hot && a.regen?.only === (d.heal ? 'health' : 'shield')) return false; // one already working
     if (d.heal && d.shield) return a.health < d.cap || a.shield < d.cap;
     if (d.heal) return a.health < d.cap;
     return a.shield < d.cap;
@@ -107,6 +108,12 @@ export class Consumable {
     const d = this.def;
     // Slurp: a pool that tops up health first, then shield
     if (d.overTime) { a.regen = { left: d.heal, rate: d.overTime, acc: 0, both: !!d.both }; return; }
+    // Chapter 5+ Med Kit and Shield Potion: a short use, then the rest heals over time as you move
+    if (d.hot) {
+      const amt = d.heal || d.shield;
+      a.regen = { left: amt, rate: amt / d.hot, acc: 0, only: d.heal ? 'health' : 'shield', cap: d.cap };
+      return;
+    }
     if (d.rift) { a.riftUp(); return; }
     if (d.fizz) { a.game?.gadgets?.fizz(a); return; }
     if (d.sos) { a.game?.gadgets?.sos(a); return; }
