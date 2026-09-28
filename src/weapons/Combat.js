@@ -364,10 +364,43 @@ export class Combat {
     const r = c.r + 0.04;
     const wy = Math.max(c.y0 + 2.4, Math.min(c.y1 - 0.3, y + (Math.random() - 0.5) * 1.0, actor.pos.y + 2.1));
     const pos = new THREE.Vector3(c.x + Math.cos(a) * r, Math.max(wy, actor.pos.y + 0.5), c.z + Math.sin(a) * r);
+    // the collider is a round approximation: move the spot onto the object's visible surface
+    const out = this._onSurface(c, pos, a);
     this.weak = { c, pos, t: this.game.time };
     this.weakMesh.position.copy(pos);
-    this.weakMesh.lookAt(pos.x + Math.cos(a), pos.y, pos.z + Math.sin(a));
+    this.weakMesh.lookAt(pos.x + out.x, pos.y, pos.z + out.z);
     this.weakMesh.visible = true;
+  }
+
+  // Ray from outside the collider toward its centre, against the meshes that draw the object; moves
+  // pos onto the first surface hit. Returns the outward direction (for facing the spot).
+  _onSurface(c, pos, a) {
+    const out = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
+    const handles = c.obj?.handles;
+    if (!handles?.length) return out;
+    const rc = (this._rc ||= new THREE.Raycaster());
+    const from = new THREE.Vector3(c.x, pos.y, c.z).addScaledVector(out, c.r + 4);
+    rc.set(from, out.clone().negate());
+    rc.far = c.r + 4.2;
+    let best = null;
+    // test each shape that draws it at its own placement (the instanced meshes stream instances in
+    // and out, so their live slots can't be ray-tested directly)
+    const tmp = (this._rayMesh ||= new THREE.Mesh());
+    tmp.matrixAutoUpdate = false;
+    for (const h of handles) {
+      if (!h.mat || !h.im.geometry) continue;
+      tmp.geometry = h.im.geometry; tmp.material = h.im.material;
+      if (!tmp.geometry.boundingSphere) tmp.geometry.computeBoundingSphere();
+      tmp.matrixWorld.multiplyMatrices(h.im.matrixWorld, h.mat);
+      const hit = rc.intersectObject(tmp, false)[0];
+      if (hit && (!best || hit.distance < best.distance)) best = hit;
+    }
+    if (best) {
+      pos.copy(best.point).addScaledVector(out, 0.04);
+      const n = new THREE.Vector3(best.point.x - c.x, 0, best.point.z - c.z);
+      if (n.lengthSq() > 1e-6) out.copy(n.normalize());
+    }
+    return out;
   }
 
   // Hide the weak point when the player walks away, puts the axe down or stops harvesting.
