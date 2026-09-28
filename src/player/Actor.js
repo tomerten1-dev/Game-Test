@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { biomeAt } from '../world/Terrain.js';
 import { makeCrownMesh } from '../world/ItemMeshes.js';
 import { attachHat, attachBackBling, makeHarvestTool, headAnchor } from './Gear.js';
 import { Character } from './Character.js';
@@ -7,6 +8,8 @@ import { damp, dampAngle } from '../core/noise.js';
 import { makeWeaponMesh, makePickaxeMesh, makeThrowableMesh } from '../weapons/WeaponModels.js';
 import { makeConsumableMesh } from '../world/ItemMeshes.js';
 import { Pickaxe, Consumable, CONSUMABLES, MAT_CAP } from '../weapons/Items.js';
+
+const _surf = []; // scratch list for surface()
 
 export const RUN_SPEED = 6.4;
 export const SPRINT_SPEED = 9.0;
@@ -110,6 +113,25 @@ export class Actor {
   get wood() { return this.mats.wood; }
   set wood(v) { this.mats.wood = Math.max(0, Math.min(MAT_CAP, v)); }
 
+  // What we're standing on, for footstep sounds: a build / house (its material), water, or the ground.
+  surface() {
+    const w = this.game.world, p = this.pos;
+    if (this.inWater) return 'water';
+    const th = w.terrain.heightAt(p.x, p.z);
+    if (p.y - th > 0.25) {
+      for (const c of w.colliders.query(p.x - 0.4, p.x + 0.4, p.z - 0.4, p.z + 0.4, _surf)) {
+        if (Math.abs(c.y1 - p.y) > 0.35 && c.kind !== 'ramp' && c.kind !== 'cone') continue;
+        const m = c.structure?.mat || c.mat;
+        _surf.length = 0;
+        return m === 'metal' ? 'metal' : m === 'stone' ? 'stone' : 'wood';
+      }
+      _surf.length = 0;
+    }
+    if (th < 2.4) return 'sand';
+    const b = biomeAt(p.x, p.z);
+    return b.snow > 0.5 ? 'snow' : b.desert > 0.5 ? 'sand' : 'grass';
+  }
+
   ammoFor(type) { return this.infiniteAmmo || type === 'none' ? Infinity : this.ammo[type] || 0; }
 
   // Move rounds from the reserve into the magazine when a reload completes.
@@ -150,7 +172,9 @@ export class Actor {
     if (!h || !h.isConsumable || this.useT > 0 || !h.usableBy(this)) return false;
     this.useT = h.def.time;
     this.useItem = h;
-    this.game.sound?.play('use', this.isPlayer ? null : this.pos, { range: 30 });
+    // you can hear other players heal: a gulp for drinks, a rip for bandages and medkits
+    const drink = h.def.shield || h.def.overTime || h.def.fizz;
+    this.game.sound?.play(drink ? 'gulp' : 'rip', this.isPlayer ? null : this.pos, { range: 28 });
     return true;
   }
 
@@ -496,8 +520,10 @@ export class Actor {
   }
 
   // Put the Victory Crown on (or take it off): a gold crown on the head bone.
-  setCrown(on) {
+  // count: crowned wins so far (Fortnite stacks it over the crown)
+  setCrown(on, count = null) {
     this.crowned = on;
+    if (on && count) this.crownCount = count;
     if (on && !this.crownMesh) {
       const c = makeCrownMesh();
       const ch = this.character;
@@ -508,6 +534,20 @@ export class Actor {
       this.crownMesh = c;
     }
     if (this.crownMesh) this.crownMesh.visible = on;
+    if (on && this.crownCount && this.crownMesh && this._crownLabelN !== this.crownCount) {
+      this._crownLabelN = this.crownCount;
+      if (this._crownLabel) this.crownMesh.remove(this._crownLabel);
+      const cv = document.createElement('canvas'); cv.width = 128; cv.height = 64;
+      const x = cv.getContext('2d');
+      x.font = '900 44px "Barlow Condensed", sans-serif'; x.textAlign = 'center'; x.lineWidth = 6;
+      x.strokeStyle = '#5a3a00'; x.strokeText(`×${this.crownCount}`, 64, 48);
+      x.fillStyle = '#ffd23f'; x.fillText(`×${this.crownCount}`, 64, 48);
+      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+      const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+      spr.scale.set(0.5, 0.25, 1); spr.position.y = 0.45;
+      this.crownMesh.add(spr);
+      this._crownLabel = spr;
+    }
   }
 
   // Medallion perks that tick: shield / health regeneration after a few seconds without damage.
@@ -667,8 +707,8 @@ export class Actor {
           this._stepDist = 0;
           // crouch-walking is much quieter (and only heard up close)
           const v = this.crouched ? 0.35 : this.sprinting ? 1.1 : 0.8;
-          if (this.isPlayer) this.game.sound?.play('step', null, { vol: this.crouched ? 0.08 : this.sprinting ? 0.35 : 0.22 });
-          else if (this.distToCam < (this.crouched ? 15 : 45)) this.game.sound?.play('step', this.pos, { range: this.crouched ? 15 : 45, vol: v });
+          if (this.isPlayer) this.game.sound?.play('step', null, { vol: this.crouched ? 0.08 : this.sprinting ? 0.35 : 0.22, surface: this.surface() });
+          else if (this.distToCam < (this.crouched ? 15 : 45)) this.game.sound?.play('step', this.pos, { range: this.crouched ? 15 : 45, vol: v, surface: this.distToCam < 25 ? this.surface() : 'grass' });
         }
       }
       // dust puffs while running (only near the camera)
@@ -1069,6 +1109,7 @@ export class Actor {
 
   destroy() {
     this.sprite?.dispose();
+    this.sidekick?.dispose();
     this.game.scene.remove(this.root);
     this.character.dispose();
   }

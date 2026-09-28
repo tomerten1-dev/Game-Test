@@ -8,6 +8,9 @@ const MUSIC_TRACKS = { lobby: { playlist: ['menu', 'title', 'title_alt'], gain: 
 const hearRange = (range = 110) => Math.min(40, range * 0.35);
 const SAMPLE_FILES = ['blaster', 'blaster_repeater', 'enemy_destroy', 'enemy_hurt', 'jump_a', 'jump_b', 'jump_c', 'land', 'walking', 'weapon_change', 'coin', 'break', 'fall', 'impact', 'engine', 'ui-tap', 'build', 'chest_open', 'chest_hum'];
 // sound name -> [sample, playbackRate, gain, (optional) synth layer too]
+// sounds that belong to the interface / voice bus (their own volume slider)
+const UI_SOUNDS = new Set(['click', 'ping', 'pingDanger', 'buy', 'stormChime', 'phase', 'elim', 'levelUp', 'victory', 'headshot', 'headshotLegacy', 'hit', 'shieldHit']);
+
 const SAMPLE_MAP = {
   chest: ['chest_open', 1, 0.9],
   pistol: ['blaster', 1.05, 0.8],
@@ -74,6 +77,9 @@ export class Sound {
       this.musicGain = this.ctx.createGain();
       this.musicGain.gain.value = this.musicVolume;
       this.musicGain.connect(this.master);
+      // separate volume buses: effects and interface / voice cues
+      this.sfx = this.ctx.createGain(); this.sfx.gain.value = this.sfxVolume ?? 1; this.sfx.connect(this.master);
+      this.ui = this.ctx.createGain(); this.ui.gain.value = this.uiVolume ?? 1; this.ui.connect(this.master);
       const comp = this.ctx.createDynamicsCompressor();
       this.master.connect(comp);
       comp.connect(this.ctx.destination);
@@ -108,7 +114,7 @@ export class Sound {
       const src = ctx.createBufferSource();
       src.buffer = this.buffers.chest_hum; src.loop = true;
       const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
-      src.connect(g); g.connect(pan); pan.connect(this.master); src.start();
+      src.connect(g); g.connect(pan); pan.connect(this.sfx || this.master); src.start();
       this._hum = { g, pan, level: 0.55 };
     }
     if (!this._hum) {
@@ -127,7 +133,7 @@ export class Sound {
         o.connect(og); og.connect(g); o.start();
       }
       lfo.start();
-      g.connect(pan); pan.connect(this.master);
+      g.connect(pan); pan.connect(this.sfx || this.master);
       this._hum = { g, pan, level: 0.05 };
     }
     let target = 0;
@@ -162,7 +168,7 @@ export class Sound {
     src.playbackRate.value = rate * (name.startsWith('chest') ? 1 : 0.94 + Math.random() * 0.12);
     const g = this.ctx.createGain();
     g.gain.value = gain;
-    src.connect(g); g.connect(this._out || this.master);
+    src.connect(g); g.connect(this._out || this._bus || this.sfx || this.master);
     if (dur) {
       g.gain.setValueAtTime(gain, t + dur * 0.7);
       g.gain.linearRampToValueAtTime(0.0001, t + dur);
@@ -178,7 +184,7 @@ export class Sound {
       const src = this.ctx.createBufferSource();
       src.buffer = this.buffers.engine; src.loop = true; src.playbackRate.value = 0.7;
       const g = this.ctx.createGain(); g.gain.value = 0.18;
-      src.connect(g); g.connect(this.master); src.start();
+      src.connect(g); g.connect(this.sfx || this.master); src.start();
       this._engine = { src, g };
     } else if (!on && this._engine) {
       this._engine.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.3);
@@ -194,11 +200,14 @@ export class Sound {
   }
 
   // master: 0..1 (UI slider), music: 0..1
-  setVolumes(master, music) {
+  setVolumes(master, music, sfx = 1, ui = 1) {
     this.volume = 0.7 * master;
     this.musicVolume = music * 0.6;
+    this.sfxVolume = sfx; this.uiVolume = ui;
     if (this.master) this.master.gain.value = this.muted ? 0 : this.volume;
     if (this.musicGain) this.musicGain.gain.value = this.musicVolume;
+    if (this.sfx) this.sfx.gain.value = sfx;
+    if (this.ui) this.ui.gain.value = ui;
   }
 
   _loadTrack(name) {
@@ -233,7 +242,8 @@ export class Sound {
     if (!name) return;
     const cfg = MUSIC_TRACKS[name];
     if (cfg && this.ctx) {
-      const list = cfg.playlist;
+      // the Lobby Music cosmetic picks one track instead of the shuffle
+      const list = name === 'lobby' && this.lobbyPick ? [this.lobbyPick] : cfg.playlist;
       if (list && this._plIdx === undefined) this._plIdx = Math.floor(Math.random() * list.length);
       const file = list ? list[this._plIdx++ % list.length] : cfg.file || name;
       this._loadTrack(file).then((buf) => {
@@ -333,7 +343,7 @@ export class Sound {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(gain, t + attack);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    src.connect(f); f.connect(g); g.connect(this._out || this.master);
+    src.connect(f); f.connect(g); g.connect(this._out || this._bus || this.sfx || this.master);
     src.start(t, Math.random() * 0.5);
     src.stop(t + dur + 0.05);
   }
@@ -348,7 +358,7 @@ export class Sound {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(gain, t + attack);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(this._out || this.master);
+    o.connect(g); g.connect(this._out || this._bus || this.sfx || this.master);
     o.start(t);
     o.stop(t + dur + 0.05);
   }
@@ -367,6 +377,7 @@ export class Sound {
     if (v <= 0.01) return;
     // positional sounds pan left/right relative to the camera
     this._out = null;
+    this._bus = UI_SOUNDS.has(name) ? this.ui : this.sfx;
     // positional sounds use HRTF 3D panning, so you can tell in front from behind and above from below
     // (loudness still comes from our own distance falloff, the panner only gives direction)
     if (pos && this.listener) {
@@ -380,19 +391,34 @@ export class Sound {
         pan.rolloffFactor = 0;
         const lx = (dx * r.x + dy * r.y + dz * r.z) / d, ly = (dx * u.x + dy * u.y + dz * u.z) / d, lz = (dx * b.x + dy * b.y + dz * b.z) / d;
         if (pan.positionX) { pan.positionX.value = lx; pan.positionY.value = ly; pan.positionZ.value = lz; } else pan.setPosition(lx, ly, lz);
-        pan.connect(this.master);
+        pan.connect(this._bus);
         this._out = pan;
       } else if (ctx.createStereoPanner) {
         const pan = ctx.createStereoPanner();
         pan.pan.value = Math.max(-1, Math.min(1, (dx * r.x + dz * r.z) / d)) * 0.85;
-        pan.connect(this.master);
+        pan.connect(this._bus);
         this._out = pan;
       }
     }
     // recorded CC0 sample first (footsteps use short slices of Kenney's walking loop)
-    if (name === 'step' && this.buffers?.walking) {
-      const d = this.buffers.walking.duration;
-      if (this._sample('walking', t, { rate: 1, gain: 0.9 * v, offset: Math.floor(Math.random() * (d / 0.42)) * 0.42, dur: 0.22 })) return;
+    if (name === 'step') {
+      // footsteps sound like what you walk on: a layer per surface over the recorded step
+      const sf = opts.surface || 'grass';
+      const RATE = { wood: 0.9, metal: 1.12, stone: 1.05, water: 0.8, snow: 0.95, sand: 0.9, grass: 1 };
+      const layer = () => {
+        if (sf === 'wood') this._tone(t, 0.07, { type: 'sine', freq: 190 + Math.random() * 40, freqEnd: 120, gain: 0.22 * v });
+        else if (sf === 'metal') this._tone(t, 0.09, { type: 'triangle', freq: 900 + Math.random() * 300, freqEnd: 600, gain: 0.12 * v });
+        else if (sf === 'stone') this._noise(t, 0.05, { type: 'highpass', freq: 1800, gain: 0.18 * v });
+        else if (sf === 'water') this._noise(t, 0.16, { type: 'bandpass', freq: 1400 + Math.random() * 600, q: 0.9, gain: 0.35 * v });
+        else if (sf === 'snow') this._noise(t, 0.12, { type: 'bandpass', freq: 2600, q: 1.5, gain: 0.25 * v });
+        else if (sf === 'sand') this._noise(t, 0.1, { type: 'lowpass', freq: 700, gain: 0.3 * v });
+      };
+      if (this.buffers?.walking) {
+        const d = this.buffers.walking.duration;
+        const gv = sf === 'water' || sf === 'sand' || sf === 'snow' ? 0.5 : 0.9;
+        if (this._sample('walking', t, { rate: RATE[sf] || 1, gain: gv * v, offset: Math.floor(Math.random() * (d / 0.42)) * 0.42, dur: 0.22 })) { layer(); return; }
+      }
+      layer();
     }
     if (name === 'jump' && this.buffers?.jump_a) { this._sample(['jump_a', 'jump_b', 'jump_c'][Math.floor(Math.random() * 3)], t, { gain: 0.45 * v }); return; }
     const sm = SAMPLE_MAP[name];
@@ -554,6 +580,12 @@ export class Sound {
       case 'ammo':
         this._noise(t, 0.04, { type: 'bandpass', freq: 3500, q: 4, gain: 0.3 });
         this._noise(t + 0.06, 0.04, { type: 'bandpass', freq: 3000, q: 4, gain: 0.25 });
+        break;
+      case 'gulp': // potion drink: a few bubbly glugs
+        for (let i = 0; i < 3; i++) this._tone(t + i * 0.13, 0.09, { type: 'sine', freq: 320 + i * 40, freqEnd: 180, gain: 0.25 * v });
+        break;
+      case 'rip': // bandage / medkit tear
+        this._noise(t, 0.28, { type: 'bandpass', freq: 2400, freqEnd: 1200, q: 0.8, gain: 0.35 * v, attack: 0.01 });
         break;
       case 'use':
         this._noise(t, 0.3, { type: 'bandpass', freq: 1500, q: 2, gain: 0.15, attack: 0.05 });

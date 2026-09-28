@@ -316,7 +316,7 @@ export class Loot {
       if (Math.random() > 0.55) continue;
       const roll = Math.random();
       if (roll < 0.4) {
-        const w = new Weapon(rollWeaponType('floor'), rollRarity(Math.random, 0)).withRandomMods();
+        const w = new Weapon(rollWeaponType('floor'), rollRarity(Math.random, this.game.lootLuck || 0)).withRandomMods();
         this.spawnPickup({ type: 'weapon', weapon: w }, _v.set(s.x, s.y + 0.2, s.z));
         this.spawnPickup(Loot.ammoFor(w), _v.set(s.x + 0.5, s.y + 0.2, s.z + 0.4));
       } else if (roll < 0.8) this.spawnPickup(Loot.randomConsumable(), _v.set(s.x, s.y + 0.2, s.z));
@@ -330,7 +330,7 @@ export class Loot {
         const y = this.world.groundAt(x, z, 200) + 0.2;
         const roll = Math.random();
         if (roll < 0.38) {
-          const w = new Weapon(rollWeaponType('floor'), rollRarity(Math.random, 0)).withRandomMods();
+          const w = new Weapon(rollWeaponType('floor'), rollRarity(Math.random, this.game.lootLuck || 0)).withRandomMods();
           this.spawnPickup({ type: 'weapon', weapon: w }, _v.set(x, y, z));
           this.spawnPickup(Loot.ammoFor(w), _v.set(x + 0.9, y, z + 0.4));
         } else if (roll < 0.8) this.spawnPickup(Loot.randomConsumable(), _v.set(x, y, z));
@@ -445,14 +445,14 @@ export class Loot {
     this.game.sound.play('chest', actor.isPlayer ? null : _v.set(c.x, c.y, c.z));
     const out = [];
     // chests never give grey weapons
-    const w = new Weapon(rollWeaponType(c.rare ? 'rare' : 'chest'), Math.max(1, rollRarity(Math.random, c.rare ? 2.2 : 1))).withRandomMods();
+    const w = new Weapon(rollWeaponType(c.rare ? 'rare' : 'chest'), Math.max(1, rollRarity(Math.random, (c.rare ? 2.2 : 1) + (this.game.lootLuck || 0)))).withRandomMods();
     out.push({ type: 'weapon', weapon: w });
     out.push(Loot.ammoFor(w));
     // like Fortnite: a weapon + ammo + materials, and sometimes a heal / utility item
     if (c.rare || Math.random() < 0.6) out.push(Loot.randomConsumable());
     // Earth Sprite: sometimes an extra rare item
     if (actor.sprite?.bonusChest()) { const w3 = new Weapon(rollWeaponType('rare'), 3 + (Math.random() < 0.3 ? 1 : 0)).withRandomMods(); out.push({ type: 'weapon', weapon: w3 }, Loot.ammoFor(w3)); }
-    if (actor.isPlayer) this.game.addSpriteXp?.(5);
+    if (actor.isPlayer) { this.game.addSpriteXp?.(5); actor.sidekick?.hop(1.4); }
     // Fortnite chests: 30 of each material
     for (const m of ['wood', 'stone', 'metal']) out.push({ type: 'mat', matType: m, amount: 30 });
     out.push({ type: 'gold', amount: c.rare ? 70 + Math.floor(Math.random() * 40) : 25 + Math.floor(Math.random() * 25) });
@@ -527,7 +527,7 @@ export class Loot {
       actor.gold = Math.min(9999, actor.gold + p.amount);
       if (actor.isPlayer) g.sound.play('coin');
     } else if (p.type === 'crown') {
-      actor.setCrown(true);
+      actor.setCrown(true, actor.isPlayer ? Math.max(1, (g.meta?.profile?.d.stats.crownedWins || 0)) : p.count || 1);
       if (actor.isPlayer) { g.sound.play('supply'); g.hud?.banner('You picked up the Victory Crown! Win to keep it', 3); }
     } else if (p.type === 'medallion') {
       actor.medallions.add(p.key);
@@ -594,7 +594,7 @@ export class Loot {
     if (actor.gold > 0) items.push({ type: 'gold', amount: actor.gold });
     if (actor.keycard) { items.push({ type: 'consumable', ctype: 'keycard', count: 1 }); actor.keycard = false; }
     for (const k of actor.medallions || []) items.push({ type: 'medallion', key: k });
-    if (actor.crowned) { items.push({ type: 'crown' }); actor.setCrown(false); }
+    if (actor.crowned) { items.push({ type: 'crown', count: actor.crownCount || 1 }); actor.setCrown(false); }
     actor.gold = 0; actor.medallions?.clear();
     if (!actor.isPlayer && Math.random() < 0.5) items.push(Loot.randomConsumable());
     items.forEach((it, i) => {

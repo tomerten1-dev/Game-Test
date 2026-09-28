@@ -24,6 +24,36 @@ export const TRACK = {
   47: { item: 'bb_wings' }, 48: { item: 'emote_summon' }, 49: { coins: 600 }, 50: { item: 'skin_saint' },
 };
 
+// Battle Pass pages (Fortnite Chapter 6+): the reward-track items grouped into pages. Every level you
+// gain gives one claim to spend on any reward of an unlocked page; claiming 4 rewards on a page
+// unlocks the next one. Coin rewards on the track still pay out automatically.
+export const PASS_PAGES = (() => {
+  const items = Object.keys(TRACK).map(Number).sort((a, b) => a - b).filter((l) => TRACK[l].item).map((l) => TRACK[l].item);
+  const pages = [];
+  for (let i = 0; i < items.length; i += 6) pages.push(items.slice(i, i + 6));
+  if (pages.length > 1 && pages[pages.length - 1].length < 3) pages[pages.length - 2].push(...pages.pop()); // no tiny last page
+  return pages;
+})();
+export const PAGE_UNLOCK = 4;
+export function passState(profile) {
+  const d = profile.d;
+  const claimedOn = PASS_PAGES.map((pg) => pg.filter((id) => profile.owns(id)).length);
+  const unlocked = PASS_PAGES.map((_, i) => i === 0 || claimedOn[i - 1] >= PAGE_UNLOCK);
+  return { claims: d.passClaims || 0, claimedOn, unlocked };
+}
+// Spend one claim on a pass reward. Returns an error message or null.
+export function claimPass(profile, id) {
+  const d = profile.d, st = passState(profile);
+  const page = PASS_PAGES.findIndex((pg) => pg.includes(id));
+  if (page < 0 || profile.owns(id)) return 'Already claimed';
+  if (!st.unlocked[page]) return `Claim ${PAGE_UNLOCK} rewards on page ${page} to unlock this page`;
+  if ((d.passClaims || 0) <= 0) return 'Level up to earn another claim';
+  d.passClaims--;
+  profile.grant(id);
+  profile.save();
+  return null;
+}
+
 export const today = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -163,11 +193,11 @@ export function applyXp(profile, amount) {
     d.level++;
     d.coins += 100;
     const reward = TRACK[d.level];
-    const ev = { level: d.level, coins: 100 };
+    const ev = { level: d.level, coins: 100, claim: true };
+    d.passClaims = (d.passClaims || 0) + 1; // one Battle Pass reward to claim per level
     if (reward && !d.trackClaimed.includes(d.level)) {
       d.trackClaimed.push(d.level);
       if (reward.coins) { d.coins += reward.coins; ev.coins += reward.coins; }
-      if (reward.item && profile.grant(reward.item)) ev.item = COSMETICS[reward.item];
     }
     events.push(ev);
   }
@@ -175,20 +205,19 @@ export function applyXp(profile, amount) {
   return events;
 }
 
-// ---------- Arena (ranked) ----------
-// Hype points climb through ten divisions. Placement points stack (a win is worth 60), every
-// elimination is worth a few more, and the higher divisions charge a bus fare each match.
+// ---------- Ranked (the Arena mode) ----------
+// Fortnite Ranked: 18 ranks, Bronze I to Unreal. Placement and eliminations add rank progress; from
+// Platinum up each match costs a little, so the top ranks move slower. Bots get sharper as you climb.
+const RANK_MIN = [0, 60, 130, 210, 300, 400, 510, 630, 760, 900, 1050, 1210, 1380, 1560, 1750, 1950, 2200, 2500];
+const RANK_TIERS = [['Bronze', '#c7874f'], ['Silver', '#c9d3de'], ['Gold', '#ffc93c'], ['Platinum', '#6fe0d0'], ['Diamond', '#6fb8ff']];
 export const ARENA_DIVISIONS = [
-  { name: 'Open I', min: 0, fare: 0, elim: 5, color: '#9aa7b8', skill: 0 },
-  { name: 'Open II', min: 50, fare: 0, elim: 5, color: '#9aa7b8', skill: 0.03 },
-  { name: 'Open III', min: 100, fare: 0, elim: 5, color: '#9aa7b8', skill: 0.06 },
-  { name: 'Open IV', min: 175, fare: 0, elim: 5, color: '#9aa7b8', skill: 0.09 },
-  { name: 'Contender I', min: 250, fare: 2, elim: 4, color: '#4dd2ff', skill: 0.12 },
-  { name: 'Contender II', min: 350, fare: 2, elim: 4, color: '#4dd2ff', skill: 0.15 },
-  { name: 'Contender III', min: 475, fare: 3, elim: 4, color: '#4dd2ff', skill: 0.18 },
-  { name: 'Champion I', min: 600, fare: 4, elim: 3, color: '#ffc93c', skill: 0.22 },
-  { name: 'Champion II', min: 800, fare: 5, elim: 3, color: '#ffc93c', skill: 0.26 },
-  { name: 'Champion III', min: 1000, fare: 6, elim: 3, color: '#ffc93c', skill: 0.3 },
+  ...RANK_TIERS.flatMap(([name, color], t) => ['I', 'II', 'III'].map((n, k) => {
+    const i = t * 3 + k;
+    return { name: `${name} ${n}`, min: RANK_MIN[i], fare: t >= 3 ? 2 + (i - 9) : 0, elim: t >= 3 ? 3 : t >= 1 ? 4 : 5, color, skill: i * 0.02 };
+  })),
+  { name: 'Elite', min: RANK_MIN[15], fare: 9, elim: 3, color: '#b86bff', skill: 0.32 },
+  { name: 'Champion', min: RANK_MIN[16], fare: 10, elim: 3, color: '#ff7a3a', skill: 0.35 },
+  { name: 'Unreal', min: RANK_MIN[17], fare: 12, elim: 3, color: '#ff4fd8', skill: 0.38 },
 ];
 
 export function arenaDivision(points) {

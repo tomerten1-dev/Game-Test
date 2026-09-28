@@ -16,6 +16,8 @@ const SLIDERS = [
   ['fov', 'Field of view', 60, 95, 1, (v) => `${v}°`],
   ['master', 'Master volume', 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`],
   ['music', 'Music volume', 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`],
+  ['sfx', 'Effects volume', 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`],
+  ['uiVol', 'Interface & voice volume', 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`],
   ['hudScale', 'HUD scale', 0.75, 1.3, 0.05, (v) => `${Math.round(v * 100)}%`],
 ];
 const keyName = keyLabel;
@@ -37,7 +39,7 @@ export function applySettings(game) {
   const s = game.meta.profile.d.settings;
   game.input.sensitivity = 0.0022 * s.sensitivity;
   game.rig.baseFov = s.fov;
-  game.sound.setVolumes(s.master, s.music);
+  game.sound.setVolumes(s.master, s.music, s.sfx ?? 1, s.uiVol ?? 1);
   document.documentElement.style.setProperty('--hud-scale', String(s.hudScale));
   game.hud?.setSoundViz(!!s.soundViz);
   if (game.effects) game.effects.stackDamage = s.stackDamage !== false;

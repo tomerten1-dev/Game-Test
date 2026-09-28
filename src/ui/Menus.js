@@ -1,7 +1,7 @@
 import { SLOTS, COSMETIC_LIST, COSMETICS } from '../meta/Cosmetics.js';
 import { SPRITES, spriteLevel } from '../player/Sprites.js';
 import { RARITIES } from '../weapons/WeaponDefs.js';
-import { TRACK, SEASON, xpForLevel, QUEST_REWARD, WEEKLY_REWARD, milestoneReward, arenaDivision } from '../meta/Progression.js';
+import { TRACK, SEASON, xpForLevel, QUEST_REWARD, WEEKLY_REWARD, milestoneReward, arenaDivision, PASS_PAGES, PAGE_UNLOCK, passState, claimPass } from '../meta/Progression.js';
 import { renderSettings } from './Settings.js';
 
 const HERO_ICON = { Knight: '🛡️', Barbarian: '🪓', Mage: '🔮', Rogue: '🗡️', Rogue_Hooded: '🏹', Male_Ranger: '🏹', Female_Ranger: '🏹', Male_Peasant: '🌾', Female_Peasant: '🌾' };
@@ -29,6 +29,11 @@ export function itemIcon(c) {
   if (c.type === 'glider') return `<i class="ic ic-glider" style="--a:${v[0]};--b:${v[1]}"></i>`;
   if (c.type === 'trail') return `<i class="ic ic-trail" style="background:${!v ? 'rgba(255,255,255,0.15)' : v === 'rainbow' ? 'linear-gradient(90deg,#ff5a5f,#ffd23f,#6ef0a8,#5fd4ff,#a15cff)' : `linear-gradient(90deg,transparent,${v[0]},${v[1]})`}"></i>`;
   if (c.type === 'emote') return '<i class="ic ic-emote">♪</i>';
+  if (c.type === 'kicks') return v ? `<i class="ic ic-hero" style="color:${v.base};text-shadow:0 2px 0 ${v.sole}">👟</i>` : '<i class="ic ic-hero">∅</i>';
+  if (c.type === 'sidekick') return `<i class="ic ic-hero">${{ pup: '🐶', kitty: '🐱', penguin: '🐧' }[v] || '∅'}</i>`;
+  if (c.type === 'spray') return `<i class="ic ic-swatch" style="background:linear-gradient(135deg,${v.a},${v.b});color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:${v.text.length > 3 ? 10 : 18}px">${v.text}</i>`;
+  if (c.type === 'loading') return `<i class="ic ic-swatch" style="background:linear-gradient(160deg,${v.a},${v.b})"></i>`;
+  if (c.type === 'lobbymusic') return '<i class="ic ic-emote">♫</i>';
   if (c.type === 'sprite') return `<i class="ic ic-hero" style="${v ? `color:${SPRITES[v].color}` : ''}">${v ? { water: '💧', earth: '🌿', fire: '🔥' }[v] : '∅'}</i>`;
   return `<i class="ic ic-wrap" style="background:${v ? v.color : '#4a505c'}"></i>`;
 }
@@ -53,7 +58,7 @@ export class Menus {
           <div class="lb-wallet">
             <div class="lb-level"><b id="lb-lvl">1</b><div><div class="xpbar"><i id="lb-xpfill"></i></div><small id="lb-xptext"></small></div></div>
             <div class="lb-crown" title="You won your last match: you start the next one wearing the Victory Crown">♛</div>
-            <div class="lb-arena" id="lb-arena" title="Arena division"></div>
+            <div class="lb-arena" id="lb-arena" title="Ranked rank"></div>
             <div class="lb-coins" title="Storm Coins — earned by playing, never sold">${coin}<b id="lb-coins">0</b></div>
           </div>
         </div>
@@ -69,7 +74,9 @@ export class Menus {
                 <button class="mode m-solo" data-mode="solo"><i class="mi">⚔</i><b>Solo</b><span>You vs 99 bots</span></button>
                 <button class="mode m-quick" data-mode="quick"><i class="mi">⚡</i><b>Quick Match</b><span>29 bots · faster storm</span></button>
                 <button class="mode m-zb" data-mode="zb"><i class="mi">◈</i><b>Zero Build</b><span>No building · overshield</span></button>
-                <button class="mode arena" data-mode="arena"><i class="mi">🏆</i><b>Arena</b><span id="arena-div">Ranked · Open I</span></button>
+                <button class="mode m-reload" data-mode="reload"><i class="mi">↻</i><b>Reload</b><span>40 players · 2 reboots · small map</span></button>
+                <button class="mode m-blitz" data-mode="blitz"><i class="mi">⏱</i><b>Blitz Royale</b><span>32 players · same kit · 5-7 min</span></button>
+                <button class="mode arena" data-mode="arena"><i class="mi">🏆</i><b>Ranked</b><span id="arena-div">Bronze I</span></button>
               </div>
               <button id="play-btn" class="btn big">PLAY</button>
               <div class="sub">Straight onto the Storm Bus</div>
@@ -135,7 +142,8 @@ export class Menus {
     const prof = this.meta.profile;
     const val = (slot) => prof.equippedItem(slot).value;
     const hero = prof.equippedItem('hero');
-    const look = { hero: val('hero'), tint: val('tint') || hero.tint || null, hat: hero.hat || null, backbling: val('backbling'), pickaxe: val('pickaxe'), glider: val('glider'), trail: val('trail'), wrap: val('wrap'), emote: val('emote'), preview: null, crowned: !!prof.d.crowned };
+    const style = hero.styles?.[prof.d.heroStyles?.[hero.id] || 0]?.[1];
+    const look = { hero: val('hero'), tint: style || val('tint') || hero.tint || null, kicks: val('kicks'), hat: hero.hat || null, backbling: val('backbling'), pickaxe: val('pickaxe'), glider: val('glider'), trail: val('trail'), wrap: val('wrap'), emote: val('emote'), preview: null, crowned: !!prof.d.crowned };
     if (this.tab === 'locker') look.preview = this.lockerSlot;
     if (this.tab === 'shop' && this.shopSel) {
       const c = COSMETICS[this.shopSel];
@@ -156,14 +164,15 @@ export class Menus {
     $('#lb-xptext').textContent = `${d.xp} / ${xpForLevel(d.level)} XP`;
     $('#lb-coins').textContent = d.coins.toLocaleString();
     const ad = arenaDivision(d.arena?.points || 0);
-    $('#arena-div').innerHTML = `<i style="color:${ad.color}">${ad.name}</i> · ${d.arena?.points || 0} Hype`;
+    $('#arena-div').innerHTML = `<i style="color:${ad.color}">${ad.name}</i> · ${d.arena?.points || 0} pts`;
     $('#lb-arena').innerHTML = `<span style="background:${ad.color}"></span>${ad.name}`;
     const quests = this.meta.quests();
     $('#qmini').innerHTML = quests.map((q) => `<div class="qrow ${q.done ? 'done' : ''}"><div class="qline"><span>${q.def.text}</span><b>${q.done ? '✓' : `${Math.floor(q.progress)}/${q.def.target}`}</b></div><div class="qbar"><i style="width:${Math.min(100, (q.progress / q.def.target) * 100)}%"></i></div></div>`).join('');
-    // season pass: the next reward on the track
-    const nextLvl = Object.keys(TRACK).map(Number).filter((l) => l > d.level && TRACK[l].item).sort((a, b) => a - b)[0];
-    const nextItem = nextLvl && COSMETICS[TRACK[nextLvl].item];
-    $('#pass-mini').innerHTML = nextItem ? `<div class="card-h">${SEASON.name.split(':')[0]} pass</div><div class="pm-row" style="--rar:${RARITIES[nextItem.rarity].color}">${itemIcon(nextItem)}<div><b>${nextItem.name}</b><small>Unlocks at level ${nextLvl}</small><div class="qbar"><i style="width:${Math.min(100, ((d.level - 1 + d.xp / xpForLevel(d.level)) / (nextLvl - 1)) * 100)}%"></i></div></div></div>` : '<div class="card-h">Season pass</div><small>Every reward unlocked!</small>';
+    // battle pass: claims waiting, or the next unclaimed reward
+    const ps = passState(this.meta.profile);
+    const nextId = PASS_PAGES.flat().find((id) => !this.meta.profile.owns(id));
+    const nextItem = nextId && COSMETICS[nextId];
+    $('#pass-mini').innerHTML = nextItem ? `<div class="card-h">Battle Pass</div><div class="pm-row" style="--rar:${RARITIES[nextItem.rarity].color}">${itemIcon(nextItem)}<div><b>${ps.claims ? `${ps.claims} reward${ps.claims > 1 ? 's' : ''} to claim!` : nextItem.name}</b><small>${ps.claims ? 'Open Quests → Battle Pass' : 'Level up to earn a claim'}</small><div class="qbar"><i style="width:${Math.min(100, (d.xp / xpForLevel(d.level)) * 100)}%"></i></div></div></div>` : '<div class="card-h">Battle Pass</div><small>Every reward claimed!</small>';
     this.el.lobby.classList.toggle('crowned', !!d.crowned);
     if (this.tab === 'locker') this.renderLocker();
     if (this.tab === 'shop') this.renderShop();
@@ -186,17 +195,25 @@ export class Menus {
     const trackLevel = (id) => Object.entries(TRACK).find(([, r]) => r.item === id)?.[0];
     $('#locker-grid').innerHTML = items.map((c) => {
       const owned = prof.owns(c.id), eq = prof.d.equipped[c.type] === c.id;
-      const lock = owned ? '' : trackLevel(c.id) ? `Level ${trackLevel(c.id)}` : 'Item Shop';
+      const lock = owned ? '' : trackLevel(c.id) ? 'Battle Pass' : 'Item Shop';
       const sub = c.type === 'sprite' && c.value ? `Level ${spriteLevel(prof.d.spriteXp?.[c.value])} · ${SPRITES[c.value].desc}` : null;
       return `<button class="card ${owned ? '' : 'locked'} ${eq ? 'eq' : ''}" data-id="${c.id}" style="--rar:${RARITIES[c.rarity].color}" ${sub ? `title="${sub}"` : ''}>${itemIcon(c)}<b>${c.name}</b><small>${eq ? 'Equipped' : lock || (sub ? sub.split(' · ')[0] : RARITIES[c.rarity].name)}</small></button>`;
     }).join('');
+    // outfit styles for the equipped hero
+    const hero = prof.equippedItem('hero');
+    if (this.lockerSlot === 'hero' && hero?.styles) {
+      const cur = prof.d.heroStyles?.[hero.id] || 0;
+      $('#locker-grid').insertAdjacentHTML('afterbegin', `<div class="styles-row"><b>${hero.name} styles</b>${hero.styles.map(([n, t], i) => `<button class="style-btn ${i === cur ? 'on' : ''}" data-style="${i}"><i style="background:${t || 'linear-gradient(135deg,#20d6c0,#2f6bff)'}"></i>${n}</button>`).join('')}</div>`);
+      $('#locker-grid').querySelectorAll('[data-style]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); (prof.d.heroStyles ||= {})[hero.id] = +b.dataset.style; prof.save(); this.game.sound.play('click'); this.refresh(); }));
+    }
     $('#locker-slots').querySelectorAll('[data-slot]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); this.lockerSlot = b.dataset.slot; this.refresh(); }));
     $('#locker-grid').querySelectorAll('[data-id]').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation();
       const c = COSMETICS[b.dataset.id];
-      if (!prof.owns(c.id)) { this.flash('Unlock it on the reward track or in the Item Shop'); return; }
+      if (!prof.owns(c.id)) { this.flash('Claim it in the Battle Pass (Quests tab) or buy it in the Item Shop'); return; }
       prof.equip(c.type, c.id);
       this.game.sound.play('click');
+      if (c.type === 'lobbymusic') { const s = this.game.sound; s.lobbyPick = c.value; s.musicName = null; s._plIdx = undefined; s.music('lobby'); }
       this.refresh();
       if (c.type === 'emote') { this.game.stage.emote(c.value); this.game.emoteFx?.(null, c.value, this.game.stage.heroPos); }
     }));
@@ -255,6 +272,8 @@ export class Menus {
 
   renderQuests() {
     const d = this.meta.profile.d;
+    const ps = passState(this.meta.profile);
+    if (this.passPage === undefined) this.passPage = Math.max(0, ps.unlocked.lastIndexOf(true));
     const quests = this.meta.quests();
     const levels = Object.keys(TRACK).map(Number);
     this.$('#quests').innerHTML = `
@@ -272,14 +291,21 @@ export class Menus {
     return `<div class="ms"><div class="qt"><b>${m.name}</b><span>${'★'.repeat(m.tier)}${'☆'.repeat(m.tiers.length - m.tier)}</span></div>
       <div class="xpbar"><i style="width:${Math.min(100, pct)}%"></i></div><small>${next ? `${m.value.toLocaleString()} / ${next.toLocaleString()} · next: +${r.xp} XP, ${r.coins} coins` : 'All tiers done!'}</small></div>`;
   }).join('')}</div>
-      <div class="card-h big">${SEASON.name}</div>
-      <div class="track">${levels.map((l) => {
-    const r = TRACK[l], c = r.item && COSMETICS[r.item];
-    const got = d.level >= l;
-    return `<div class="tier ${got ? 'got' : ''}" style="--rar:${c ? RARITIES[c.rarity].color : '#ffd23f'}"><small>Lv ${l}</small>${c ? itemIcon(c) : `<i class="ic">${coin}</i>`}<b>${c ? c.name : `${r.coins}`}</b></div>`;
-  }).join('')}</div>`;
-    const cur = this.$('#quests .tier:not(.got)');
-    cur?.scrollIntoView?.({ inline: 'center', block: 'nearest' });
+      <div class="card-h big">${SEASON.name} · Battle Pass <small class="h-sub">${ps.claims} claim${ps.claims === 1 ? '' : 's'} left · one per level</small></div>
+      <div class="bp-pages">${PASS_PAGES.map((_, i) => `<button class="bp-tab ${i === this.passPage ? 'on' : ''} ${ps.unlocked[i] ? '' : 'locked'}" data-page="${i}">Page ${i + 1}<small>${ps.claimedOn[i]}/${PASS_PAGES[i].length}</small></button>`).join('')}</div>
+      <div class="bp-grid">${PASS_PAGES[this.passPage].map((id) => {
+    const c = COSMETICS[id], own = this.meta.profile.owns(id), open = ps.unlocked[this.passPage];
+    return `<button class="card bp-item ${own ? 'eq' : open ? '' : 'locked'}" data-claim="${id}" style="--rar:${RARITIES[c.rarity].color}">${itemIcon(c)}<b>${c.name}</b><small>${own ? 'Claimed' : open ? (ps.claims ? 'Click to claim' : 'Needs a level-up') : `Claim ${PAGE_UNLOCK} on page ${this.passPage}`}</small></button>`;
+  }).join('')}</div>
+      <div class="card-h">Coin rewards on the level track</div>
+      <div class="track">${levels.filter((l) => TRACK[l].coins).map((l) => `<div class="tier ${d.level >= l ? 'got' : ''}" style="--rar:#ffd23f"><small>Lv ${l}</small><i class="ic">${coin}</i><b>${TRACK[l].coins}</b></div>`).join('')}</div>`;
+    this.$('#quests').querySelectorAll('[data-page]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); this.passPage = +b.dataset.page; this.renderQuests(); }));
+    this.$('#quests').querySelectorAll('[data-claim]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const msg = claimPass(this.meta.profile, b.dataset.claim);
+      if (msg) this.flash(msg); else { this.game.sound.play('buy'); this.flash(`Claimed ${COSMETICS[b.dataset.claim].name}!`); }
+      this.refresh();
+    }));
   }
 
   _weekLeft() {
@@ -299,9 +325,9 @@ export class Menus {
       ['Storm Coins', d.coins], ['Items owned', `${d.owned.length} / ${COSMETIC_LIST.length}`],
     ];
     const A = d.arena || { points: 0, best: 0, matches: 0, wins: 0 }, ad = arenaDivision(A.points);
-    const arena = [['Division', `<i style="color:${ad.color}">${ad.name}</i>`], ['Hype', A.points], ['Best Hype', A.best], ['Arena matches', A.matches], ['Arena wins', A.wins], ['Crowned wins', s.crownedWins || 0]];
+    const arena = [['Rank', `<i style="color:${ad.color}">${ad.name}</i>`], ['Rank points', A.points], ['Best', A.best], ['Ranked matches', A.matches], ['Ranked wins', A.wins], ['Crowned wins', s.crownedWins || 0]];
     this.$('#career').innerHTML = `<div class="card-h big">Career</div><div class="stats">${rows.map(([k, v]) => `<div><b>${v}</b><span>${k}</span></div>`).join('')}</div>
-      <div class="card-h">Arena</div><div class="stats">${arena.map(([k, v]) => `<div><b>${v}</b><span>${k}</span></div>`).join('')}</div>`;
+      <div class="card-h">Ranked</div><div class="stats">${arena.map(([k, v]) => `<div><b>${v}</b><span>${k}</span></div>`).join('')}</div>`;
   }
 
   // ---- screens ----
@@ -348,7 +374,7 @@ export class Menus {
         </div>
         <div class="lvl-line"><b>Level ${d.level}</b><div class="xpbar"><i style="width:${(d.xp / xpForLevel(d.level)) * 100}%"></i></div><small>${d.xp} / ${xpForLevel(d.level)}</small></div>
         ${r.arena ? this._arenaCard(r.arena) : ''}
-        ${r.levelUps.map((e) => `<div class="lvlup">LEVEL ${e.level}!${e.item ? ` Unlocked <b style="color:${RARITIES[e.item.rarity].color}">${e.item.name}</b>` : ''}</div>`).join('')}`;
+        ${r.levelUps.map((e) => `<div class="lvlup">LEVEL ${e.level}!${e.claim ? ' +1 Battle Pass claim' : ''}</div>`).join('')}`;
     } else el.innerHTML = '';
     this.el.end.classList.toggle('victory', victory);
     this.el.end.classList.remove('hidden');
@@ -359,11 +385,11 @@ export class Menus {
     const div = a.division, next = div.next;
     const k = next ? (a.to - div.min) / (next.min - div.min) : 1;
     return `<div class="arena-card" style="--div:${div.color}">
-      <div class="ac-h"><span>ARENA</span><b>${div.name}</b><em>${a.from} → ${a.to} Hype (${a.total >= 0 ? '+' : ''}${a.total})</em></div>
+      <div class="ac-h"><span>RANKED</span><b>${div.name}</b><em>${a.from} → ${a.to} points (${a.total >= 0 ? '+' : ''}${a.total})</em></div>
       <div class="ac-rows">${a.rows.map(([n, v]) => `<div class="rw"><span>${n}</span><b class="${v < 0 ? 'neg' : ''}">${v >= 0 ? '+' : ''}${v}</b></div>`).join('')}</div>
       <div class="ac-bar"><i style="width:${Math.max(2, Math.min(100, k * 100))}%"></i></div>
-      <small>${next ? `${next.min - a.to} Hype to ${next.name}` : 'Top division!'}</small>
-      ${a.promoted ? `<div class="lvlup">PROMOTED TO ${div.name.toUpperCase()}!</div>` : ''}
+      <small>${next ? `${next.min - a.to} points to ${next.name}` : 'Unreal!'}</small>
+      ${a.promoted ? `<div class="lvlup">RANKED UP: ${div.name.toUpperCase()}!</div>` : ''}
     </div>`;
   }
 

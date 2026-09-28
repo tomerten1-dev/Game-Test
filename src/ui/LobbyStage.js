@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { attachHat, attachBackBling, makeHarvestTool, headAnchor } from '../player/Gear.js';
+import { attachHat, attachBackBling, makeHarvestTool, headAnchor, attachKicks } from '../player/Gear.js';
 import { makeCrownMesh } from '../world/ItemMeshes.js';
 import { Character } from '../player/Character.js';
 import { makeGlider } from '../player/Glider.js';
@@ -106,7 +106,7 @@ export class LobbyStage {
 
   // look: { hero, tint, glider: [c, accent], trail, wrap, preview: slot being previewed }
   setLook(look) {
-    const key = `${look.hero}|${look.tint}|${look.hat}|${look.backbling}|${look.crowned}`;
+    const key = `${look.hero}|${look.tint}|${look.hat}|${look.backbling}|${look.crowned}|${look.kicks?.base}`;
     if (key !== this._key) {
       this._key = key;
       if (this.character) { this.heroRoot.remove(this.character.root); this.character.dispose(); }
@@ -114,6 +114,7 @@ export class LobbyStage {
       this.heroRoot.add(this.character.root);
       if (look.hat) attachHat(this.character, look.hat);
       if (look.backbling) attachBackBling(this.character, look.backbling);
+      if (look.kicks) attachKicks(this.character, look.kicks);
       if (look.crowned) { const c = makeCrownMesh(); c.position.copy(headAnchor(this.character, look.hat ? 0.12 : -0.08)); this.character.root.add(c); this.character.root.updateMatrixWorld(true); this.character.head?.attach(c); }
       this.character.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     }

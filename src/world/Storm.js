@@ -83,6 +83,19 @@ export class Storm {
     this._apply();
   }
 
+  // Start the match already k circles in (smaller maps for Reload / Blitz).
+  fastForward(k) {
+    for (let i = 0; i < k && i < STORM_PHASES.length - 1; i++) {
+      this.radius = STORM_PHASES[i].radius;
+      this.center.copy(this.nextCenter);
+      this.phase = i + 1;
+      this.stage = 'wait';
+      this.timer = STORM_PHASES[this.phase].wait;
+      this._pickNext();
+    }
+    this._apply();
+  }
+
   get damage() { return STORM_PHASES[Math.min(this.phase, STORM_PHASES.length - 1)].dmg; }
 
   _pickNext() {

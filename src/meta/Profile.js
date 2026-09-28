@@ -1,9 +1,10 @@
 import { STARTERS, DEFAULT_EQUIPPED, COSMETICS } from './Cosmetics.js';
+import { TRACK } from './Progression.js';
 
 const KEY = 'stormbound.profile.v1';
 
 export const DEFAULT_SETTINGS = {
-  sensitivity: 1, fov: 70, master: 0.8, music: 0.5, hudScale: 1, soundViz: false, quality: 'auto', keys: {}, island: 'auto',
+  sensitivity: 1, fov: 70, master: 0.8, music: 0.5, sfx: 1, uiVol: 1, hudScale: 1, soundViz: false, quality: 'auto', keys: {}, island: 'auto',
 };
 
 function fresh() {
@@ -35,6 +36,12 @@ export class Profile {
       owned: [...new Set([...(d.owned || []), ...STARTERS])].filter((id) => COSMETICS[id]),
       quests: d.quests || base.quests,
     };
+    // Battle Pass pages: levels already earned become claims (rewards already unlocked stay unlocked)
+    if (this.data.passClaims === undefined) {
+      const trackItems = Object.values(TRACK).filter((r) => r.item).map((r) => r.item);
+      const got = trackItems.filter((id) => this.data.owned.includes(id)).length;
+      this.data.passClaims = Math.max(0, (this.data.level || 1) - 1 - got);
+    }
     // one-time switch to the new outfit characters
     if (!this.data.qHeroes) { this.data.qHeroes = true; this.data.equipped.hero = DEFAULT_EQUIPPED.hero; }
     // drop equipped items that no longer exist / aren't owned

@@ -294,7 +294,8 @@ export class Combat {
     const w = actor.weapon;
     if (!w) return;
     const reserve = actor.ammoFor(w.def.ammoType);
-    if (w.startReload(reserve)) { if (actor.isPlayer) this.game.sound.play('reload'); }
+    // other players' reloads are audible nearby too
+    if (w.startReload(reserve)) this.game.sound.play('reload', actor.isPlayer ? null : actor.pos, { range: 22 });
     else if (actor.isPlayer && reserve <= 0 && w.ammo < w.mag && !this._noAmmoT) {
       this.game.hud.toast(`No ${w.def.ammoType} ammo`);
       this._noAmmoT = setTimeout(() => (this._noAmmoT = null), 1500);

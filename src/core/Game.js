@@ -36,9 +36,9 @@ import { LobbyStage } from '../ui/LobbyStage.js';
 import { applySettings, setting } from '../ui/Settings.js';
 import { Pickaxe, Consumable, CONSUMABLES } from '../weapons/Items.js';
 import { Weapon } from '../weapons/Weapon.js';
-import { COSMETICS } from '../meta/Cosmetics.js';
+import { COSMETICS, COSMETIC_LIST } from '../meta/Cosmetics.js';
 import { arenaDivision } from '../meta/Progression.js';
-import { HAT_IDS, BACK_IDS, TOOL_IDS } from '../player/Gear.js';
+import { HAT_IDS, BACK_IDS, TOOL_IDS, attachKicks } from '../player/Gear.js';
 import { EMOTE_FX } from '../meta/Cosmetics.js';
 import { VARIANT, VARIANT_KEY } from '../world/Variant.js';
 import { Snowfall } from '../effects/Weather.js';
@@ -56,6 +56,7 @@ const WARMUP_TIME = 20;
 import { isTouch } from './device.js';
 
 // seconds of holding interact to search containers
+const LOAD_TIPS = ['Tip: crouch to sneak up on a Loot Llama', 'Tip: shoot a supply drop balloon to bring it down fast', 'Tip: Override Consoles change the rules for everyone', 'Tip: the reload key turns ramps in build mode', 'Tip: hold the emote key and scroll for your sprays', 'Tip: Storm forecast consoles sit on top of the lookout towers'];
 const HOLD_TIME = { chest: 0.45, ammobox: 0.3, supply: 1.0, llama: 0.8, vault: 1.0, forecast: 1.0 };
 
 export class Game {
@@ -151,6 +152,7 @@ export class Game {
     this.state = 'menu';
     this.stage.show(true);
     this.menus.showMenu(true);
+    this.sound.lobbyPick = this.meta.profile.equippedItem('lobbymusic')?.value || null;
     this.sound.music('lobby');
     progress(1, 'Ready!');
   }
@@ -159,7 +161,7 @@ export class Game {
   // It's you against bots, so there's no matchmaking or warm-up: straight onto the Storm Bus.
   play(mode = 'solo') {
     this.mode = mode;
-    this.zeroBuild = mode === 'zb';
+    this.zeroBuild = mode === 'zb' || mode === 'blitz'; // Blitz Royale is Zero Build only
     this.map.show(false);
     this.menus.showMenu(false);
     this.menus.hideEnd();
@@ -167,6 +169,19 @@ export class Game {
     this.paused = false;
     if (this.state !== 'menu') this.toLobby(true);
     this._enterMatch();
+  }
+
+  // The equipped Loading Screen fades over the start of a match.
+  showLoadingScreen() {
+    const v = this.meta.profile.equippedItem('loading')?.value;
+    if (!v) return;
+    let el = document.getElementById('loading-screen');
+    if (!el) { el = document.createElement('div'); el.id = 'loading-screen'; document.getElementById('ui')?.appendChild(el) || document.body.appendChild(el); }
+    el.style.background = `linear-gradient(160deg, ${v.a}, ${v.b})`;
+    el.innerHTML = `<div class="ls-bolt">⚡</div><div class="ls-title">${v.title}</div><div class="ls-tip">${LOAD_TIPS[Math.floor(Math.random() * LOAD_TIPS.length)]}</div>`;
+    el.classList.remove('out'); el.classList.add('on');
+    clearTimeout(this._lsT);
+    this._lsT = setTimeout(() => el.classList.add('out'), 1600);
   }
 
   cancelMatchmaking() {
@@ -178,6 +193,7 @@ export class Game {
 
   _enterMatch() {
     this.menus.showMatchmaking(false);
+    this.showLoadingScreen();
     this.stage.show(false);
     this.sound.music(null);
     this.hud.reset();
@@ -206,6 +222,8 @@ export class Game {
     this.fire.reset();
     this.gadgets.reset();
     this.overrides.reset();
+    for (const m of this.sprays || []) this.scene.remove(m);
+    this.sprays = [];
     this.pings.reset();
     this.storm.reset();
     this.hud.show(false);
@@ -429,7 +447,10 @@ export class Game {
     this.stormTick = 0;
     this.matchStart = 0;
     this.storm.reset();
-    this.stormScale = this.mode === 'quick' ? 1.6 : 1;
+    // Reload: a quicker, smaller match with respawns; Blitz: 5-7 minute matches
+    this.stormScale = { quick: 1.6, reload: 1.5, blitz: 1.7 }[this.mode] || 1;
+    this._blitzKit = null;
+    this.lootLuck = this.mode === 'blitz' ? 1.2 : this.mode === 'reload' ? 0.5 : 0;
     this.building.reset();
     this.pings.reset();
     this.projectiles.reset();
@@ -452,7 +473,7 @@ export class Game {
 
     this.player = new Player(this);
     this.actors.push(this.player);
-    const n = this.mode === 'quick' ? 29 : 99;
+    const n = { quick: 29, reload: 39, blitz: 31 }[this.mode] || 99;
     const colors = botColors(n);
     this.bots = [];
     for (let i = 0; i < n; i++) {
@@ -463,6 +484,7 @@ export class Game {
       const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
       if (Math.random() < 0.35) b.pickaxeSkin = pick(TOOL_IDS);
       b.applyGear({ hat: Math.random() < 0.12 ? pick(HAT_IDS) : null, backbling: Math.random() < 0.45 ? pick(BACK_IDS) : null });
+      if (Math.random() < 0.25) attachKicks(b.character, pick(COSMETIC_LIST.filter((c) => c.type === 'kicks' && c.value)).value);
       if (Math.random() < 0.3) { b.spriteLevel = 1 + Math.floor(Math.random() * 3); b.sprite = new SpriteCompanion(b, pick(Object.keys(SPRITES))); }
       this.bots.push(b);
       this.actors.push(b);
@@ -508,6 +530,9 @@ export class Game {
     this.time = 0;
     this.stormTick = 0;
     this.storm.reset();
+    // smaller play areas: Reload starts at the second circle, Blitz at the third
+    if (this.mode === 'reload') this.storm.fastForward(1);
+    else if (this.mode === 'blitz') this.storm.fastForward(2);
     this.events.reset();
     this.homes.reset();
     this.world.destructibles.reset();
@@ -526,9 +551,17 @@ export class Game {
       for (const k of Object.keys(a.mats)) a.mats[k] = 0;
       a.gold = 0; a.medallions?.clear(); a.setCrown?.(false);
       a.health = 100; a.shield = 0; a.kills = 0; a.emote = null; a.crouched = false; a.dmgDealt = 0;
+      a.reboots = 2; a.rebootPending = false;
       a.scanPhase = -1; a.extraLife = false; a.speedT = 0; a.slapT = 0; a.lowGravT = 0; a.markedUntil = 0;
+      // Blitz Royale: everyone starts with the same kit and the same medallion
+      if (this.mode === 'blitz' && !a.npc) {
+        this._blitzKit ||= { medal: ['shield', 'surge', 'reload', 'bloom'][Math.floor(Math.random() * 4)], ar: ['ar', 'burst', 'drum'][Math.floor(Math.random() * 3)] };
+        a.items[1] = new Weapon(this._blitzKit.ar, 3); a.items[2] = new Weapon('pump', 3);
+        a.ammo.medium = 120; a.ammo.light = 120; a.ammo.shells = 24;
+        a.items[5] = new Consumable('smallshield', 3); a.items[4] = new Consumable('medkit', 1);
+        a.medallions?.add(this._blitzKit.medal);
+      } else if (this.zeroBuild && !a.npc) {
       // Zero Build start kit: a pistol, small shields and one extra item
-      if (this.zeroBuild && !a.npc) {
         a.items[1] = new Weapon('pistol', 0);
         a.ammo.light = 48;
         a.items[5] = new Consumable('smallshield', 2);
@@ -542,9 +575,9 @@ export class Game {
     }
     for (const b of this.bots) this._planDrop(b);
     // the Victory Crown: you keep it from your last win, and one bot starts wearing one
-    if (this.meta.profile.d.crowned) this.player.setCrown(true);
+    if (this.meta.profile.d.crowned) this.player.setCrown(true, Math.max(1, this.meta.profile.d.stats.crownedWins || 0));
     const cb = this.bots.filter((b) => !b.npc)[Math.floor(Math.random() * this.bots.filter((b) => !b.npc).length)];
-    cb?.setCrown(true);
+    cb?.setCrown(true, 1 + Math.floor(Math.random() * 4));
     this.boss.reset();
     this.boss.spawn();
     this.rifts.spawn();
@@ -572,7 +605,11 @@ export class Game {
     const towns = TOWNS;
     let x = 0, z = 0;
     for (let i = 0; i < 30; i++) {
-      if (Math.random() < 0.5) {
+      if (this.mode === 'reload' || this.mode === 'blitz') {
+        // small maps: land inside the first circle
+        const c = this.storm.center, a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * this.storm.radius * 0.8;
+        x = c.x + Math.cos(a) * d; z = c.y + Math.sin(a) * d;
+      } else if (Math.random() < 0.5) {
         const t = towns[Math.floor(Math.random() * towns.length)];
         x = t.x + (Math.random() - 0.5) * t.r * 1.2; z = t.z + (Math.random() - 0.5) * t.r * 1.2;
       } else {
@@ -650,6 +687,7 @@ export class Game {
     }
     if (this.spectating) this.updateSpectate(dt);
     if (this.warmup > 0) this.updateWarmup(dt);
+    else if (this.respawns.length) this.updateReboots();
     this.updateEmoteWheel(dt);
     if (p.alive) {
       p.readInput(dt, this.input, this.rig);
@@ -728,6 +766,7 @@ export class Game {
       this._healT = 0;
       for (const a of this.actors) if (a.alive && !a.npc && this.time - (a.lastHurtTime || 0) > 5 && this.time - (a.lastFireTime || 0) > 5) { if (a.health < 100) a.health = Math.min(100, a.health + 3); else a.shield = Math.min(100, a.shield + 3); }
     }
+    this.player?.sidekick?.update(dt);
     for (const a of this.actors) {
       if (!a.sprite) continue;
       if (a.distToCam === undefined || a.distToCam < 80 || a.isPlayer) a.sprite.update(dt); else a.sprite.mesh.visible = false;
@@ -1196,6 +1235,27 @@ export class Game {
     if (it.count > 0 && p.held === it && this.input.down('fire')) p.startUse();
   }
 
+  // Reload reboots: back in from the sky over the safe zone with a basic kit.
+  updateReboots() {
+    for (const r of [...this.respawns]) {
+      if (!r.reboot || this.time < r.t) continue;
+      this.respawns.splice(this.respawns.indexOf(r), 1);
+      const a = r.a;
+      a.rebootPending = false;
+      if (this.state !== 'playing' || this.storm.phase >= 6) { a.deathCause ||= 'reboot'; continue; }
+      const c = this.storm.safeCenter(), rad = this.storm.safeRadius() * 0.7, ang = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * rad;
+      const x = c.x + Math.cos(ang) * d, z = c.y + Math.sin(ang) * d;
+      a.revive(x, z);
+      a.items = [a.items[0], new Weapon('pistol', 1), null, null, null, null];
+      a.ammo.light = Math.max(a.ammo.light || 0, 36);
+      a.mats.wood = Math.max(a.mats.wood, 100);
+      a.slot = -1; a.switchSlot(1);
+      a.jumpFromBus(new THREE.Vector3(x, this.world.heightAt(x, z) + 80, z), new THREE.Vector3());
+      a.resetAI?.();
+      if (a.isPlayer) { this.spectating = null; this.hud.showSpectate(null); this.hud.banner('Rebooted! Back in the fight', 2.5); }
+    }
+  }
+
   updateWarmup(dt) {
     const before = Math.ceil(this.warmup);
     this.warmup -= dt;
@@ -1231,15 +1291,30 @@ export class Game {
     const w = this.emoteWheel;
     if (!w) {
       if (input.pressed('emote') && can) {
-        const list = this.meta.profile.d.owned.map((id) => COSMETICS[id]).filter((c) => c?.type === 'emote');
+        // pages like Fortnite's emote wheel: emotes (8 per page), then sprays
+        const owned = this.meta.profile.d.owned.map((id) => COSMETICS[id]);
+        const list = owned.filter((c) => c?.type === 'emote');
         const eq = this.meta.profile.equippedItem('emote');
         list.sort((a, b) => (b.id === eq.id) - (a.id === eq.id));
-        this.emoteWheel = { t: 0, x: 0, y: 0, sel: -1, list: list.slice(0, 8), touch: !!this.touch };
+        const pages = [];
+        for (let i = 0; i < list.length; i += 8) pages.push({ name: pages.length ? `Emotes ${pages.length + 1}` : 'Emotes', list: list.slice(i, i + 8) });
+        const sprays = owned.filter((c) => c?.type === 'spray');
+        const eqs = this.meta.profile.equippedItem('spray');
+        sprays.sort((a, b) => (b.id === eqs?.id) - (a.id === eqs?.id));
+        if (sprays.length) pages.push({ name: 'Sprays', list: sprays.slice(0, 8) });
+        this.emoteWheel = { t: 0, x: 0, y: 0, sel: -1, pages, page: 0, list: pages[0]?.list || [], touch: !!this.touch };
         this.hud.emoteWheel(this.emoteWheel);
       }
       return;
     }
     w.t += dt;
+    // mouse wheel (or the on-screen arrows) flips pages
+    const wh = input.consumeWheel();
+    if ((wh || w.flip) && w.pages.length > 1) {
+      w.page = (w.page + Math.sign(wh || w.flip) + w.pages.length) % w.pages.length;
+      w.list = w.pages[w.page].list; w.flip = 0; w.sel = -1; w.t = 1;
+      this.hud.emoteWheel(w);
+    }
     if (!w.touch) {
       const l = input.consumeLook();
       w.x = Math.max(-1, Math.min(1, w.x + l.x * 4)); w.y = Math.max(-1, Math.min(1, w.y + l.y * 4));
@@ -1250,9 +1325,46 @@ export class Game {
     const release = w.touch ? w.picked !== undefined : !input.down('emote');
     if (!release && can) return;
     const pick = w.touch ? w.picked : w.sel >= 0 ? w.sel : w.t < 0.25 ? 0 : -1;
-    if (can && pick >= 0 && w.list[pick]) { p.emote = p.emote === w.list[pick].value ? null : w.list[pick].value; if (p.emote) this.emoteFx(p, p.emote); }
+    const it = can && pick >= 0 ? w.list[pick] : null;
+    if (it?.type === 'spray') this.spray(p, it.value);
+    else if (it) { p.emote = p.emote === it.value ? null : it.value; if (p.emote) this.emoteFx(p, p.emote); }
     this.emoteWheel = null;
     this.hud.emoteWheel(null);
+  }
+
+  // Sprays: paint the chosen design on the surface under the crosshair (up to 10 at a time).
+  spray(p, v) {
+    const dir = this.camera.getWorldDirection(_dir);
+    const origin = _origin.copy(this.camera.position).addScaledVector(dir, this.rig.curDist * 0.8);
+    const hit = this.world.raycast(origin, dir, 9, {});
+    if (!hit) { this.hud.toast?.('Get closer to a surface to spray'); return; }
+    const pt = origin.clone().addScaledVector(dir, hit.t);
+    const n = new THREE.Vector3();
+    const c = hit.collider;
+    if (!c) this.world.terrain.normalAt(pt.x, pt.z, n);
+    else if (c.kind === 'box') {
+      const d = [[pt.x - c.minX, -1, 0, 0], [c.maxX - pt.x, 1, 0, 0], [pt.y - c.y0, 0, -1, 0], [c.y1 - pt.y, 0, 1, 0], [pt.z - c.minZ, 0, 0, -1], [c.maxZ - pt.z, 0, 0, 1]].sort((a, b) => Math.abs(a[0]) - Math.abs(b[0]));
+      n.set(d[0][1], d[0][2], d[0][3]);
+    } else n.copy(dir).negate();
+    const key = v.text + v.a;
+    this._sprayTex ||= {};
+    if (!this._sprayTex[key]) {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+      const x = cv.getContext('2d');
+      const gr = x.createLinearGradient(0, 0, 256, 256); gr.addColorStop(0, v.a); gr.addColorStop(1, v.b);
+      x.fillStyle = gr; x.beginPath(); x.arc(128, 128, 112, 0, Math.PI * 2); x.fill();
+      x.fillStyle = '#ffffff'; x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.font = `900 ${v.text.length > 3 ? 64 : 128}px "Barlow Condensed", sans-serif`; x.fillText(v.text, 128, 136);
+      this._sprayTex[key] = new THREE.CanvasTexture(cv);
+      this._sprayTex[key].colorSpace = THREE.SRGBColorSpace;
+    }
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), new THREE.MeshBasicMaterial({ map: this._sprayTex[key], transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }));
+    m.position.copy(pt).addScaledVector(n, 0.03);
+    m.lookAt(pt.clone().add(n));
+    this.scene.add(m);
+    (this.sprays ||= []).push(m);
+    if (this.sprays.length > 10) this.scene.remove(this.sprays.shift());
+    this.sound.play('throw', null, { vol: 0.6 });
   }
 
   startSpectate(actor) {
@@ -1331,11 +1443,22 @@ export class Game {
   }
 
   // Players still in the match (NPC boss and guards don't count).
-  get aliveCount() { return this.actors.reduce((n, a) => n + (a.alive && !a.npc ? 1 : 0), 0); }
+  get aliveCount() { return this.actors.reduce((n, a) => n + ((a.alive || a.rebootPending) && !a.npc ? 1 : 0), 0); }
 
   onActorDied(actor, killer) {
     this.effects.eliminate(actor.pos, actor.color);
     this.sound.play(killer?.isPlayer ? 'elim' : 'break', actor.pos);
+    // Reload: two reboots each while the reboot timers are on (the first six circles)
+    if (this.mode === 'reload' && !actor.npc && (actor.reboots ?? 2) > 0 && this.storm.phase < 6 && this.state === 'playing') {
+      actor.reboots = (actor.reboots ?? 2) - 1;
+      if (killer && killer !== actor) killer.kills++;
+      this.hud.killFeed?.(killer, actor);
+      this.loot?.dropInventory(actor);
+      actor.rebootPending = true;
+      this.respawns.push({ a: actor, t: this.time + (actor.isPlayer ? 10 : 12), reboot: true });
+      if (actor.isPlayer) this.hud.banner(`Rebooting in 10 s · ${actor.reboots} reboot${actor.reboots === 1 ? '' : 's'} left`, 3);
+      return;
+    }
     if (this.warmup > 0) {
       // warm-up: nothing counts, respawn shortly
       this.hud.killFeed?.(killer, actor);

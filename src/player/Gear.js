@@ -271,3 +271,40 @@ export function makeHarvestTool(id) {
 export const HAT_IDS = Object.keys(HATS);
 export const BACK_IDS = Object.keys(BACK);
 export const TOOL_IDS = Object.keys(TOOLS);
+
+// Kicks: a pair of sneakers over the outfit's boots, fixed to the foot bones (outfit characters only).
+// v: { base, sole, accent } colours.
+export function attachKicks(character, v) {
+  if (!v || !character?.root) return null;
+  const feet = [];
+  character.root.traverse((o) => { if (o.isBone && (o.name === 'foot_l' || o.name === 'foot_r')) feet.push(o); });
+  if (feet.length !== 2) return null;
+  const mk = (c, r = 0.55) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
+  const base = mk(v.base), sole = mk(v.sole, 0.8), acc = mk(v.accent, 0.4);
+  character.root.updateMatrixWorld(true);
+  const rootQ = character.root.getWorldQuaternion(new THREE.Quaternion());
+  const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(rootQ);
+  const out = [];
+  for (const f of feet) {
+    const shoe = new THREE.Group();
+    const upper = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.1, 0.27), base); upper.position.set(0, 0.06, 0.03);
+    const toe = new THREE.Mesh(new THREE.SphereGeometry(0.068, 10, 8), base); toe.scale.set(1, 0.75, 1.1); toe.position.set(0, 0.045, 0.16);
+    const s = new THREE.Mesh(new THREE.BoxGeometry(0.145, 0.035, 0.32), sole); s.position.set(0, 0.0, 0.04);
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.135, 0.03, 0.12), acc); stripe.position.set(0, 0.075, 0.02);
+    const heel = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.05), acc); heel.position.set(0, 0.08, -0.1);
+    for (const m of [upper, toe, s, stripe, heel]) { m.castShadow = true; shoe.add(m); }
+    // place it under the ankle, pointing where the character faces, then hand it to the foot bone
+    const fp = f.getWorldPosition(new THREE.Vector3());
+    const ground = character.root.getWorldPosition(new THREE.Vector3()).y;
+    shoe.position.set(fp.x, ground + 0.005, fp.z).addScaledVector(fwd, 0.02);
+    shoe.quaternion.copy(rootQ);
+    character.root.add(shoe);
+    shoe.position.sub(character.root.getWorldPosition(new THREE.Vector3())).applyQuaternion(rootQ.clone().invert());
+    shoe.quaternion.identity();
+    shoe.scale.divideScalar(character.root.scale.x || 1);
+    character.root.updateMatrixWorld(true);
+    f.attach(shoe);
+    out.push(shoe);
+  }
+  return out;
+}

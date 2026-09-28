@@ -336,6 +336,11 @@ export class HUD {
     }
     if (!w) { el.classList.add('hidden'); el.querySelectorAll('.ew-item').forEach((i) => i.remove()); this._ewKey = null; return; }
     el.classList.remove('hidden');
+    // page label and arrows
+    const ctr = el.querySelector('.ew-center');
+    const pg = w.pages?.[w.page];
+    ctr.innerHTML = pg && w.pages.length > 1 ? `<button class="ew-arrow" data-flip="-1">‹</button><span>${pg.name.toUpperCase()}<small>${w.page + 1}/${w.pages.length} · wheel</small></span><button class="ew-arrow" data-flip="1">›</button>` : 'EMOTE';
+    ctr.querySelectorAll('[data-flip]').forEach((b) => b.onpointerdown = (e) => { e.stopPropagation(); w.flip = +b.dataset.flip; });
     const key = w.list.map((c) => c.id).join();
     if (this._ewKey !== key) {
       this._ewKey = key;
@@ -345,7 +350,7 @@ export class HUD {
         const b = document.createElement('button');
         b.className = 'ew-item';
         b.style.transform = `translate(${Math.sin(a) * 120}px, ${-Math.cos(a) * 120}px)`;
-        b.innerHTML = `<i>♪</i><span>${c.name}</span>`;
+        b.innerHTML = c.type === 'spray' ? `<i style="background:linear-gradient(135deg,${c.value.a},${c.value.b});border-radius:50%;font-size:${c.value.text.length > 3 ? 9 : 16}px">${c.value.text}</i><span>${c.name}</span>` : `<i>♪</i><span>${c.name}</span>`;
         b.addEventListener('pointerdown', (e) => { e.stopPropagation(); w.picked = i; });
         el.appendChild(b);
       });
@@ -644,9 +649,28 @@ export class HUD {
       this.set('bbS', this.root.querySelector('#bb-shield').style, `${(boss.shield / 200) * 33.3}%`, 'width');
     }
     this._updateSoundViz(dt);
+    // spectator count: eliminated players watch whoever got them (and on up the chain)
+    if ((this._watchT = (this._watchT || 0) - dt) <= 0) {
+      this._watchT = 1;
+      let n = 0;
+      if (p.alive && g.state === 'playing') {
+        for (const a of g.actors) {
+          if (a.alive || a.npc || a.isPlayer) continue;
+          let k = a.killer, hops = 0;
+          while (k && !k.alive && hops++ < 12) k = k.killer;
+          if (k === p) n++;
+        }
+      }
+      let el = this._watchEl;
+      if (!el) { el = this._watchEl = document.createElement('div'); el.id = 'watchers'; this.el.hud.appendChild(el); }
+      el.textContent = n ? `👁 ${n} watching` : '';
+      el.classList.toggle('hidden', !n);
+    }
     const sp = g.spectating;
     if (sp) this.set('spinfo', this.spect.info, `${sp.kills} eliminations · ${Math.ceil(sp.health)} HP${sp.shield > 0 ? ` · ${Math.ceil(sp.shield)} shield` : ''}`);
-    const w = p.weapon;
+    // spectating: show the watched player's weapon, slots, ammo and materials (Fortnite's full HUD)
+    const who = g.spectating && !p.alive ? g.spectating : p;
+    const w = who.weapon;
 
     // crosshair gap follows current spread
     const moving = Math.hypot(p.vel.x, p.vel.z) > 1.5;
@@ -656,16 +680,16 @@ export class HUD {
     this.set('chVis', this.el.crosshair.style, p.state === 'ground' && p.alive && !p.victory ? 'block' : 'none', 'display');
     // reticle per weapon: bloom cross (AR/SMG/pistol), circle (shotguns), dot (sniper hip-fire,
     // pickaxe, building, items), circle with drop marks (rocket)
-    const heldNow = p.held, key = w?.def.key;
+    const heldNow = who.held, key = w?.def.key;
     let mode = 'dot';
     if (p.buildMode || g.editing) mode = 'dot';
     else if (w) mode = !setting(g, 'weaponReticles') ? 'cross' : key === 'shotgun' || key === 'pump' ? 'shotgun' : key === 'sniper' ? 'sniper' : key === 'rocket' ? 'rocket' : 'cross';
     else if (heldNow?.def?.throw) mode = 'throw';
     this.set('chMode', this.el.crosshair.dataset, mode, 'mode');
 
-    const h = p.held;
+    const h = who.held;
     if (w) {
-      const res = p.ammoFor(w.def.ammoType);
+      const res = who.ammoFor(w.def.ammoType);
       this.set('ammoCur', this.el.ammoCur, String(w.ammo));
       this.set('ammoMax', this.el.ammoMax, `/${res === Infinity ? '∞' : res}`);
       this.set('wname', this.el.weaponName, w.name);
@@ -677,14 +701,14 @@ export class HUD {
       this.set('wcol', this.el.weaponName.style, h?.isConsumable ? h.def.color : '#ffffff', 'color');
     }
     this.slotEls.forEach((s, i) => {
-      const it = p.items[i];
+      const it = who.items[i];
       const code = this.game.input.keyFor('slot' + (i + 1));
       const key = code ? keyLabel(code).replace(' Mouse', '').replace('Mouse ', 'M') : '';
-      const sig = `${it ? it.type + (it.rarity ?? '') + (it.count ?? '') + (it.isGun ? '/' + it.ammo : '') : ''}|${i === p.slot}|${key}`;
+      const sig = `${it ? it.type + (it.rarity ?? '') + (it.count ?? '') + (it.isGun ? '/' + it.ammo : '') : ''}|${i === who.slot}|${key}`;
       if (this.cache['slot' + i] === sig) return;
       this.cache['slot' + i] = sig;
       s.querySelector('.key').textContent = key;
-      s.classList.toggle('active', i === p.slot);
+      s.classList.toggle('active', i === who.slot);
       const col = !it ? 'rgba(255,255,255,0.15)' : it.isGun ? RARITIES[it.rarity].color : it.isConsumable ? it.def.color : '#e8d7b0';
       s.style.setProperty('--rar', col);
       const url = itemIcon(it);
@@ -695,16 +719,16 @@ export class HUD {
       s.querySelector('.count').textContent = it?.isConsumable ? String(it.count) : it?.isGun ? String(it.ammo) : '';
       s.classList.toggle('low', !!it?.isGun && it.ammo <= Math.ceil(it.mag * 0.25));
     });
-    for (const k of ['wood', 'stone', 'metal']) this.set('mat' + k, this.el.mats[k], String(p.mats[k]));
+    for (const k of ['wood', 'stone', 'metal']) this.set('mat' + k, this.el.mats[k], String(who.mats[k]));
     // ammo by type next to the materials, and special items (keycard) beside the quick bar
-    const ammoSig = Object.keys(AMMO).map((t) => p.ammoFor(t)).join(',');
+    const ammoSig = Object.keys(AMMO).map((t) => who.ammoFor(t)).join(',');
     if (this.cache.ammoTypes !== ammoSig) {
       this.cache.ammoTypes = ammoSig;
       const el = this.el.ammoTypes || (this.el.ammoTypes = document.getElementById('ammo-types'));
-      el.innerHTML = Object.entries(AMMO).map(([t, a]) => { const n = p.ammoFor(t); return n === Infinity ? '' : `<span class="at" title="${a.name}" style="--c:${a.color || '#fff'}"><i></i>${n}</span>`; }).join('');
+      el.innerHTML = Object.entries(AMMO).map(([t, a]) => { const n = who.ammoFor(t); return n === Infinity ? '' : `<span class="at" title="${a.name}" style="--c:${a.color || '#fff'}"><i></i>${n}</span>`; }).join('');
     }
     this.set('keycard', this.el.special || (this.el.special = document.getElementById('special-slots')), p.keycard ? '<div class="sslot" title="Vault Keycard"><span>⌘</span><small>KEYCARD</small></div>' : '', 'innerHTML');
-    this.set('gold', this.el.gold || (this.el.gold = document.getElementById('gold-n')), String(p.gold || 0));
+    this.set('gold', this.el.gold || (this.el.gold = document.getElementById('gold-n')), String(who.gold || 0));
     const mk = [...(p.medallions || [])].join(',');
     if (this.cache.medals !== mk) {
       this.cache.medals = mk;
@@ -766,7 +790,7 @@ export class HUD {
     if (this.cache.sl !== slq) { this.cache.sl = slq; this.el.speed.style.opacity = String(slq); }
 
     // health / shield
-    const stam = Math.round(p.stamina ?? 100);
+    const stam = Math.round(who.stamina ?? 100);
     this.set('stam', this.el.staminaFill.style, `${stam}%`, 'width');
     this.set('stamShow', this.el.staminaRow.style, stam < 100 && p.alive ? '1' : '0', 'opacity');
     const view = g.spectating || p;
