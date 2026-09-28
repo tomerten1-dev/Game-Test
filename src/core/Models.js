@@ -22,7 +22,7 @@ const KK = [
 export const KIT_PIECES = [
   'Wall_Plaster_Straight', 'Wall_Plaster_Window_Wide_Round', 'Wall_Plaster_Door_Round', 'Wall_Plaster_Door_Flat',
   'Wall_UnevenBrick_Straight', 'Wall_UnevenBrick_Window_Wide_Round', 'Wall_UnevenBrick_Door_Round',
-  'Window_Wide_Round1', 'WindowShutters_Wide_Round_Open', 'Corner_Exterior_Wood', 'Floor_WoodDark', 'Floor_Brick', 'Stair_Interior_Rails',
+  'Window_Wide_Round1', 'WindowShutters_Wide_Round_Open', 'Corner_Exterior_Wood', 'Floor_WoodDark', 'Floor_Brick', 'Stair_Interior_Rails', 'Stair_Interior_Solid',
   'Roof_RoundTiles_6x8', 'Roof_RoundTiles_8x10', 'Roof_Front_Brick6', 'Roof_Front_Brick8', 'Prop_Chimney', 'Door_1_Round', 'Door_1_Flat',
   'Prop_ExteriorBorder_Straight1', 'Prop_Vine1', 'Prop_Vine4', 'Prop_Wagon', 'Prop_WoodenFence_Single',
 ].map((n) => `village/${n}`);

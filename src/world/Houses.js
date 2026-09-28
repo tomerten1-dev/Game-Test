@@ -446,6 +446,8 @@ export class Houses {
     if (h.stairs) {
       const s = h.stairs;
       tile('Floor_WoodDark', STORY + 0.005, (ix, iz) => ix < s.x1 && iz > s.z0 && iz < s.z1 - 0.35);
+      // the steps (solid flight) with the banisters on top
+      h.handles.push(...this._piece(h, P('Stair_Interior_Solid'), s.cx, 0, s.z1, 0, 0.95, STORY / 3.03, 1));
       h.handles.push(...this._piece(h, P('Stair_Interior_Rails'), s.cx, 0, s.z1, 0, 0.95, STORY / 3.03, 1));
     }
     // roof, gables, chimney
