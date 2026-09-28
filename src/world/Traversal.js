@@ -2,12 +2,8 @@ import * as THREE from 'three';
 import { TOWNS, MOUNTAIN, MAP_SCALE, GROW } from './Terrain.js';
 import { mulberry32 } from '../core/noise.js';
 
-// Ways to get around the island (Fortnite-style):
-//  - lookout towers on hills with a ladder (walk into it to climb) and a zipline down from the top
-//  - ziplines: interact to grab on, ride along the cable (forward / back), jump to let go; no fall
-//    damage until you land
-//  - an ascender up the Rusty Works smokestack: interact to ride it to the catwalk
-//  - hot air balloons: step into the basket and ride it up and down
+// Lookout towers on hills with a ladder (walk into it to climb). The zipline, ascender and balloon
+// code below is kept but nothing places them (Chapter 1 Season 3 had none).
 
 const ZIP_SPEED = 17, ASC_SPEED = 11, LADDER_SPEED = 4.6;
 const _v = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3();
@@ -26,9 +22,9 @@ export class Traversal {
     this.wood = new THREE.MeshStandardMaterial({ color: '#8a5a34', roughness: 0.85 });
     this.metal = new THREE.MeshStandardMaterial({ color: '#5b6470', roughness: 0.5, metalness: 0.5 });
     this.cable = new THREE.MeshStandardMaterial({ color: '#2b2f36', roughness: 0.4, metalness: 0.6 });
+    // lookout towers with ladders only: ziplines, ascenders, ride-on balloons and storm forecast
+    // consoles all came after Chapter 1 Season 3
     this._towers(r);
-    for (const s of towns.smoke || []) this._stackAscender(s);
-    this._balloons(r);
   }
 
   _mesh(geo, mat, x, y, z, parent = this.scene) {
@@ -69,7 +65,7 @@ export class Traversal {
         this._mesh(new THREE.BoxGeometry(S * 2, 0.14, 0.14), this.wood, x, yy, z - S + 0.2);
         this._mesh(new THREE.BoxGeometry(S * 2, 0.14, 0.14), this.wood, x, yy, z + S - 0.2);
       }
-      // deck + railing (open on the ladder side and the zipline side)
+      // deck + railing (open on the ladder side)
       this._mesh(new THREE.BoxGeometry(S * 2 + 0.3, 0.3, S * 2 + 0.3), this.wood, x, top - 0.15, z);
       this.colliders.add({ kind: 'box', minX: x - S - 0.15, maxX: x + S + 0.15, minZ: z - S - 0.15, maxZ: z + S + 0.15, y0: top - 0.3, y1: top, crate: true, mat: 'wood' });
       for (const [rx, rz, w, d] of [[0, -S, S * 2, 0.1], [-S, 0, 0.1, S * 2]]) {
@@ -83,23 +79,6 @@ export class Traversal {
       for (const sx of [-0.35, 0.35]) this._mesh(new THREE.BoxGeometry(0.08, H + 1, 0.08), this.wood, x + sx, h + (H + 1) / 2, lz);
       for (let y = h + 0.4; y < top; y += 0.4) this._mesh(new THREE.BoxGeometry(0.7, 0.06, 0.06), this.wood, x, y, lz);
       this.ladders.push({ x, z: lz, nx: 0, nz: 1, y0: h - 0.5, y1: top, halfW: 0.45 });
-      // zipline from the +x side of the deck down to the lowest ground 55-80 m away
-      let best = null;
-      for (let k = 0; k < 24; k++) {
-        const a = (k / 24) * Math.PI * 2, d = 55 + (k % 3) * 12;
-        const ex = x + Math.cos(a) * d, ez = z + Math.sin(a) * d, eh = this.terrain.heightAt(ex, ez);
-        if (eh < 2 || this.terrain.normalAt(ex, ez).y < 0.9 || !this._clearOf(ex, ez, 4)) continue;
-        if (!best || eh < best.h) best = { x: ex, z: ez, h: eh };
-      }
-      if (best && top - best.h > 6) {
-        const a = new THREE.Vector3(x, top + 2.4, z), b = new THREE.Vector3(best.x, best.h + 4.2, best.z);
-        this._zip(a, b, true);
-      }
-      // storm forecast console on the deck: reveals where the circle after next will be
-      const fx = x - S + 0.7, fz = z + 0.6;
-      this._mesh(new THREE.BoxGeometry(0.5, 1.0, 0.4), new THREE.MeshStandardMaterial({ color: '#2c3140', roughness: 0.5, metalness: 0.4 }), fx, top + 0.5, fz);
-      this._mesh(new THREE.BoxGeometry(0.44, 0.3, 0.05), new THREE.MeshStandardMaterial({ color: '#c05cff', emissive: '#8a2be2', emissiveIntensity: 1.2 }), fx + 0.24, top + 0.95, fz).rotation.y = Math.PI / 2;
-      (this.forecasts ||= []).push({ x: fx, z: fz, y: top });
       this.towns.houses.push({ minX: x - S, maxX: x + S, minZ: z - S, maxZ: z + S, x, z, y: h, h: H + 3.5, rot: 0 });
       (this.towns.landmarks ||= []).push({ name: 'Lookout Tower', x, z });
     }
