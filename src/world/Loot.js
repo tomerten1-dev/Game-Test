@@ -255,6 +255,7 @@ export class Loot {
     if (w && AMMO[w.def.ammoType]) types.add(w.def.ammoType); // bows / blades use no ammo
     const all = ['light', 'medium', 'shells', 'heavy', 'light', 'medium', 'shells'];
     while (types.size < 2) types.add(all[Math.floor(Math.random() * all.length)]);
+    if (Math.random() < 0.4) this.spawnPickup({ type: 'gold', amount: 10 }, _v.set(b.x, b.y + 0.6, b.z), new THREE.Vector3(0, 4.5, 0));
     [...types].forEach((t, i) => {
       const a = b.group.rotation.y + (i - 0.5) * 0.9;
       this.spawnPickup({ type: 'ammo', ammoType: t, amount: AMMO[t].box }, _v.set(b.x, b.y + 0.6, b.z), new THREE.Vector3(Math.sin(a) * 2, 4.5, Math.cos(a) * 2));
@@ -464,6 +465,8 @@ export class Loot {
     out.push({ type: 'ammo', ammoType: extra, amount: AMMO[extra].box });
     // Chapter 1 chests: 30 of one material
     out.push({ type: 'mat', matType: ['wood', 'stone', 'metal'][Math.floor(Math.random() * 3)], amount: 30 });
+    // gold bars for the vending machines and upgrade benches
+    out.push({ type: 'gold', amount: c.rare ? 70 + Math.floor(Math.random() * 40) : 25 + Math.floor(Math.random() * 25) });
     const fwd = c.group.rotation.y;
     out.forEach((it, i) => {
       const a = fwd + (i - (out.length - 1) / 2) * 0.55;

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { TOWNS, WORLD_HALF, MAP_SCALE, GROW } from './Terrain.js';
 import { Weapon } from '../weapons/Weapon.js';
-import { RARITIES, WEAPONS, rollWeaponType, EXOTIC, EXOTICS, MOD_COST } from '../weapons/WeaponDefs.js';
+import { RARITIES, WEAPONS, rollWeaponType, fitRarity, EXOTIC, EXOTICS, MOD_COST } from '../weapons/WeaponDefs.js';
 import { Character } from '../player/Character.js';
 import { makeWeaponMesh, itemGeometry } from '../weapons/WeaponModels.js';
 import { mulberry32 } from '../core/noise.js';
@@ -59,8 +59,12 @@ export class Events {
     this.hides = [];     // haystacks / dumpsters you can hide in
     this.dropIdx = 0;
     this.padMat = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.5 });
-    // Chapter 1 Season 3 has none of these: jump pads, vending machines, upgrade / mod benches, dealers,
-    // NPCs, hiding spots and foraged food all came later
+    // gold buys guns at vending machines and upgrades at benches; hide in bushes, haystacks and dumpsters
+    // (no jump pads, mod benches, dealers, NPCs or foraged food)
+    this._createVending();
+    this._createBenches();
+    this._createHides();
+    this._createBushes();
     this.modBenches = [];
     this.dealers = [];
     this.npcs = [];
@@ -503,6 +507,41 @@ export class Events {
     }
   }
 
+  // ---------- bushes: leafy clumps around the towns and in the woods you can crawl into ----------
+  _createBushes() {
+    const rnd = mulberry32(3131);
+    const leaf = [new THREE.MeshStandardMaterial({ color: '#4f8a3a', roughness: 0.9 }), new THREE.MeshStandardMaterial({ color: '#5f9c44', roughness: 0.9 })];
+    const blob = new THREE.IcosahedronGeometry(0.75, 1);
+    const spots = [];
+    for (const t of TOWNS) for (let n = 0; n < 3; n++) { const a = rnd() * Math.PI * 2, d = t.r * (0.6 + rnd() * 0.5); spots.push([t.x + Math.cos(a) * d, t.z + Math.sin(a) * d]); }
+    for (let i = 0; i < 60; i++) spots.push([(rnd() * 2 - 1) * WORLD_HALF * 0.85, (rnd() * 2 - 1) * WORLD_HALF * 0.85]);
+    for (const [x0, z0] of spots) {
+      let spot = null;
+      for (let i = 0; i < 20 && !spot; i++) {
+        const x = x0 + (rnd() - 0.5) * 12, z = z0 + (rnd() - 0.5) * 12;
+        if (this.world.heightAt(x, z) > 1.5 && this._clearSpot(x, z, 1.4, 0.85) && !this.hides.some((h) => Math.hypot(h.x - x, h.z - z) < 10)) spot = { x, z };
+      }
+      if (!spot) continue;
+      const y = this.world.heightAt(spot.x, spot.z);
+      const group = new THREE.Group();
+      for (let k = 0; k < 6; k++) {
+        const m = new THREE.Mesh(blob, leaf[k % 2]);
+        const a = (k / 6) * Math.PI * 2;
+        m.position.set(Math.cos(a) * 0.55, 0.6 + (k % 3) * 0.25, Math.sin(a) * 0.55);
+        m.scale.setScalar(0.85 + rnd() * 0.35);
+        m.castShadow = true;
+        group.add(m);
+      }
+      const top = new THREE.Mesh(blob, leaf[0]); top.position.y = 1.25; group.add(top);
+      group.rotation.y = rnd() * Math.PI * 2;
+      group.position.set(spot.x, y, spot.z);
+      this.scene.add(group);
+      const col = { kind: 'circle', x: spot.x, z: spot.z, r: 0.9, y0: y - 0.5, y1: y + 1.7, crate: true };
+      this.world.colliders.add(col);
+      this.hides.push({ kind: 'bush', x: spot.x, z: spot.z, y, group, col, occupant: null });
+    }
+  }
+
   // ---------- Supply Llamas (v3.3): three piñata stashes hidden away from the towns ----------
   _llamaMesh() {
     const g = new THREE.Group();
@@ -622,8 +661,9 @@ export class Events {
     l.opened = true;
     if (actor.isPlayer) this.game.meta?.track('llama');
     const items = [];
-    // Season 3 Supply Llama: loads of materials and ammo, heals and traps, but no weapons
+    // Season 3 Supply Llama: loads of materials, ammo and gold, heals and traps, but no weapons
     for (const m of ['wood', 'stone', 'metal']) items.push({ type: 'mat', matType: m, amount: 500 });
+    items.push({ type: 'gold', amount: 150 });
     for (const [a, n] of [['light', 180], ['medium', 180], ['heavy', 24], ['shells', 30], ['rockets', 6]]) items.push({ type: 'ammo', ammoType: a, amount: n });
     for (const [c, n] of [['bigshield', 2], ['bandage', 10], ['trap', 2], ['launchpad', 1]]) items.push({ type: 'consumable', ctype: c, count: n });
     const heal = ['chug', 'slurp', 'medkit'][Math.floor(Math.random() * 3)];
@@ -736,14 +776,20 @@ export class Events {
   }
 
   _rustle(spot) {
-    const c = spot.kind === 'hay' ? _fc.set('#e3c16f') : _fc.set('#3f6b4a');
+    const c = _fc.set(spot.kind === 'hay' ? '#e3c16f' : spot.kind === 'bush' ? '#4f8a3a' : '#3f6b4a');
     for (let i = 0; i < 18; i++) this.game.effects.debris.emit(spot.x + (Math.random() - 0.5), spot.y + 1.4, spot.z + (Math.random() - 0.5), (Math.random() - 0.5) * 3, 2 + Math.random() * 3, (Math.random() - 0.5) * 3, c, 0.8, 0.15, 12);
     this.game.sound.play('harvest_wood', spot.occupant?.isPlayer ? null : new THREE.Vector3(spot.x, spot.y, spot.z), { range: 30 });
   }
 
   // Cost to take a gun from its rarity to the next one (Legendary is the top; Mythics can't be upgraded).
   static upgradeCost(w) {
-    return w?.isGun && w.rarity < 4 ? UPGRADE_COST[w.rarity] : null;
+    return w?.isGun && w.rarity < 4 && Events.upgradeTo(w) > w.rarity ? UPGRADE_COST[w.rarity] : null;
+  }
+
+  // The next rarity this gun comes in (a rare Pump is already its best).
+  static upgradeTo(w) {
+    const list = WEAPONS[w.type].rarities;
+    return list ? list.find((r) => r > w.rarity) ?? w.rarity : w.rarity + 1;
   }
 
   upgrade(bench, actor) {
@@ -751,11 +797,11 @@ export class Events {
     const w = actor.held;
     const cost = Events.upgradeCost(w);
     if (!w?.isGun) return 'Hold the weapon you want to upgrade';
-    if (!cost) return w.rarity >= 5 ? `${RARITIES[w.rarity].name} weapons can't be upgraded` : 'Already Legendary';
+    if (!cost) return w.rarity >= 5 ? `${RARITIES[w.rarity].name} weapons can't be upgraded` : w.rarity >= 4 ? 'Already Legendary' : `${w.name} doesn't come in a higher rarity`;
     const [, n] = cost;
     if (actor.gold < n) return `Need ${n} gold (you have ${actor.gold})`;
     actor.gold -= n;
-    const nw = new Weapon(w.type, w.rarity + 1);
+    const nw = new Weapon(w.type, Events.upgradeTo(w));
     nw.mods = { ...w.mods };
     nw.ammo = Math.max(w.ammo, Math.min(nw.mag, w.ammo));
     actor.items[actor.slot] = nw;
@@ -774,9 +820,9 @@ export class Events {
 
   _rollOffers(v) {
     v.offers = [0, 1, 2].map((k) => {
-      const rarity = 2 + k;
       let type = rollWeaponType('chest');
       if (type === 'pistol') type = 'ar';
+      const rarity = fitRarity(type, 2 + k); // only rarities the gun really comes in
       return { type, rarity, mat: VEND_MATS[k], price: VEND_PRICES[rarity] };
     });
   }
@@ -856,6 +902,7 @@ export class Events {
     const extra = ['grenade', 'trap', 'impulse', 'launchpad'][Math.floor(Math.random() * 4)];
     items.push({ type: 'consumable', ctype: extra, count: CONSUMABLES[extra].stack });
     for (const m of ['wood', 'stone', 'metal']) items.push({ type: 'mat', matType: m, amount: 30 });
+    items.push({ type: 'gold', amount: 100 });
     items.forEach((it, i) => {
       const a = (i / items.length) * Math.PI * 2;
       loot.spawnPickup(it, _v.set(s.x, s.ground + 1, s.z), new THREE.Vector3(Math.cos(a) * 2.6, 5, Math.sin(a) * 2.6));
@@ -911,7 +958,7 @@ export class Events {
     for (const h of this.hides) {
       if (h.occupant) continue;
       const d = Math.hypot(h.x - pos.x, h.z - pos.z);
-      if (d < bd + 0.8 && Math.abs(h.y - pos.y) < 2.5) { bd = d; best = { kind: 'hide', hide: h, text: `Hide in ${h.kind === 'hay' ? 'Haystack' : 'Dumpster'}` }; }
+      if (d < bd + 0.8 && Math.abs(h.y - pos.y) < 2.5) { bd = d; best = { kind: 'hide', hide: h, text: `Hide in ${{ hay: 'Haystack', bush: 'Bush' }[h.kind] || 'Dumpster'}` }; }
     }
     for (const l of this.llamas) {
       if (l.opened) continue;
