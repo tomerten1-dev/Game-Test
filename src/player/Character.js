@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { readCustomSkin, addCustomType } from './CustomSkin.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { addRim, addHueSwap } from '../effects/Shaders.js';
@@ -29,7 +30,7 @@ const Q_SKIN = ['#8a5a3e', '#7a4d34', '#95654a']; // close to the outfits' skin 
 // sit like they do in the KayKit hand slot
 // (measured against the KayKit slot in the idle and aiming poses)
 const Q_SLOT = { pos: [0, 0.08, 0], quat: [-0.399, -0.615, -0.396, -0.554], scale: 0.761 };
-const HEIGHT = 2.02; // model box incl. hair: puts the top of the head at ~1.92 m, Fortnite's player height
+export const HEIGHT = 2.02; // model box incl. hair: puts the top of the head at ~1.92 m, Fortnite's player height
 // Main outfit hue band per hero (0..1), used by outfit colours.
 const OUTFIT_HUE = { Knight: [0.95, 0.05], Barbarian: [0.5, 0.06], Mage: [0.93, 0.06], Rogue: [0.43, 0.07], Rogue_Hooded: [0.43, 0.07] };
 
@@ -114,6 +115,11 @@ export class CharacterAssets {
         a.types[t] = { scene: g.scene, scale: HEIGHT / h, footOffset: (-box.min.y * HEIGHT) / h, q: true, head, headAbove: (head?.userData.headAbove ?? 0.2) + (t.includes('Ranger') ? 0.06 : 0) };
       });
     }
+    // your own custom skin (Locker), kept in this browser only
+    try {
+      const saved = await readCustomSkin();
+      if (saved?.buf) { const res = await addCustomType(a, saved.buf, 1.92); a.customInfo = { ...res, name: saved.name }; }
+    } catch (e) { console.warn('custom skin', e); }
     // legacy fields used elsewhere
     const first = a.types[CHARACTER_TYPES[0]];
     a.scale = first.scale;
@@ -143,7 +149,8 @@ export class Character {
     this.materials = [];
     this.q = !!src.q;
     this.headAbove = (src.headAbove || 0) * src.scale; // Quaternius rig: head bone -> top of head (hood)
-    this.clips = this.q ? assets.q : assets;
+    this.custom = !!src.custom;
+    this.clips = this.custom && assets.qc ? assets.qc : this.q ? assets.q : assets;
     const tintColor = new THREE.Color(1, 1, 1).lerp(this.color, tint);
     const skin = new THREE.Color(Q_SKIN[Math.floor(Math.random() * Q_SKIN.length)]);
     model.traverse((o) => {
@@ -162,6 +169,9 @@ export class Character {
           };
           m.customProgramCacheKey = () => `qhead${cut.toFixed(3)}`;
           o.castShadow = false;
+        } else if (this.custom) {
+          // your own model keeps its own colours and textures
+          addRim(m, '#e6f4ff', 0.3);
         } else {
           m.color.copy(tintColor);
           m.roughness = this.q ? Math.max(0.55, m.roughness) : 0.6;

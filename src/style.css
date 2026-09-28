@@ -1008,3 +1008,7 @@ body.touch .slot { width: 46px; height: 46px; }
 body.touch .slot .icon img { width: 40px; height: 34px; }
 body.touch .slot .count { font-size: 13px; right: 3px; bottom: 1px; }
 body.touch #slots { gap: 4px; }
+.custom-skin-row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 6px; border-radius: 6px; background: rgba(170, 90, 255, 0.16); border: 1px solid rgba(200, 140, 255, 0.45); color: #fff; }
+.custom-skin-row b { font-family: var(--title); font-weight: 400; font-size: 17px; letter-spacing: 0.5px; text-transform: uppercase; }
+.custom-skin-row small { flex: 1 1 200px; opacity: 0.85; font-weight: 600; }
+.custom-skin-row .lb-btn { padding: 5px 12px; font-size: 14px; }

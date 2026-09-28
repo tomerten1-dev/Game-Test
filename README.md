@@ -55,6 +55,7 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 ## Inventory & survival
 
 - **Slot 1** is the harvesting axe: hit trees, crates and wooden houses for wood, rocks and walls for stone, cars, lamps and city props for metal. Trees and rocks show a glowing blue **weak point**; hit it for double materials. Trees and rocks have HP: chop a tree down and it **topples over**, and rocks **crumble**. Bullets and explosions wear them down too. Everything grows back next match.
+- **Custom Skin (Locker → Hero → Load model…):** wear your own `.glb` / `.gltf` character. The file stays in your browser (IndexedDB), never in the game files or the repo, so use models you're allowed to use. Rigs with Unreal-mannequin bone names (pelvis, spine_01, thigh_l, hand_r… as used by Fortnite-style and Unreal characters) or Mixamo names are driven by all our animations; other models load but stand still. Weapons go in the right hand, and the model is scaled to 1.92 m. **Remove** goes back to a normal hero.
 - **Fortnite numbers (researched):**
   - Scale matches Fortnite: players are 1.92 m tall, and every house storey is exactly one build wall (3.84 m) high, so walls you build line up with the floors. Doors are ~2.9 m and small houses about 10 × 7 m; furniture keeps its real size.
   - Sprint is 1.3× the run speed (Fortnite Chapter 5), with tactical sprint a bit faster on stamina.

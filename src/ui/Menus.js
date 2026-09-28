@@ -1,3 +1,4 @@
+import { saveCustomSkin, clearCustomSkin, addCustomType } from '../player/CustomSkin.js';
 import { SLOTS, COSMETIC_LIST, COSMETICS } from '../meta/Cosmetics.js';
 import { SPRITES, spriteLevel } from '../player/Sprites.js';
 import { RARITIES } from '../weapons/WeaponDefs.js';
@@ -211,17 +212,48 @@ export class Menus {
       $('#locker-grid').insertAdjacentHTML('afterbegin', `<div class="styles-row"><b>${hero.name} styles</b>${hero.styles.map(([n, t], i) => `<button class="style-btn ${i === cur ? 'on' : ''}" data-style="${i}"><i style="background:${t || 'linear-gradient(135deg,#20d6c0,#2f6bff)'}"></i>${n}</button>`).join('')}</div>`);
       $('#locker-grid').querySelectorAll('[data-style]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); (prof.d.heroStyles ||= {})[hero.id] = +b.dataset.style; prof.save(); this.game.sound.play('click'); this.refresh(); }));
     }
+    if (this.lockerSlot === 'hero') {
+      // your own character model, loaded from this computer and kept in this browser only
+      const info = this.game.assets?.customInfo;
+      const status = info?.ok ? `${info.name}${info.animated ? '' : ' · no matching skeleton, so it won\'t animate'}` : info ? `Couldn't load ${info.name}: ${info.error}` : 'Load a .glb / .gltf character from your computer (kept in this browser only)';
+      $('#locker-grid').insertAdjacentHTML('afterbegin', `<div class="custom-skin-row"><b>Custom Skin</b><small>${status}</small><button class="lb-btn" id="cs-load">Load model…</button>${info ? '<button class="lb-btn" id="cs-clear">Remove</button>' : ''}<input type="file" id="cs-file" accept=".glb,.gltf,model/gltf-binary" hidden></div>`);
+      $('#cs-load').addEventListener('click', (e) => { e.stopPropagation(); $('#cs-file').click(); });
+      $('#cs-file').addEventListener('change', (e) => { const f = e.target.files?.[0]; if (f) this.loadCustomSkin(f); });
+      $('#cs-clear')?.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await clearCustomSkin();
+        delete this.game.assets.types.Custom; this.game.assets.customInfo = null;
+        if (prof.d.equipped.hero === 'hero_custom') prof.equip('hero', 'hero_ranger_m');
+        if (this.game.stage) this.game.stage._key = null;
+        this.refresh();
+      });
+    }
     $('#locker-slots').querySelectorAll('[data-slot]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); this.lockerSlot = b.dataset.slot; this.refresh(); }));
     $('#locker-grid').querySelectorAll('[data-id]').forEach((b) => b.addEventListener('click', (e) => {
       e.stopPropagation();
       const c = COSMETICS[b.dataset.id];
       if (!prof.owns(c.id)) { this.flash('Claim it in the Battle Pass (Quests tab) or buy it in the Item Shop'); return; }
+      if (c.id === 'hero_custom' && !this.game.assets?.types?.Custom) { $('#cs-file')?.click(); return; }
       prof.equip(c.type, c.id);
       this.game.sound.play('click');
       if (c.type === 'lobbymusic') { const s = this.game.sound; s.lobbyPick = c.value; s.musicName = null; s._plIdx = undefined; s.music('lobby'); }
       this.refresh();
       if (c.type === 'emote') { this.game.stage.emote(c.value); this.game.emoteFx?.(null, c.value, this.game.stage.heroPos); }
     }));
+  }
+
+  // Read a model file, keep it in this browser, and wear it.
+  async loadCustomSkin(file) {
+    if (file.size > 60e6) { this.flash('That file is over 60 MB - try a smaller .glb'); return; }
+    const buf = await file.arrayBuffer();
+    const res = await addCustomType(this.game.assets, buf, 1.92);
+    this.game.assets.customInfo = { ...res, name: file.name };
+    if (!res.ok) { this.flash(`Couldn't load that model: ${res.error}`); this.refresh(); return; }
+    await saveCustomSkin(buf, file.name).catch(() => this.flash('Loaded, but the browser would not save it for next time'));
+    this.meta.profile.equip('hero', 'hero_custom');
+    if (this.game.stage) this.game.stage._key = null; // rebuild the lobby hero
+    this.flash(res.animated ? 'Custom skin loaded' : 'Loaded - but its skeleton does not match our animations, so it will not animate');
+    this.refresh();
   }
 
   renderShop() {

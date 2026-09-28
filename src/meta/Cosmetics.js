@@ -23,6 +23,8 @@ export const PRICES = [200, 300, 600, 1000, 1500];
 const items = [
   // heroes: Quaternius outfit characters (the default look for you and the bots)
   // styles: alternate looks for an outfit (picked in the Locker)
+  // your own .glb character (Locker: Load custom skin), stored in this browser only
+  { id: 'hero_custom', type: 'hero', name: 'Custom Skin', rarity: 4, value: 'Custom', starter: true },
   { id: 'hero_ranger_m', type: 'hero', name: 'Trail Ranger', rarity: 1, value: 'Male_Ranger', starter: true, styles: [['Classic', null], ['Night Watch', '#34406b'], ['Autumn', '#b8642f']] },
   { id: 'hero_ranger_f', type: 'hero', name: 'Forest Ranger', rarity: 1, value: 'Female_Ranger', starter: true, styles: [['Classic', null], ['Frost', '#9fd8ff'], ['Crimson', '#b8323f']] },
   { id: 'hero_peasant_m', type: 'hero', name: 'Village Hand', rarity: 1, value: 'Male_Peasant', starter: true, styles: [['Classic', null], ['Harvest', '#d9a13a'], ['Slate', '#5a6475']] },
