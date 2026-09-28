@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { MAT_CAP } from './Items.js';
 import { setting } from '../ui/Settings.js';
 import { raySphere } from '../world/Colliders.js';
 
@@ -346,7 +347,10 @@ export class Combat {
           else this._placeWeak(c, actor, _end.y, crit);
         } else this._placeWeak(c, actor, _end.y, crit);
       } else if (c?.obj) g.world.destructibles.damage(c, 50, actor);
+      const room = MAT_CAP - actor.mats[mat];
       actor.addMat(mat, amount);
+      // at the 500 cap the rest drops on the ground as a pickup (Fortnite)
+      if (amount > room && g.loot) g.loot.spawnPickup({ type: 'mat', matType: mat, amount: amount - Math.max(0, room) }, _n.set(_end.x, _end.y, _end.z), new THREE.Vector3(-dir.x * 2, 3, -dir.z * 2));
       if (actor.isPlayer) g.meta?.track('harvest', amount); // no floating number: the object shows its HP bar, the counter shows the mats
       g.sound.play(`harvest_${mat}`, actor.isPlayer ? null : _end, { range: 50 });
     } else if (actor.isPlayer) g.sound.play('impact');

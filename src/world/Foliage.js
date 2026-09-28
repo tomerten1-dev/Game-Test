@@ -98,6 +98,12 @@ export class Foliage {
     return true;
   }
 
+  // any building (lone houses, farms, landmark buildings) within pad metres
+  _nearHouse(x, z, pad) {
+    for (const c of this.colliders.query(x - pad, x + pad, z - pad, z + pad, this._hq || (this._hq = []))) if (c.house || c.part) return true;
+    return false;
+  }
+
   _inTown(x, z, pad = 6) {
     for (const t of TOWNS) if (Math.hypot(x - t.x, z - t.z) < t.r + pad) return true;
     return false;
@@ -118,7 +124,7 @@ export class Foliage {
       const h = this.terrain.heightAt(x, z);
       if (h < minH || h > maxH) continue;
       if (this.terrain.normalAt(x, z).y < minNy) continue;
-      if (this._inTown(x, z)) continue;
+      if (this._inTown(x, z) || this._nearHouse(x, z, 4)) continue;
       if (TUNNELS.some((t) => x > t.ax - 4 && x < t.bx + 4 && Math.abs(z - t.az) < t.w + 3)) continue; // keep the tunnel clear
       return { x, z, h };
     }
@@ -388,6 +394,7 @@ export class Foliage {
     const r = this.rand;
     const pl = { 'formation-large-stone': [], 'formation-stone': [] };
     const grey = ['#b8bcc2', '#a7aab0', '#c9ccd1', '#9ea3aa'];
+    const pending = [];
     let n = 0;
     for (let i = 0; i < 1500 * AREA_SCALE && n < 34 * AREA_SCALE * ROCK_DENSITY; i++) {
       const onMountain = r() < 0.6;
@@ -399,12 +406,19 @@ export class Foliage {
       const info = this.models.get(type);
       const s = (4 + r() * 6) / info.size.x;
       pl[type].push({ x: c.x, y: c.h - 0.8, z: c.z, rot: r() * Math.PI * 2, scale: s, colors: { stone: new THREE.Color(grey[Math.floor(r() * grey.length)]) } });
-      this.colliders.add({ kind: 'circle', x: c.x, z: c.z, r: info.size.x * s * 0.36, y0: c.h - 3, y1: c.h + info.size.y * s * 0.9, stone: true });
+      const col = { kind: 'circle', x: c.x, z: c.z, r: info.size.x * s * 0.36, y0: c.h - 3, y1: c.h + info.size.y * s * 0.9, stone: true };
+      this.colliders.add(col);
+      // big pillars break too (lots of HP) and give stone like any rock
+      pending.push({ col, type, idx: pl[type].length - 1, hp: Math.round(600 + info.size.x * s * 60) });
       n++;
     }
+    const groups = {};
     for (const [type, list] of Object.entries(pl)) {
-      if (list.length) this.scene.add(this.models.instanced(type, list, { material: (p) => new THREE.MeshStandardMaterial({ color: p.material.color, roughness: 0.92, flatShading: true }) }));
+      if (!list.length) continue;
+      groups[type] = this.models.instanced(type, list, { material: (p) => new THREE.MeshStandardMaterial({ color: p.material.color, roughness: 0.92, flatShading: true }) });
+      this.scene.add(groups[type]);
     }
+    for (const p of pending) if (groups[p.type]) this.destr.register(p.col, groups[p.type].children.map((im) => ({ im, idx: p.idx })), { kind: 'rock', hp: p.hp });
   }
 
   _bushes() {

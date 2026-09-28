@@ -592,8 +592,8 @@ export class Actor {
         // Slurp: health and shield together
         if (this.health >= 100 && this.shield >= 100) r.left = 0;
         this.health = Math.min(100, this.health + 1); this.shield = Math.min(100, this.shield + 1);
-      } else if (this.health < 100) this.health++;
-      else if (this.shield < 100) this.shield++;
+      } else if (this.health < 100) this.health = Math.min(100, this.health + 1); // health can be fractional: never past 100
+      else if (this.shield < 100) this.shield = Math.min(100, this.shield + 1);
       else r.left = 0;
     }
     if (r.left <= 0) this.regen = null;

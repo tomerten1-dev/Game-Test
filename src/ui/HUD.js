@@ -639,11 +639,6 @@ export class HUD {
       const low = p.alive ? Math.max(0, (40 - p.health) / 40) * 0.5 : 0; // low health keeps a faint pulse
       this.root.querySelector('#dmg-vignette').style.opacity = String(Math.max(this.vig, low * (0.7 + 0.3 * Math.sin(g.time * 4))));
     }
-    // heartbeat at low health
-    if (p.alive && g.state === 'playing' && p.health < 30) {
-      this._beatT = (this._beatT || 0) - dt;
-      if (this._beatT <= 0) { this._beatT = 0.6 + (p.health / 30) * 0.5; g.sound.play('heartbeat'); }
-    }
     const boss = g.boss?.boss;
     const showBoss = !!boss && boss.alive && p.alive && p.pos.distanceTo(boss.pos) < 75;
     this.set('bossOn', this.root.querySelector('#bossbar').style, showBoss ? 'flex' : 'none', 'display');
@@ -694,7 +689,7 @@ export class HUD {
     if (w) {
       const res = who.ammoFor(w.def.ammoType);
       this.set('ammoCur', this.el.ammoCur, String(w.ammo));
-      this.set('ammoMax', this.el.ammoMax, `/${res === Infinity ? '∞' : res}`);
+      this.set('ammoMax', this.el.ammoMax, `/${res === Infinity ? '∞' : res + w.ammo}`); // loaded / all you have for it
       this.set('wname', this.el.weaponName, w.name);
       this.set('wcol', this.el.weaponName.style, RARITIES[w.rarity].color, 'color');
     } else {

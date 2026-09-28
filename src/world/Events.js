@@ -821,6 +821,8 @@ export class Events {
       const tx = c.x + Math.cos(a) * d, tz = c.y + Math.sin(a) * d;
       if (this.world.heightAt(tx, tz) > 2.5 && this.world.terrain.normalAt(tx, tz).y > 0.85) { x = tx; z = tz; break; }
     }
+    // land on the ground, not on a tree top: trees under the crate are knocked down
+    for (const c of this.world.colliders.query(x - 1.6, x + 1.6, z - 1.6, z + 1.6, [])) if (c.obj && c.tree) this.world.destructibles.damage(c, 9999, null);
     const ground = this.world.groundAt(x, z, 300, 0.8);
     const grp = new THREE.Group();
     const crateMat = new THREE.MeshStandardMaterial({ color: '#2f6bff', roughness: 0.45, metalness: 0.2, emissive: '#1b3fb0', emissiveIntensity: 0.3 });

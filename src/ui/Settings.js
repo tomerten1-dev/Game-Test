@@ -25,7 +25,7 @@ const keyName = keyLabel;
 const TOGGLES = [['autoPickup', 'Auto pick up weapons'], ['stackDamage', 'Stack damage numbers'], ['autoSort', 'Auto sort consumables right'],
   ['weaponReticles', 'Crosshair changes per weapon'], ['throwArc', 'Show throw arc'], ['legacyHitSound', 'Legacy headshot sound', false],
   ['sprintByDefault', 'Sprint by default (sprint key walks)', false], ['toggleSprint', 'Toggle sprint (instead of hold)', false],
-  ['tapToSearch', 'Tap to search (no holding)', false], ['holdToSwap', 'Hold to swap when inventory is full'],
+  ['tapToSearch', 'Tap to search (no holding)', false], ['holdToSwap', 'Hold to swap when inventory is full', false],
   ['questTracker', 'Quest tracker in matches'], ['showMinimap', 'Show minimap'], ['showCompass', 'Show compass'], ['showKillfeed', 'Show kill feed'], ['showFps', 'FPS counter', false],
   ['simpleBuild', 'Simple Build (fire: wall · aim: floor / ramp / cone by where you look)', false], ['preEdits', 'Pre-edits (edit in build mode to pre-shape the piece)'], ['editOnRelease', 'Confirm edit on release', false]];
 // preferred inventory slot per kind of gun (0 = any)

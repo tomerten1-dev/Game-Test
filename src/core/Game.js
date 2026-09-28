@@ -879,7 +879,7 @@ export class Game {
       // containers are searched by holding interact (Fortnite-style), unless "tap to search" is on;
       // swapping into a full inventory is a short hold too
       const full = near?.pickup && (near.pickup.type === 'weapon' || near.pickup.type === 'consumable') && !p.items.some((it, i) => i > 0 && !it);
-      const need = !near ? 0 : full ? (setting(this, 'holdToSwap') ? 0.35 : 0) : setting(this, 'tapToSearch', false) ? 0 : HOLD_TIME[near.kind] || 0;
+      const need = !near ? 0 : full ? (setting(this, 'holdToSwap', false) ? 0.35 : 0) : setting(this, 'tapToSearch', false) ? 0 : HOLD_TIME[near.kind] || 0;
       const tgt = near && (near.chest || near.box || near.supply || near.llama || near.pickup || near.vending || near.door || near.bench || near.hide || near.forage || near.kind);
       let act = false;
       if (near && need > 0 && this.warmup <= 0) {
