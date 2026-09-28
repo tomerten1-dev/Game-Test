@@ -469,7 +469,6 @@ export class Loot {
     out.push(Loot.ammoFor(w));
     // like Fortnite: a weapon + ammo + materials, and sometimes a heal / utility item
     if (c.rare || Math.random() < 0.6) out.push(Loot.randomConsumable());
-    if (actor.isPlayer) actor.sidekick?.hop(1.4);
     // Fortnite chests: 30 of each material
     for (const m of ['wood', 'stone', 'metal']) out.push({ type: 'mat', matType: m, amount: 30 });
     out.push({ type: 'gold', amount: c.rare ? 70 + Math.floor(Math.random() * 40) : 25 + Math.floor(Math.random() * 25) });

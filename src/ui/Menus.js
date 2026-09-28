@@ -28,16 +28,13 @@ export function itemIcon(c) {
   if (c.type === 'hero') return `<i class="ic ic-hero" style="${c.tint ? `--tint:${c.tint}` : ''}">${HAT_ICON[c.hat] || HERO_ICON[v] || '★'}</i>`;
   if (c.type === 'backbling') return `<i class="ic ic-hero">${BACK_ICON[v] || '∅'}</i>`;
   if (c.type === 'pickaxe') return `<i class="ic ic-hero">${TOOL_ICON[v] || '🪓'}</i>`;
-  if (c.type === 'tint') return `<i class="ic ic-swatch" style="background:${v || 'conic-gradient(#20d6c0, #2f6bff, #ff4d5e, #ffc93c, #20d6c0)'}"></i>`;
   if (c.type === 'glider') return `<i class="ic ic-glider" style="--a:${v[0]};--b:${v[1]}"></i>`;
   if (c.type === 'trail') return `<i class="ic ic-trail" style="background:${!v ? 'rgba(255,255,255,0.15)' : v === 'rainbow' ? 'linear-gradient(90deg,#ff5a5f,#ffd23f,#6ef0a8,#5fd4ff,#a15cff)' : `linear-gradient(90deg,transparent,${v[0]},${v[1]})`}"></i>`;
   if (c.type === 'emote') return '<i class="ic ic-emote">♪</i>';
-  if (c.type === 'kicks') return v ? `<i class="ic ic-hero" style="color:${v.base};text-shadow:0 2px 0 ${v.sole}">👟</i>` : '<i class="ic ic-hero">∅</i>';
-  if (c.type === 'sidekick') return `<i class="ic ic-hero">${{ pup: '🐶', kitty: '🐱', penguin: '🐧' }[v] || '∅'}</i>`;
   if (c.type === 'spray') return `<i class="ic ic-swatch" style="background:linear-gradient(135deg,${v.a},${v.b});color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:${v.text.length > 3 ? 10 : 18}px">${v.text}</i>`;
   if (c.type === 'loading') return `<i class="ic ic-swatch" style="background:linear-gradient(160deg,${v.a},${v.b})"></i>`;
   if (c.type === 'lobbymusic') return '<i class="ic ic-emote">♫</i>';
-  return `<i class="ic ic-wrap" style="background:${v ? v.color : '#4a505c'}"></i>`;
+  return '<i class="ic ic-hero">★</i>';
 }
 
 // Lobby (play / locker / shop / quests / career / settings), matchmaking, pause and results.
@@ -151,12 +148,12 @@ export class Menus {
     const val = (slot) => prof.equippedItem(slot).value;
     const hero = prof.equippedItem('hero');
     const style = hero.styles?.[prof.d.heroStyles?.[hero.id] || 0]?.[1];
-    const look = { hero: val('hero'), tint: style || val('tint') || hero.tint || null, kicks: val('kicks'), hat: hero.hat || null, backbling: val('backbling'), pickaxe: val('pickaxe'), glider: val('glider'), trail: val('trail'), wrap: val('wrap'), emote: val('emote'), preview: null, crowned: !!prof.d.crowned };
+    const look = { hero: val('hero'), tint: style || hero.tint || null, hat: hero.hat || null, backbling: val('backbling'), pickaxe: val('pickaxe'), glider: val('glider'), trail: val('trail'), emote: val('emote'), preview: null, crowned: !!prof.d.crowned };
     if (this.tab === 'locker') look.preview = this.lockerSlot;
     if (this.tab === 'shop' && this.shopSel) {
       const c = COSMETICS[this.shopSel];
       look[c.type] = c.value;
-      if (c.type === 'hero') { look.hat = c.hat || null; look.tint = val('tint') || c.tint || null; }
+      if (c.type === 'hero') { look.hat = c.hat || null; look.tint = c.tint || null; }
       look.preview = c.type;
     }
     return look;

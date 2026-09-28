@@ -3,15 +3,11 @@
 
 export const SLOTS = [
   { key: 'hero', name: 'Hero' },
-  { key: 'tint', name: 'Outfit Color' },
   { key: 'backbling', name: 'Back Bling' },
   { key: 'pickaxe', name: 'Harvesting Tool' },
   { key: 'glider', name: 'Glider' },
   { key: 'trail', name: 'Contrail' },
   { key: 'emote', name: 'Emote' },
-  { key: 'wrap', name: 'Weapon Wrap' },
-  { key: 'kicks', name: 'Kicks' },
-  { key: 'sidekick', name: 'Sidekick' },
   { key: 'spray', name: 'Spray' },
   { key: 'loading', name: 'Loading Screen' },
   { key: 'lobbymusic', name: 'Lobby Music' },
@@ -63,17 +59,6 @@ const items = [
   { id: 'pick_neon', type: 'pickaxe', name: 'Neon Edge', rarity: 4, value: 'neon' },
   { id: 'pick_gold', type: 'pickaxe', name: 'Golden Axe', rarity: 4, value: 'gold' },
   // outfit colours
-  { id: 'tint_teal', type: 'tint', name: 'Original', rarity: 0, value: null, starter: true },
-  { id: 'tint_lagoon', type: 'tint', name: 'Lagoon', rarity: 0, value: '#20d6c0', starter: true },
-  { id: 'tint_crimson', type: 'tint', name: 'Crimson', rarity: 1, value: '#ff4d5e' },
-  { id: 'tint_sun', type: 'tint', name: 'Sunflower', rarity: 1, value: '#ffc93c' },
-  { id: 'tint_ocean', type: 'tint', name: 'Deep Ocean', rarity: 1, value: '#2f6bff', starter: true },
-  { id: 'tint_mint', type: 'tint', name: 'Mint', rarity: 1, value: '#6ef0a8' },
-  { id: 'tint_violet', type: 'tint', name: 'Violet', rarity: 2, value: '#a15cff' },
-  { id: 'tint_rose', type: 'tint', name: 'Rose', rarity: 2, value: '#ff7ab8' },
-  { id: 'tint_midnight', type: 'tint', name: 'Midnight', rarity: 3, value: '#31365a' },
-  { id: 'tint_frost', type: 'tint', name: 'Frost', rarity: 3, value: '#bfeaff' },
-  { id: 'tint_gold', type: 'tint', name: 'Solid Gold', rarity: 4, value: '#ffcc33' },
   // gliders
   { id: 'glider_teal', type: 'glider', name: 'Breeze', rarity: 0, value: ['#20d6c0', '#ffd23f'], starter: true },
   { id: 'glider_sunset', type: 'glider', name: 'Sunset Wing', rarity: 1, value: ['#ff8a4c', '#ffe066'] },
@@ -87,8 +72,8 @@ const items = [
   { id: 'trail_storm', type: 'trail', name: 'Storm Surge', rarity: 3, value: ['#c77dff', '#5fd4ff'] },
   { id: 'trail_rainbow', type: 'trail', name: 'Rainbow Road', rarity: 4, value: 'rainbow' },
   // emotes (KayKit animation clips)
-  { id: 'emote_cheer', type: 'emote', name: 'Cheer', rarity: 0, value: 'Cheer', starter: true },
-  { id: 'emote_wave', type: 'emote', name: 'Hello There', rarity: 0, value: 'Interact', starter: true },
+  { id: 'emote_cheer', type: 'emote', name: 'Dance Moves', rarity: 0, value: 'Cheer', starter: true },
+  { id: 'emote_wave', type: 'emote', name: 'Hello There', rarity: 0, value: 'Idle_Rail_Call', starter: true },
   { id: 'emote_kick', type: 'emote', name: 'Show-off Kick', rarity: 1, value: 'Unarmed_Melee_Attack_Kick' },
   { id: 'emote_sit', type: 'emote', name: 'Take a Seat', rarity: 1, value: 'Sit_Floor_Idle' },
   { id: 'emote_magic', type: 'emote', name: 'Sparkle Hands', rarity: 2, value: 'Spellcasting' },
@@ -106,16 +91,6 @@ const items = [
   { id: 'emote_summon', type: 'emote', name: 'Grand Summon', rarity: 4, value: 'Spellcast_Long', fx: 'sparkle' },
   // weapon wraps
   // kicks (shoes over the outfit's boots)
-  { id: 'kick_none', type: 'kicks', name: 'Outfit Default', rarity: 0, value: null, starter: true },
-  { id: 'kick_white', type: 'kicks', name: 'Clean Whites', rarity: 1, value: { base: '#f4f6f8', sole: '#d8dde4', accent: '#3a86ff' }, starter: true },
-  { id: 'kick_red', type: 'kicks', name: 'Hot Streaks', rarity: 2, value: { base: '#e63946', sole: '#f4f6f8', accent: '#1d1d1d' } },
-  { id: 'kick_neon', type: 'kicks', name: 'Neon Runners', rarity: 3, value: { base: '#1b1f2a', sole: '#39ff88', accent: '#ff3df0' } },
-  { id: 'kick_gold', type: 'kicks', name: 'Gold Rush', rarity: 4, value: { base: '#ffc93c', sole: '#fff3c4', accent: '#8a5a00' } },
-  // sidekicks: a little companion that follows you around (no gameplay effect)
-  { id: 'sk_none', type: 'sidekick', name: 'No Sidekick', rarity: 0, value: null, starter: true },
-  { id: 'sk_pup', type: 'sidekick', name: 'Buddy the Pup', rarity: 1, value: 'pup', starter: true },
-  { id: 'sk_kitty', type: 'sidekick', name: 'Whiskers', rarity: 2, value: 'kitty' },
-  { id: 'sk_penguin', type: 'sidekick', name: 'Waddles', rarity: 3, value: 'penguin' },
   // sprays (from the emote wheel's second page)
   { id: 'spray_gg', type: 'spray', name: 'GG', rarity: 0, value: { text: 'GG', a: '#20d6c0', b: '#2f6bff' }, starter: true },
   { id: 'spray_bolt', type: 'spray', name: 'Storm Bolt', rarity: 1, value: { text: '⚡', a: '#ffd23f', b: '#ff7a3a' }, starter: true },
@@ -132,11 +107,6 @@ const items = [
   { id: 'lm_title', type: 'lobbymusic', name: 'Sky High', rarity: 1, value: 'title' },
   { id: 'lm_alt', type: 'lobbymusic', name: 'Cloud Nine', rarity: 2, value: 'title_alt' },
   { id: 'lm_battle', type: 'lobbymusic', name: 'Battle Bus', rarity: 3, value: 'battle' },
-  { id: 'wrap_none', type: 'wrap', name: 'Factory', rarity: 0, value: null, starter: true },
-  { id: 'wrap_camo', type: 'wrap', name: 'Leafy Camo', rarity: 1, value: { color: '#6b8f4a', emissive: '#000000' } },
-  { id: 'wrap_ice', type: 'wrap', name: 'Glacier', rarity: 2, value: { color: '#bfeaff', emissive: '#2a7fbf' } },
-  { id: 'wrap_neon', type: 'wrap', name: 'Neon Pulse', rarity: 3, value: { color: '#ff4fd8', emissive: '#a0209a' } },
-  { id: 'wrap_gold', type: 'wrap', name: 'Gilded', rarity: 4, value: { color: '#ffcc33', emissive: '#8a5a00' } },
 ];
 
 export const COSMETICS = Object.fromEntries(items.map((i) => [i.id, { ...i, price: PRICES[i.rarity] }]));
@@ -171,7 +141,7 @@ export function unregisterCustomSkin(id) {
   if (i >= 0) COSMETIC_LIST.splice(i, 1);
 }
 export const STARTERS = items.filter((i) => i.starter).map((i) => i.id);
-export const DEFAULT_EQUIPPED = { hero: 'hero_ranger_m', tint: 'tint_teal', backbling: 'bb_antenna', pickaxe: 'pick_default', glider: 'glider_teal', trail: 'trail_none', emote: 'emote_cheer', wrap: 'wrap_none', sprite: 'sp_water', kicks: 'kick_none', sidekick: 'sk_none', spray: 'spray_gg', loading: 'load_default', lobbymusic: 'lm_shuffle' };
+export const DEFAULT_EQUIPPED = { hero: 'hero_ranger_m', backbling: 'bb_antenna', pickaxe: 'pick_default', glider: 'glider_teal', trail: 'trail_none', emote: 'emote_cheer', spray: 'spray_gg', loading: 'load_default', lobbymusic: 'lm_shuffle' };
 // emote clip -> particle effect played with it
 export const EMOTE_FX = Object.fromEntries(items.filter((i) => i.type === 'emote' && i.fx).map((i) => [i.value, i.fx]));
 

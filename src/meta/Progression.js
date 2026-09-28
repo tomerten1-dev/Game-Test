@@ -8,12 +8,12 @@ export const xpForLevel = (level) => 600 + 150 * (level - 1);
 
 // Season reward track: a reward on every level (cosmetics or Storm Coins).
 export const TRACK = {
-  2: { coins: 150 }, 3: { item: 'tint_crimson' }, 4: { coins: 150 }, 5: { item: 'emote_kick' },
+  2: { coins: 150 }, 3: { coins: 150 }, 4: { coins: 150 }, 5: { item: 'emote_kick' },
   6: { coins: 200 }, 7: { item: 'glider_sunset' }, 8: { coins: 200 }, 9: { item: 'trail_spark' },
-  10: { item: 'hero_rogue' }, 11: { coins: 250 }, 12: { item: 'wrap_camo' }, 13: { coins: 250 },
-  14: { item: 'tint_violet' }, 15: { item: 'emote_magic' }, 16: { coins: 300 }, 17: { item: 'glider_candy' },
+  10: { item: 'hero_rogue' }, 11: { coins: 250 }, 12: { coins: 250 }, 13: { coins: 250 },
+  14: { coins: 250 }, 15: { item: 'emote_magic' }, 16: { coins: 300 }, 17: { item: 'glider_candy' },
   18: { coins: 300 }, 19: { item: 'trail_fire' }, 20: { item: 'hero_barbarian' }, 21: { coins: 300 },
-  22: { item: 'wrap_ice' }, 23: { coins: 350 }, 24: { item: 'tint_midnight' }, 25: { item: 'emote_nap' },
+  22: { coins: 300 }, 23: { coins: 350 }, 24: { coins: 350 }, 25: { item: 'emote_nap' },
   26: { coins: 400 }, 27: { item: 'glider_storm' }, 28: { item: 'trail_storm' }, 29: { coins: 500 },
   30: { item: 'hero_mage' },
   // season track continues: skins, back blings and tools

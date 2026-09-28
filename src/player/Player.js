@@ -1,8 +1,6 @@
 import { setting } from '../ui/Settings.js';
 import * as THREE from 'three';
 import { Actor } from './Actor.js';
-import { attachKicks } from './Gear.js';
-import { Sidekick } from './Sidekick.js';
 import { TOWNS } from '../world/Terrain.js';
 
 // The human-controlled actor: turns input into movement intent relative to the camera.
@@ -13,17 +11,13 @@ export class Player extends Actor {
     const hero = prof?.equippedItem('hero');
     // skins bring their own colours unless you picked an outfit colour
     const style = hero?.styles?.[prof?.d.heroStyles?.[hero.id] || 0];
-    const outfit = style?.[1] || look('tint') || hero?.tint || null;
+    const outfit = style?.[1] || hero?.tint || null;
     super(game, { name: 'You', color: '#20d6c0', isPlayer: true, type: hero?.value || 'Male_Ranger', glider: look('glider'), tint: outfit ? 0.1 : 0.3, outfit });
     this.trail = look('trail') || null;
-    this.wrap = look('wrap') || null;
     this.emoteClip = look('emote') || 'Cheer';
     this.victoryEmote = this.emoteClip;
     this.pickaxeSkin = look('pickaxe') || null;
     this.applyGear({ hat: hero?.hat, backbling: prof ? look('backbling') : 'antenna' });
-    if (prof) attachKicks(this.character, look('kicks'));
-    const skv = look('sidekick');
-    if (skv) this.sidekick = new Sidekick(this, skv);
     this._equip?.();
   }
 

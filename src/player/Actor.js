@@ -42,25 +42,6 @@ const _sc = new THREE.Color();
 const _mq = [];
 
 // Cosmetic weapon wrap: recolour the gun body (keeps the rarity stripe). Wrapped materials are cached.
-const WRAPPED = new Map();
-export function applyWrap(mesh, wrap) {
-  if (!wrap || !mesh) return mesh;
-  mesh.traverse((o) => {
-    if (!o.isMesh || o.material.emissiveIntensity > 0.8) return;
-    const key = o.material.uuid + wrap.color;
-    if (WRAPPED.has(key)) { o.material = WRAPPED.get(key); return; }
-    const m = o.material.clone();
-    WRAPPED.set(key, m);
-    m.color.lerp(new THREE.Color(wrap.color), 0.75);
-    if (m.vertexColors) m.color.set(wrap.color);
-    m.emissive = new THREE.Color(wrap.emissive);
-    m.emissiveIntensity = 0.35;
-    m.metalness = 0.5;
-    m.roughness = 0.3;
-    o.material = m;
-  });
-  return mesh;
-}
 
 const _useCol = new THREE.Color();
 export class Actor {
@@ -994,7 +975,7 @@ export class Actor {
   _equip() {
     const h = this.held;
     if (this.buildMode) this.character.setWeapon(null);
-    else if (h && h.isGun) this.character.setWeapon(applyWrap(makeWeaponMesh(h.type, h.rarity, h.mods), this.wrap));
+    else if (h && h.isGun) this.character.setWeapon(makeWeaponMesh(h.type, h.rarity, h.mods));
     else if (h && h.isPickaxe) this.character.setWeapon(makeHarvestTool(this.pickaxeSkin), true);
     else if (h?.def?.throw) this.character.setWeapon(makeThrowableMesh(h.type, 1.2));
     else if (h?.isConsumable && !h.def.key) {
@@ -1115,7 +1096,6 @@ export class Actor {
   }
 
   destroy() {
-    this.sidekick?.dispose();
     this.game.scene.remove(this.root);
     this.character.dispose();
   }

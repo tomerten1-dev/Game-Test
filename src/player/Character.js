@@ -28,8 +28,9 @@ const Q_ANIM = {
   '2H_Ranged_Aiming': 'Pistol_Aim_Neutral', '2H_Ranged_Shoot': 'Pistol_Shoot', '2H_Ranged_Shooting': 'Pistol_Shoot', '2H_Ranged_Reload': 'Pistol_Reload',
   '1H_Melee_Attack_Chop': 'Sword_Regular_A', '1H_Melee_Attack_Slice_Diagonal': 'Sword_Regular_B', '2H_Melee_Attack_Spinning': 'Sword_Heavy_Combo',
   Unarmed_Melee_Attack_Kick: 'Punch_Cross', Block: 'Sword_Block', Use_Item: 'Consume', Throw: 'OverhandThrow', PickUp: 'PickUp_Table', Interact: 'Interact',
-  Cheer: 'Yes', Spellcasting: 'Spell_Simple_Idle_Loop', Spellcast_Raise: 'Spell_Simple_Idle_Loop', Spellcast_Long: 'Spell_Simple_Shoot',
-  Sit_Floor_Idle: 'Sitting_Idle_Loop', Lie_Idle: 'Idle_No_Loop',
+  // Cheer is Fortnite's default dance (the 'Yes' clip was only a nod)
+  Cheer: 'Dance_Loop', Spellcasting: 'Spell_Simple_Idle_Loop', Spellcast_Raise: 'Spell_Simple_Idle_Loop', Spellcast_Long: 'Spell_Simple_Shoot',
+  Sit_Floor_Idle: 'Sitting_Idle_Loop', Lie_Idle: 'LayToIdle',
 };
 const Q_SKIN = ['#8a5a3e', '#7a4d34', '#95654a']; // close to the outfits' skin texture
 // hand slot on the UAL right-hand bone (bone-local, before the model scale), tuned so held tools

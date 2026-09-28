@@ -1,10 +1,8 @@
 import * as THREE from 'three';
-import { attachHat, attachBackBling, makeHarvestTool, headAnchor, attachKicks } from '../player/Gear.js';
+import { attachHat, attachBackBling, makeHarvestTool, headAnchor } from '../player/Gear.js';
 import { makeCrownMesh } from '../world/ItemMeshes.js';
 import { Character } from '../player/Character.js';
 import { makeGlider } from '../player/Glider.js';
-import { makeWeaponMesh } from '../weapons/WeaponModels.js';
-import { applyWrap } from '../player/Actor.js';
 
 // Floating lobby platform off the island's coast: your hero, locker previews and emotes.
 export const STAGE_POS = new THREE.Vector3(0, 62, 262);
@@ -104,9 +102,9 @@ export class LobbyStage {
   show(v) { this.group.visible = v; this.idleT = 0; }
   get heroPos() { return STAGE_POS; }
 
-  // look: { hero, tint, glider: [c, accent], trail, wrap, preview: slot being previewed }
+  // look: { hero, tint (the hero's own colour), glider: [c, accent], trail, preview: slot being previewed }
   setLook(look) {
-    const key = `${look.hero}|${look.tint}|${look.hat}|${look.backbling}|${look.crowned}|${look.kicks?.base}`;
+    const key = `${look.hero}|${look.tint}|${look.hat}|${look.backbling}|${look.crowned}`;
     if (key !== this._key) {
       this._key = key;
       if (this.character) { this.heroRoot.remove(this.character.root); this.character.dispose(); }
@@ -114,7 +112,6 @@ export class LobbyStage {
       this.heroRoot.add(this.character.root);
       if (look.hat) attachHat(this.character, look.hat);
       if (look.backbling) attachBackBling(this.character, look.backbling);
-      if (look.kicks) attachKicks(this.character, look.kicks);
       if (look.crowned) { const c = makeCrownMesh(); c.position.copy(headAnchor(this.character, look.hat ? 0.12 : -0.08)); this.character.root.add(c); this.character.root.updateMatrixWorld(true); this.character.head?.attach(c); }
       this.character.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     }
@@ -122,7 +119,7 @@ export class LobbyStage {
     this.glider = makeGlider(look.glider[0], look.glider[1]);
     this.glider.visible = look.preview === 'glider';
     this.character.root.add(this.glider);
-    this.character.setWeapon(look.preview === 'wrap' ? applyWrap(makeWeaponMesh('ar', 3), look.wrap) : look.preview === 'pickaxe' ? makeHarvestTool(look.pickaxe) : null, look.preview === 'pickaxe');
+    this.character.setWeapon(look.preview === 'pickaxe' ? makeHarvestTool(look.pickaxe) : null, look.preview === 'pickaxe');
     this.look = look;
     if (look.preview !== 'emote') this.emoteT = 0;
   }
@@ -164,10 +161,9 @@ export class LobbyStage {
     } else if (this.emoteT > 0) {
       this.emoteT -= dt;
       ch.setPose(this.emoteClip, null, 0.25);
-    } else if (look?.preview === 'wrap') ch.setPose('2H_Ranged_Aiming', null, 0.25);
-    else if (look?.preview === 'pickaxe') ch.setPose('Idle', null, 0.25);
+    } else if (look?.preview === 'pickaxe') ch.setPose('Idle', null, 0.25);
     else ch.setPose('Idle', null, 0.3);
-    ch.update(dt, 0, look?.preview === 'wrap', 0);
+    ch.update(dt, 0, false, 0);
     // contrail preview: ribbons circling the hero
     const trail = look?.trail;
     if (trail && look.preview === 'trail') {

@@ -42,7 +42,7 @@ import { Pickaxe, Consumable, CONSUMABLES } from '../weapons/Items.js';
 import { Weapon } from '../weapons/Weapon.js';
 import { COSMETICS, COSMETIC_LIST } from '../meta/Cosmetics.js';
 import { arenaDivision } from '../meta/Progression.js';
-import { HAT_IDS, BACK_IDS, TOOL_IDS, attachKicks } from '../player/Gear.js';
+import { HAT_IDS, BACK_IDS, TOOL_IDS } from '../player/Gear.js';
 import { EMOTE_FX } from '../meta/Cosmetics.js';
 import { VARIANT, VARIANT_KEY } from '../world/Variant.js';
 import { Snowfall } from '../effects/Weather.js';
@@ -487,7 +487,6 @@ export class Game {
         b.glider.visible = false;
         b.root.add(b.glider);
       }
-      if (Math.random() < 0.25) attachKicks(b.character, pick(COSMETIC_LIST.filter((c) => c.type === 'kicks' && c.value)).value);
       this.bots.push(b);
       this.actors.push(b);
     }
@@ -770,7 +769,6 @@ export class Game {
       this._healT = 0;
       for (const a of this.actors) if (a.alive && !a.npc && this.time - (a.lastHurtTime || 0) > 5 && this.time - (a.lastFireTime || 0) > 5) { if (a.health < 100) a.health = Math.min(100, a.health + 3); else a.shield = Math.min(100, a.shield + 3); }
     }
-    this.player?.sidekick?.update(dt);
     this.combat.updateBursts(dt);
     this.world.traversal.update(dt, this.time, this.actors);
     if (this.warmup <= 0) this.events.update(dt, this.time);
