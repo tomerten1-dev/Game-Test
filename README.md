@@ -209,6 +209,7 @@ Pieces start weaker (and see-through) and harden while they build. Anything that
 - **Rotate ramps** before placing with the reload key (R) in build mode. **Change material** with right-click or L.
 - Settings: **Simple Build** (fire places walls, aim places a floor, ramp or cone depending on where you look), **Pre-edits** on/off and **Confirm edit on release**.
 - Chests give 30 of each material, and material piles lie around the towns.
+- **Loot placement like Fortnite:** most chests are in the named places. Enterable homes have indoor chest spots (downstairs and upstairs), other buildings one by the wall, and each spot spawns 60% of the time (Fortnite: 50–70%), so a village has ~25–30 chests. Only a few chests sit out in the wild (some crate piles, landmarks, islands). About 7% are rare chests. Floor loot fills most rooms, porches and plazas (~800 items a match), plus ~300 ammo boxes. Plain villages are Fortnite-POI sized: two rings of ~16 buildings round the plaza.
 
 ## Graphics settings
 

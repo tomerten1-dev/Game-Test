@@ -175,18 +175,21 @@ export class Towns {
       this._dress(town, [['props/FarmCrate_Apple', 2], ['props/FarmCrate_Carrot', 2], ['props/Barrel_Apples', 2], ['res/Pallet_Wood_Covered_A', 1], ['village/Prop_Wagon', 1], ['res/Wood_Log_Stack', 1]], 12, 0.4, 1.1);
       return this._fields(town, parts);
     }
-    this._village(town, parts, crates);
+    // named villages are Fortnite-POI sized: two rings, ~16 buildings
+    this._village(town, parts, crates, { rings: [[[0.36, 0.5], 6 + Math.floor(this.rand() * 2)], [[0.66, 0.84], 9 + Math.floor(this.rand() * 3)]] });
     return this._dress(town, [['res/Wood_Log_Stack', 2], ['res/Stone_Bricks_Stack_Medium', 1], ['props/Barrel', 1], ['res/Pallet_Wood_Covered_A', 1], ['props/Barrel_Holder', 1]], 5, 0.75, 1.1);
   }
 
   _village(town, parts, crates, opts = {}) {
     const r = this.rand;
-    const ring = opts.ring || [0.5, 0.72];
     if (opts.fountain !== false) this._fountain(town, parts);
     const cafeAt = opts.fountain !== false ? this._cafe(town) : 0;
-    const count = opts.count || 6 + Math.floor(r() * 3);
-    let placed = 0;
+    // one ring of houses, or (big villages) an inner ring round the plaza and an outer one
+    const rings = opts.rings || [[opts.ring || [0.5, 0.72], opts.count || 6 + Math.floor(r() * 3)]];
+    let total = 0;
     const specials = [...SPECIALS].sort(() => r() - 0.5).slice(0, 2);
+    for (const [ring, count] of rings) {
+    let placed = 0;
     for (let i = 0; i < count * 6 && placed < count; i++) {
       const a = (placed / count) * Math.PI * 2 + r() * 0.5 + i * 0.37;
       const dist = town.r * (ring[0] + r() * (ring[1] - ring[0]));
@@ -195,7 +198,7 @@ export class Towns {
       const face = Math.atan2(town.x - x, town.z - z);
       const rotIdx = ((Math.round(face / (Math.PI / 2)) % 4) + 4) % 4;
       const rot = rotIdx * (Math.PI / 2);
-      const type = placed < specials.length ? specials[placed] : HOMES[Math.floor(r() * HOMES.length)];
+      const type = total < specials.length ? specials[total] : HOMES[Math.floor(r() * HOMES.length)];
       const home = type.includes('home');
       const kind = home ? (r() < 0.5 ? 'two' : 'one') : null;
       const info = this.models.get(type);
@@ -216,7 +219,7 @@ export class Towns {
       if (!home) this.colliders.add({ kind: 'box', ...box, y0: y - 3, y1: y + h, house: true });
       const doorPt = [x + Math.sin(rot) * (d / 2 + 2) + Math.cos(rot) * (home ? Houses.doorX(kind) : 0), z + Math.cos(rot) * (d / 2 + 2) - Math.sin(rot) * (home ? Houses.doorX(kind) : 0)];
       this.houses.push({ ...box, x, z, y, h, rot, home, door: doorPt });
-      placed++;
+      placed++; total++;
       // chest spot next to the door side, crates at the corner
       const fx = Math.sin(rot), fz = Math.cos(rot);
       const sideX = Math.cos(rot), sideZ = -Math.sin(rot);
@@ -246,6 +249,7 @@ export class Towns {
       else if (pick < 0.5) this._prop('kk/bucket_water', px, pz, 0.6, r() * 6, 0.3);
       else if (pick < 0.7) this._prop('kk/wheelbarrow', px, pz, 0.9, rot + Math.PI / 2, 0.6);
       else if (pick < 0.8) this._prop('kk/weaponrack', px, pz, 1.4, rot, 0.5);
+    }
     }
     // windmill(s) on the outskirts
     for (let wi = 0; wi < (opts.windmills || 1); wi++) {
@@ -309,7 +313,7 @@ export class Towns {
       if (h < 2.5 || h > 25 || this.terrain.normalAt(x, z).y < 0.9) continue;
       this._crateStack(crates, x, z, 1);
       this._crateStack(crates, x + 1.25, z, r() < 0.5 ? 2 : 1);
-      this.chestSpots.push({ x: x + 0.6, z: z + 2, rot: r() * 6 });
+      if (r() < 0.25) this.chestSpots.push({ x: x + 0.6, z: z + 2, rot: r() * 6 }); // only a few chests out in the wild
     }
   }
 

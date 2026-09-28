@@ -41,7 +41,8 @@ const RAW_TOWNS = [
   { name: 'Dusty Dunes', x: -118, z: 250, r: 26 },
   { name: 'Cliffside', x: 250, z: -150, r: 24 },
 ];
-export const TOWNS = RAW_TOWNS.map((t) => ({ ...t, x: Math.round(t.x * MAP_SCALE), z: Math.round(t.z * MAP_SCALE) }));
+// plain villages get a bigger footprint (two rings of houses, like a Fortnite named place)
+export const TOWNS = RAW_TOWNS.map((t) => ({ ...t, r: t.kind ? t.r : Math.round(t.r * 1.6), x: Math.round(t.x * MAP_SCALE), z: Math.round(t.z * MAP_SCALE) }));
 // dirt roads: every town links to its two nearest neighbours
 export const ROADS = (() => {
   const out = [], seen = new Set();

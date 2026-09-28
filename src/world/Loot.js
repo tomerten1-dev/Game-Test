@@ -147,17 +147,23 @@ export class Loot {
     // chest spots: next to houses, town centers, crate piles, plus random spots
     const spots = [...this.world.towns.chestSpots];
     const r = mulberry32(555);
-    for (let i = 0; i < 20 * GROW; i++) {
+    // like Fortnite, most chests are in named places: the town buildings get a spot each
+    for (const h of this.world.towns.houses) {
+      if (h.home) continue; // enterable homes already have indoor spots
+      const side = r() < 0.5 ? -1 : 1;
+      spots.push({ x: h.x + side * ((h.maxX - h.minX) / 2 + 1.4), z: h.z + (r() - 0.5) * 2, rot: r() * 6 });
+    }
+    for (let i = 0; i < 5 * GROW; i++) {
       const a = r() * Math.PI * 2, d = (25 + r() * 250) * MAP_SCALE;
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
       if (this.world.heightAt(x, z) > 2.5 && this.world.terrain.normalAt(x, z).y > 0.85) spots.push({ x, z, rot: r() * 6 });
     }
     for (const s of spots) {
-      if (r() > (s.y !== undefined ? 0.8 : 0.68)) continue; // not every spot gets a chest (less loot overall)
+      if (r() > 0.6) continue; // Fortnite: each chest spot spawns 50-70% of the time
       const y = s.y ?? this.world.groundAt(s.x, s.z, 200, 0.6); // spots inside houses know their floor
       if (y < 1) continue;
       const group = new THREE.Group();
-      const rare = r() < 0.12; // rare chests: shinier gold, better rarity (same number of items)
+      const rare = r() < 0.07; // rare chests (Fortnite: a few per big named place): shinier gold, better rarity (same number of items)
       let lidPivot;
       const kk = this.game.models?.get('kk/chest_gold');
       if (kk) {
@@ -313,7 +319,7 @@ export class Loot {
   spawnFloorLoot() {
     // inside houses: one item on some of the floor spots
     for (const s of this.world.towns.homes?.lootSpots || []) {
-      if (Math.random() > 0.55) continue;
+      if (Math.random() > 0.8) continue; // indoor floor loot is common, like Fortnite
       const roll = Math.random();
       if (roll < 0.4) {
         const w = new Weapon(rollWeaponType('floor'), rollRarity(Math.random, this.game.lootLuck || 0)).withRandomMods();
@@ -322,9 +328,20 @@ export class Loot {
       } else if (roll < 0.8) this.spawnPickup(Loot.randomConsumable(), _v.set(s.x, s.y + 0.2, s.z));
       else this.spawnPickup({ type: 'ammo', ammoType: ['light', 'medium', 'shells'][Math.floor(Math.random() * 3)], amount: 20 }, _v.set(s.x, s.y + 0.2, s.z));
     }
+    // floor loot by the other town buildings (porches, sheds, shop fronts)
+    for (const h of this.world.towns.houses) {
+      if (h.home || Math.random() > 0.45) continue;
+      const x = h.x + (Math.random() - 0.5) * (h.maxX - h.minX), z = h.z + (Math.random() < 0.5 ? -1 : 1) * ((h.maxZ - h.minZ) / 2 + 1.2);
+      const y = this.world.groundAt(x, z, 200) + 0.2;
+      if (Math.random() < 0.4) {
+        const w = new Weapon(rollWeaponType('floor'), rollRarity(Math.random, this.game.lootLuck || 0)).withRandomMods();
+        this.spawnPickup({ type: 'weapon', weapon: w }, _v.set(x, y, z));
+        this.spawnPickup(Loot.ammoFor(w), _v.set(x + 0.7, y, z));
+      } else this.spawnPickup(Loot.randomConsumable(), _v.set(x, y, z));
+    }
     // weapons (with ammo), heals and ammo lying around town plazas
     for (const t of TOWNS) {
-      for (let i = 0; i < Math.round(t.r / 10); i++) {
+      for (let i = 0; i < Math.round(t.r / 6); i++) {
         const a = Math.random() * Math.PI * 2, d = 4 + Math.random() * t.r * 0.45;
         const x = t.x + Math.cos(a) * d, z = t.z + Math.sin(a) * d;
         const y = this.world.groundAt(x, z, 200) + 0.2;

@@ -538,6 +538,7 @@ export class Houses {
       put(r() < 0.5 ? 'Barrel' : 'Barrel_Apples', 2.1, 0, 3.1, r() * 6);
       rug(-0.7, 0.7, 0.6, 3.2, ...rc());
       spot(1.1, 0.02, 2.9, this.lootSpots);
+      spot(-2.3, 0.02, 3.5, this.chestSpots, { rot: h.rot + PI }); // Fortnite hides most chests indoors
       // back room: bedroom
       put(r() < 0.5 ? 'Bed_Twin1' : 'Bed_Twin2', -1.5, 0, -2.35, 0);
       put('Nightstand_Shelf', -0.2, 0, -3.3, 0);
@@ -575,7 +576,7 @@ export class Houses {
       put('CandleStick_Stand', 3.2, y, 4.2, 0, { col: false });
       rug(-0.6, 2.4, -1.4, 1.8, ...rc(), y);
       spot(1.4, y + 0.02, 0.2, this.lootSpots);
-      if (r() < 0.6) spot(-1.2, y + 0.02, 4.0, this.chestSpots, { rot: h.rot + PI });
+      spot(-1.2, y + 0.02, 4.0, this.chestSpots, { rot: h.rot + PI });
     }
     // a lantern by the front door
     put('Lantern_Wall', h.K.frontDoor + 1.0, 1.1, hd, 0, { col: false });
