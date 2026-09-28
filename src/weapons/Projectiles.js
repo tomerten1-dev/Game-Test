@@ -20,8 +20,6 @@ export class Projectiles {
     this.areas = [];
     this.bulletGeo = new THREE.BoxGeometry(0.05, 0.05, 1.4);
     this.bulletMat = new THREE.MeshBasicMaterial({ color: '#fff4c2' });
-    this.rocketGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.7, 10).rotateX(Math.PI / 2);
-    this.rocketMat = new THREE.MeshStandardMaterial({ color: '#d9dde3', roughness: 0.5, metalness: 0.3, emissive: '#ff6a2a', emissiveIntensity: 0.25 });
     this.grenadeMat = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.5 });
   }
 
@@ -50,7 +48,7 @@ export class Projectiles {
     } else if (pr.bounce) {
       kind = 'glnade';
       mesh = new THREE.Mesh(this.glGeo ||= new THREE.SphereGeometry(0.1, 10, 8), this.glMat ||= new THREE.MeshStandardMaterial({ color: '#46553a', roughness: 0.5, emissive: '#ff3a1a', emissiveIntensity: 0.3 }));
-    } else mesh = new THREE.Mesh(rocket ? this.rocketGeo : this.bulletGeo, rocket ? this.rocketMat : this.bulletMat);
+    } else mesh = rocket ? this._rocketMesh() : new THREE.Mesh(this.bulletGeo, this.bulletMat);
     return this._add({
       kind, owner, weapon, damage, arrow: !!pr.arrow,
       pos: from.clone(), vel: dir.clone().multiplyScalar(speed), gravity,
@@ -236,9 +234,9 @@ export class Projectiles {
       if (p.kind === 'rocket') {
         const back = _pt.copy(p.pos).addScaledVector(_dir, -0.45);
         _c.set('#ffb347');
-        g.effects.sparks.emit(back.x, back.y, back.z, (Math.random() - 0.5), (Math.random() - 0.5), (Math.random() - 0.5), _c, 0.18, 0.22, 0);
-        _c.set('#b9b9b9');
-        g.effects.debris.emit(back.x, back.y, back.z, (Math.random() - 0.5) * 0.6, 0.4, (Math.random() - 0.5) * 0.6, _c, 0.9, 0.35, -0.5, 0.55);
+        g.effects.sparks.emit(back.x, back.y, back.z, (Math.random() - 0.5), (Math.random() - 0.5), (Math.random() - 0.5), _c, 0.25, 0.3, 0);
+        _c.set('#c9c9c9');
+        for (let k = 0; k < 2; k++) g.effects.debris.emit(back.x - _dir.x * k * 0.5, back.y - _dir.y * k * 0.5, back.z - _dir.z * k * 0.5, (Math.random() - 0.5) * 0.6, 0.4, (Math.random() - 0.5) * 0.6, _c, 1.4, 0.6, -0.5, 0.55);
       }
     }
   }
@@ -343,6 +341,29 @@ export class Projectiles {
     const pos = at.clone();
     this._remove(p);
     explode(this.game, pos, p.owner, p.damage, p.explode.radius, p.explode.structure);
+  }
+
+  // A rocket you can actually see: a fat body with a red warhead, fins and a burning exhaust.
+  _rocketMesh() {
+    if (!this._rocketParts) {
+      const body = new THREE.MeshStandardMaterial({ color: '#dfe3e8', roughness: 0.45, metalness: 0.3 });
+      const red = new THREE.MeshStandardMaterial({ color: '#d93a2b', roughness: 0.4, metalness: 0.2 });
+      const dark = new THREE.MeshStandardMaterial({ color: '#3b4048', roughness: 0.6 });
+      const fins = new THREE.BoxGeometry(0.62, 0.03, 0.22);
+      this._rocketParts = [
+        [new THREE.CylinderGeometry(0.14, 0.14, 0.8, 12).rotateX(Math.PI / 2), body, 0],
+        [new THREE.ConeGeometry(0.14, 0.38, 12).rotateX(Math.PI / 2), red, 0.59],
+        [fins, dark, -0.3],
+        [fins.clone().rotateZ(Math.PI / 2), dark, -0.3],
+      ];
+      this._flameMat = new THREE.SpriteMaterial({ map: this.game.effects.glowTex, color: '#ffb347', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+    }
+    const g = new THREE.Group();
+    for (const [geo, m, z] of this._rocketParts) { const o = new THREE.Mesh(geo, m); o.position.z = z; g.add(o); }
+    const flame = new THREE.Sprite(this._flameMat);
+    flame.scale.setScalar(1.1); flame.position.z = -0.55;
+    g.add(flame);
+    return g;
   }
 
   _remove(p) {
