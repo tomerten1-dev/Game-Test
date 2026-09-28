@@ -161,7 +161,7 @@ export class Loot {
       if (this.world.heightAt(x, z) > 2.5 && this.world.terrain.normalAt(x, z).y > 0.85) spots.push({ x, z, rot: r() * 6 });
     }
     for (const s of spots) {
-      if (r() > 0.6) continue; // Fortnite: each chest spot spawns 50-70% of the time
+      if (r() > 0.7) continue; // Chapter 1 Season 3 (v3.2): each chest spot spawns 60-80% of the time
       const y = s.y ?? this.world.groundAt(s.x, s.z, 200, 0.6); // spots inside houses know their floor
       if (y < 1) continue;
       const group = new THREE.Group();
@@ -215,7 +215,7 @@ export class Loot {
     for (const h of this.world.towns.houses) spots.push({ x: h.x + (r() < 0.5 ? -1 : 1) * ((h.maxX - h.minX) / 2 + 1.6), z: h.z + (r() - 0.5) * 3 });
     for (let i = 0; i < 45 * GROW; i++) { const a = r() * Math.PI * 2, d = (20 + r() * 260) * MAP_SCALE; spots.push({ x: Math.cos(a) * d, z: Math.sin(a) * d }); }
     for (const sp of spots) {
-      if (r() > 0.55) continue;
+      if (r() > 0.82) continue; // v3.2: ammo boxes spawn 75-90% of the time
       const y = this.world.groundAt(sp.x, sp.z, 200, 0.5);
       if (y < 1.5) continue;
       if (chestSpots.some((c) => Math.hypot(c.x - sp.x, c.z - sp.z) < 3)) continue;
@@ -247,14 +247,14 @@ export class Loot {
     if (this.game.warmup > 0) return;
     if (b.opened) return;
     b.opened = true;
+    if (actor.isPlayer) this.game.meta?.track('ammobox');
     b.group.visible = false;
     this.game.sound.play('ammo', actor.isPlayer ? null : _v.set(b.x, b.y, b.z));
     const types = new Set();
     const w = actor.weapon;
     if (w && AMMO[w.def.ammoType]) types.add(w.def.ammoType); // bows / blades use no ammo
-    const all = Object.keys(AMMO).filter((t) => t !== 'heavy');
+    const all = ['light', 'medium', 'shells', 'heavy', 'light', 'medium', 'shells'];
     while (types.size < 2) types.add(all[Math.floor(Math.random() * all.length)]);
-    if (Math.random() < 0.4) this.spawnPickup({ type: 'gold', amount: 10 }, _v.set(b.x, b.y + 0.6, b.z), new THREE.Vector3(0, 4.5, 0));
     [...types].forEach((t, i) => {
       const a = b.group.rotation.y + (i - 0.5) * 0.9;
       this.spawnPickup({ type: 'ammo', ammoType: t, amount: AMMO[t].box }, _v.set(b.x, b.y + 0.6, b.z), new THREE.Vector3(Math.sin(a) * 2, 4.5, Math.cos(a) * 2));
@@ -302,11 +302,10 @@ export class Loot {
 
   static randomConsumable() {
     const r = Math.random();
+    // Chapter 1 Season 3 items only
     const table = [
-      ['bandage', 20], ['smallshield', 15], ['bigshield', 13], ['medkit', 9], ['medmist', 6], ['slurp', 5], ['chug', 2], ['keg', 2], ['campfire', 3],
-      ['grenade', 8], ['smoke', 3], ['impulse', 3], ['fire', 3], ['launchpad', 2], ['shockwave', 3], ['grappler', 2], ['rift', 1.5], ['trap', 4],
-      ['bouncer', 2], ['crashpad', 2.5], ['wingsuit', 1.5], ['sliders', 1.5], ['gascan', 2.5],
-      ['chugsplash', 4], ['flowberry', 2.5], ['spicytaco', 2.5], ['bubble', 2], ['portafort', 2], ['stormflip', 1.5], ['sos', 0.8], ['scanner', 1], ['oneup', 0.6], ['rod', 1.5], ['flopper', 1.5],
+      ['bandage', 22], ['smallshield', 18], ['bigshield', 12], ['medkit', 9], ['slurp', 5], ['chug', 2],
+      ['grenade', 11], ['impulse', 5], ['launchpad', 2], ['trap', 5], ['portafort', 2],
     ];
     let k = r * table.reduce((a, t) => a + t[1], 0), type = table[0][0];
     for (const [t, w] of table) { if ((k -= w) <= 0) { type = t; break; } }
@@ -354,14 +353,6 @@ export class Loot {
           this.spawnPickup(Loot.ammoFor(w), _v.set(x + 0.9, y, z + 0.4));
         } else if (roll < 0.8) this.spawnPickup(Loot.randomConsumable(), _v.set(x, y, z));
         else this.spawnPickup({ type: 'mat', matType: ['wood', 'stone', 'metal'][Math.floor(Math.random() * 3)], amount: 30 + 10 * Math.floor(Math.random() * 3) }, _v.set(x, y, z)); // material piles
-      }
-    }
-    // fishing rods lie on the shore near most fishing spots
-    for (const s of this.game?.gadgets?.spots || []) {
-      if (Math.random() < 0.3) continue;
-      for (let k = 0; k < 16; k++) {
-        const a = (k / 16) * Math.PI * 2, x = s.x + Math.cos(a) * 11, z = s.z + Math.sin(a) * 11;
-        if (this.world.heightAt(x, z) > 1.3) { this.spawnPickup({ type: 'consumable', ctype: 'rod', count: 1 }, _v.set(x, this.world.groundAt(x, z, 200) + 0.2, z)); break; }
       }
     }
   }
@@ -467,11 +458,12 @@ export class Loot {
     const w = new Weapon(rollWeaponType(c.rare ? 'rare' : 'chest'), Math.max(1, rollRarity(Math.random, (c.rare ? 2.2 : 1) + (this.game.lootLuck || 0)))).withRandomMods();
     out.push({ type: 'weapon', weapon: w });
     out.push(Loot.ammoFor(w));
-    // like Fortnite: a weapon + ammo + materials, and sometimes a heal / utility item
-    if (c.rare || Math.random() < 0.6) out.push(Loot.randomConsumable());
-    // Fortnite chests: 30 of each material
-    for (const m of ['wood', 'stone', 'metal']) out.push({ type: 'mat', matType: m, amount: 30 });
-    out.push({ type: 'gold', amount: c.rare ? 70 + Math.floor(Math.random() * 40) : 25 + Math.floor(Math.random() * 25) });
+    // Chapter 1: a weapon with its ammo, a consumable, another ammo stack and materials
+    out.push(Loot.randomConsumable());
+    const extra = ['light', 'medium', 'shells', 'heavy'][Math.floor(Math.random() * 4)];
+    out.push({ type: 'ammo', ammoType: extra, amount: AMMO[extra].box });
+    // Chapter 1 chests: 30 of one material
+    out.push({ type: 'mat', matType: ['wood', 'stone', 'metal'][Math.floor(Math.random() * 3)], amount: 30 });
     const fwd = c.group.rotation.y;
     out.forEach((it, i) => {
       const a = fwd + (i - (out.length - 1) / 2) * 0.55;

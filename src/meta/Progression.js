@@ -70,10 +70,10 @@ const QUESTS = [
   { id: 'heal', text: 'Use {n} healing or shield items', event: 'heal', target: 3 },
   { id: 'circles', text: 'Survive {n} storm circles', event: 'circle', target: 4 },
   { id: 'supply', text: 'Open a supply drop', event: 'supply', target: 1 },
-  { id: 'pads', text: 'Bounce on {n} jump or launch pads', event: 'pad', target: 2 },
+  { id: 'pads', text: 'Search {n} ammo boxes', event: 'ammobox', target: 3 },
   { id: 'top10', text: 'Finish in the top 10', event: 'top10', target: 1 },
   { id: 'land', text: 'Land at {town}', event: 'land', target: 1 },
-  { id: 'vend', text: 'Buy from a vending machine', event: 'vend', target: 1 },
+  { id: 'vend', text: 'Search a Supply Llama', event: 'llama', target: 1 },
 ];
 export const QUEST_REWARD = { xp: 500, coins: 100 };
 export const WEEKLY_REWARD = { xp: 2000, coins: 250 };
@@ -90,9 +90,9 @@ const WEEKLY = [
   { id: 'w_win', text: 'Win a match', event: 'win', target: 1 },
   { id: 'w_heal', text: 'Use {n} healing or shield items', event: 'heal', target: 20 },
   { id: 'w_supply', text: 'Open {n} supply drops', event: 'supply', target: 3 },
-  { id: 'w_pads', text: 'Bounce on {n} jump or launch pads', event: 'pad', target: 10 },
-  { id: 'w_boss', text: 'Defeat the Foreman at Dusty Depot', event: 'boss', target: 1 },
-  { id: 'w_vault', text: 'Open the vault at Dusty Depot', event: 'vault', target: 1 },
+  { id: 'w_pads', text: 'Search {n} ammo boxes', event: 'ammobox', target: 25 },
+  { id: 'w_boss', text: 'Search {n} Supply Llamas', event: 'llama', target: 2 },
+  { id: 'w_vault', text: 'Destroy {n} trees', event: 'tree', target: 50 },
 ];
 
 // ISO-ish week key (Monday start) so everyone gets the same weekly set.

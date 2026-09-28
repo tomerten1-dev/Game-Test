@@ -11,7 +11,8 @@ import { CONSUMABLES } from '../weapons/Items.js';
 const _v = new THREE.Vector3();
 const _c = new THREE.Color();
 const _fc = new THREE.Color();
-const DROP_TIMES = [90, 220, 350, 460]; // seconds after the bus leaves
+const SUPPLY_LLAMAS_STAND_STILL = true; // Season 3 llamas don't run or teleport (that came in Chapter 2)
+const DROP_TIMES = [180, 390, 600, 810]; // seconds after the bus leaves (v3.2: every 210 s or so)
 const FALL_SPEED = 5.5;
 const VEND_PRICES = [0, 0, 150, 300, 500]; // gold, by rarity (rare+)
 // upgrade bench: cost to go from rarity i to i + 1
@@ -58,17 +59,12 @@ export class Events {
     this.hides = [];     // haystacks / dumpsters you can hide in
     this.dropIdx = 0;
     this.padMat = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.5 });
-    this._createJumpPads();
-    this._createVending();
-    this._createBenches();
+    // Chapter 1 Season 3 has none of these: jump pads, vending machines, upgrade / mod benches, dealers,
+    // NPCs, hiding spots and foraged food all came later
     this.modBenches = [];
-    this._createModBenches();
     this.dealers = [];
-    this._createDealers();
     this.npcs = [];
-    this._createNpcs();
-    this._createHides();
-    this._createForage();
+    this.forage = [];
     this.llamas = [];
     this._placeLlamas();
   }
@@ -507,7 +503,7 @@ export class Events {
     }
   }
 
-  // ---------- loot llamas: a few rare piñata-like stashes hidden away from the towns ----------
+  // ---------- Supply Llamas (v3.3): three piñata stashes hidden away from the towns ----------
   _llamaMesh() {
     const g = new THREE.Group();
     const body = new THREE.MeshStandardMaterial({ color: '#c77dff', roughness: 0.55 });
@@ -551,7 +547,7 @@ export class Events {
   // away in a puff when someone gets right up to them. Sneak up crouched to open one.
   _updateLlamas(dt) {
     const g = this.game;
-    if (g.state !== 'playing' || g.warmup > 0) return;
+    if (SUPPLY_LLAMAS_STAND_STILL || g.state !== 'playing' || g.warmup > 0) return;
     for (const l of this.llamas) {
       if (l.opened) continue;
       l.tpCd = Math.max(0, (l.tpCd || 0) - dt);
@@ -624,14 +620,14 @@ export class Events {
   openLlama(l, actor) {
     if (l.opened) return;
     l.opened = true;
+    if (actor.isPlayer) this.game.meta?.track('llama');
     const items = [];
-    for (const m of ['wood', 'stone', 'metal']) items.push({ type: 'mat', matType: m, amount: 200 });
-    items.push({ type: 'gold', amount: 150 });
-    for (const [a, n] of [['light', 60], ['medium', 60], ['heavy', 12], ['shells', 15]]) items.push({ type: 'ammo', ammoType: a, amount: n });
-    const heal = ['chug', 'slurp', 'bigshield', 'medkit'][Math.floor(Math.random() * 4)];
-    items.push({ type: 'consumable', ctype: heal, count: CONSUMABLES[heal].stack });
-    const util = ['grenade', 'impulse', 'launchpad', 'shockwave'][Math.floor(Math.random() * 4)];
-    items.push({ type: 'consumable', ctype: util, count: CONSUMABLES[util].stack });
+    // Season 3 Supply Llama: loads of materials and ammo, heals and traps, but no weapons
+    for (const m of ['wood', 'stone', 'metal']) items.push({ type: 'mat', matType: m, amount: 500 });
+    for (const [a, n] of [['light', 180], ['medium', 180], ['heavy', 24], ['shells', 30], ['rockets', 6]]) items.push({ type: 'ammo', ammoType: a, amount: n });
+    for (const [c, n] of [['bigshield', 2], ['bandage', 10], ['trap', 2], ['launchpad', 1]]) items.push({ type: 'consumable', ctype: c, count: n });
+    const heal = ['chug', 'slurp', 'medkit'][Math.floor(Math.random() * 3)];
+    items.push({ type: 'consumable', ctype: heal, count: 1 });
     items.forEach((it, i) => {
       const a = (i / items.length) * Math.PI * 2;
       this.game.loot.spawnPickup(it, _v.set(l.x, l.y + 1.4, l.z), new THREE.Vector3(Math.cos(a) * 2.8, 5.5, Math.sin(a) * 2.8));
@@ -640,7 +636,7 @@ export class Events {
     this.world.colliders.remove(l.col);
     this.game.effects.confetti?.(_v.set(l.x, l.y - 4, l.z));
     this.game.sound.play('chest', actor.isPlayer ? null : _v.set(l.x, l.y, l.z));
-    if (actor.isPlayer) this.game.hud?.banner?.('Loot Llama!', 1.5);
+    if (actor.isPlayer) this.game.hud?.banner?.('Supply Llama!', 1.5);
   }
 
   // ---------- foraged food: apples under trees (+5 health), mushrooms in the woods (+5 shield) ----------
@@ -853,13 +849,13 @@ export class Events {
     s.opened = true;
     const loot = this.game.loot;
     const items = [];
-    const w = new Weapon(rollWeaponType('rare'), Math.random() < 0.4 ? 4 : 3).withRandomMods();
+    // an epic or legendary weapon with ammo, a heal, a trap and materials
+    const w = new Weapon(rollWeaponType('rare'), Math.random() < 0.25 ? 4 : 3);
     items.push({ type: 'weapon', weapon: w }, Loot.ammoFor(w), Loot.ammoFor(w));
-    items.push({ type: 'consumable', ctype: Math.random() < 0.5 ? 'bigshield' : 'medkit', count: 1 });
-    const extra = ['grenade', 'grenade', 'smoke', 'impulse', 'fire', 'launchpad'][Math.floor(Math.random() * 6)];
+    items.push({ type: 'consumable', ctype: ['bigshield', 'medkit', 'slurp'][Math.floor(Math.random() * 3)], count: 1 });
+    const extra = ['grenade', 'trap', 'impulse', 'launchpad'][Math.floor(Math.random() * 4)];
     items.push({ type: 'consumable', ctype: extra, count: CONSUMABLES[extra].stack });
-    items.push({ type: 'mat', matType: 'metal', amount: 60 });
-    items.push({ type: 'gold', amount: 100 });
+    for (const m of ['wood', 'stone', 'metal']) items.push({ type: 'mat', matType: m, amount: 30 });
     items.forEach((it, i) => {
       const a = (i / items.length) * Math.PI * 2;
       loot.spawnPickup(it, _v.set(s.x, s.ground + 1, s.z), new THREE.Vector3(Math.cos(a) * 2.6, 5, Math.sin(a) * 2.6));
@@ -920,7 +916,7 @@ export class Events {
     for (const l of this.llamas) {
       if (l.opened) continue;
       const d = Math.hypot(l.x - pos.x, l.z - pos.z);
-      if (d < bd + 0.6 && Math.abs(l.y - pos.y) < 2.5) { bd = d; best = { kind: 'llama', llama: l, text: 'Open Loot Llama', rarity: 4 }; }
+      if (d < bd + 0.6 && Math.abs(l.y - pos.y) < 2.5) { bd = d; best = { kind: 'llama', llama: l, text: 'Search Supply Llama', rarity: 4 }; }
     }
     for (const f of this.forage || []) {
       if (f.eaten || Math.abs(f.x - pos.x) > bd || Math.abs(f.z - pos.z) > bd) continue;

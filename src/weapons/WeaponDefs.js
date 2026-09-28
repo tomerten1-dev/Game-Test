@@ -25,63 +25,67 @@ export const OPTIC_ZOOM = { reddot: 1.15, holo: 1.3, x2: 2, x4: 4 };
 export const WEAPONS = {
   pistol: {
     key: 'pistol', name: 'Pistol', icon: 'PST', ammoType: 'light',
-    draw: 0.2, headMult: 2, firstShot: true,
-    damage: 23, pellets: 1, rate: 5.5, mag: 16, reload: 1.3,
+    draw: 0.2, headMult: 2, firstShot: true, dmg: [23, 24], rarities: [0, 1],
+    damage: 23, pellets: 1, rate: 6.75, mag: 16, reload: 1.3,
     spread: 0.012, bloom: 0.02, maxSpread: 0.075, recover: 0.22,
     range: 150, falloffStart: 35, recoil: 0.02, idealRange: 16, shake: 0.12,
   },
   ar: {
     key: 'ar', name: 'Assault Rifle', icon: 'AR', ammoType: 'medium',
-    // Fortnite (Holo Twister): 27 common -> 33 legendary, 5.1 shots/s, 25 rounds, 2.97 s -> 2.43 s reload
-    draw: 0.3, headMult: 1.5, firstShot: true,
-    damage: 27, pellets: 1, rate: 5.1, mag: 25, reload: 2.97,
+    // Chapter 1 Season 3: M16 30/31/33 (common-rare), SCAR 35/36 (epic, legendary); 5.5 shots/s, 30 rounds
+    draw: 0.3, headMult: 2, firstShot: true, dmg: [30, 31, 33, 35, 36],
+    damage: 30, pellets: 1, rate: 5.5, mag: 30, reload: 2.3,
     spread: 0.007, bloom: 0.011, maxSpread: 0.055, recover: 0.18,
     range: 230, falloffStart: 60, recoil: 0.014, idealRange: 34, shake: 0.14, drop: 380,
   },
   shotgun: {
     key: 'shotgun', name: 'Tactical Shotgun', icon: 'TAC', ammoType: 'shells',
-    draw: 0.45, shellReload: 0.42, headMult: 2,
-    damage: 8.5, pellets: 10, rate: 1.45, mag: 8, reload: 4.2,
+    // Chapter 1 Season 3: 67/70/74 (common-rare), 1.5 shots/s, 8 shells
+    draw: 0.45, shellReload: 0.7, headMult: 2, dmg: [67, 70, 74], rarities: [0, 1, 2],
+    damage: 6.7, pellets: 10, rate: 1.5, mag: 8, reload: 5.6,
     spread: 0.075, bloom: 0, maxSpread: 0.075, recover: 1,
     range: 34, falloffStart: 7, cap: 150, recoil: 0.07, idealRange: 7, shake: 0.4,
   },
   smg: {
     key: 'smg', name: 'SMG', icon: 'SMG', ammoType: 'light',
-    draw: 0.25, headMult: 1.75,
-    damage: 16, pellets: 1, rate: 12, mag: 30, reload: 2.0,
+    draw: 0.25, headMult: 2, dmg: [17, 18, 19], rarities: [0, 1, 2],
+    damage: 17, pellets: 1, rate: 12, mag: 30, reload: 2.0,
     spread: 0.02, bloom: 0.007, maxSpread: 0.08, recover: 0.25,
     range: 110, falloffStart: 22, recoil: 0.008, idealRange: 13, shake: 0.08,
   },
   pump: {
     key: 'pump', name: 'Pump Shotgun', icon: 'PMP', ammoType: 'shells',
-    draw: 0.45, shellReload: 0.55,
-    // Fortnite (Sentinel Pump): 12 pellets, 92 common -> 114 legendary, 0.85 shots/s, 4 shells, 1.75x heads
-    damage: 7.7, pellets: 12, rate: 0.85, mag: 4, reload: 3.6, headMult: 1.75,
+    draw: 0.45, shellReload: 0.95,
+    // Chapter 1 Season 3: uncommon 80 / rare 85, 0.7 shots/s, 5 shells loaded one at a time, 2x heads
+    dmg: [80, 80, 85], rarities: [1, 2],
+    damage: 8, pellets: 10, rate: 0.7, mag: 5, reload: 4.8, headMult: 2,
     spread: 0.058, bloom: 0, maxSpread: 0.058, recover: 1,
     range: 31, falloffStart: 7, cap: 165, recoil: 0.09, idealRange: 6, shake: 0.5,
   },
   burst: {
     key: 'burst', name: 'Burst Rifle', icon: 'BRS', ammoType: 'medium',
-    draw: 0.35, headMult: 1.5, firstShot: true,
+    draw: 0.35, headMult: 2, firstShot: true, dmg: [27, 29, 30, 32, 33],
     damage: 27, pellets: 1, rate: 2.4, mag: 30, reload: 2.4, burst: 3, burstGap: 0.075,
     spread: 0.005, bloom: 0.006, maxSpread: 0.04, recover: 0.2,
     range: 230, falloffStart: 70, recoil: 0.011, idealRange: 38, shake: 0.12, drop: 420,
   },
   sniper: {
-    key: 'sniper', name: 'Sniper Rifle', icon: 'SNP', ammoType: 'heavy',
-    draw: 0.5,
-    damage: 100, pellets: 1, rate: 0.4, mag: 1, reload: 2.4,
+    key: 'sniper', name: 'Bolt-Action Sniper', icon: 'SNP', ammoType: 'heavy',
+    // Chapter 1 Season 3: 105/110/116 (rare-legendary), 2.5x heads, one round, 3.0 -> 2.7 s reload
+    draw: 0.5, dmg: [, , 105, 110, 116], rarities: [2, 3, 4],
+    damage: 105, pellets: 1, rate: 0.33, mag: 1, reload: 3.33,
     spread: 0.035, bloom: 0, maxSpread: 0.035, recover: 1, scopedSpread: 0,
     range: 420, falloffStart: 400, recoil: 0.09, idealRange: 70, shake: 0.35, headMult: 2.5,
     projectile: { speed: 600, gravity: 6, pad: 0.16 }, scope: true, // fast, flat, a little forgiving
   },
   rocket: {
     key: 'rocket', name: 'Rocket Launcher', icon: 'RKT', ammoType: 'rockets',
-    draw: 0.6, headMult: 1,
-    damage: 85, pellets: 1, rate: 0.75, mag: 1, reload: 2.8,
+    // Chapter 1 Season 3: 110/116/121 (rare-legendary), 375 to builds
+    draw: 0.6, headMult: 1, dmg: [, , 110, 116, 121], rarities: [2, 3, 4],
+    damage: 110, pellets: 1, rate: 0.75, mag: 1, reload: 3.1,
     spread: 0.004, bloom: 0, maxSpread: 0.004, recover: 1,
     range: 300, falloffStart: 300, recoil: 0.08, idealRange: 30, shake: 0.4,
-    projectile: { speed: 55, gravity: 0, explode: { radius: 5.5, structure: 450 } },
+    projectile: { speed: 55, gravity: 0, explode: { radius: 5.5, structure: 375 } },
   },
   // ---- newer weapon types ----
   drum: {
@@ -93,8 +97,9 @@ export const WEAPONS = {
   },
   minigun: {
     key: 'minigun', name: 'Minigun', icon: 'MNG', ammoType: 'medium', heavy: true,
-    draw: 0.7, headMult: 1.5, spinUp: 0.6,
-    damage: 15, pellets: 1, rate: 12, mag: 100, reload: 4.5,
+    // Chapter 1 Season 3 (v3.6): 18 epic / 19 legendary
+    draw: 0.7, headMult: 2.5, spinUp: 0.6, dmg: [, , , 18, 19], rarities: [3, 4],
+    damage: 18, pellets: 1, rate: 12, mag: 100, reload: 4.5,
     spread: 0.028, bloom: 0.003, maxSpread: 0.06, recover: 0.2,
     range: 130, falloffStart: 30, recoil: 0.006, idealRange: 18, shake: 0.08,
   },
@@ -107,8 +112,9 @@ export const WEAPONS = {
   },
   handcannon: {
     key: 'handcannon', name: 'Hand Cannon', icon: 'HCN', ammoType: 'heavy', firstShot: true,
-    draw: 0.3, headMult: 2,
-    damage: 60, pellets: 1, rate: 1.2, mag: 7, reload: 2.1,
+    // Chapter 1 Season 3: 75 epic / 78 legendary, 2.5x heads
+    draw: 0.3, headMult: 2.5, dmg: [, , , 75, 78], rarities: [3, 4],
+    damage: 75, pellets: 1, rate: 0.8, mag: 7, reload: 2.1,
     spread: 0.01, bloom: 0.04, maxSpread: 0.07, recover: 0.2,
     range: 160, falloffStart: 35, recoil: 0.06, idealRange: 20, shake: 0.35,
   },
@@ -129,8 +135,9 @@ export const WEAPONS = {
   },
   launcher: {
     key: 'launcher', name: 'Grenade Launcher', icon: 'GL', ammoType: 'rockets',
-    draw: 0.55, headMult: 1,
-    damage: 70, pellets: 1, rate: 1.3, mag: 6, reload: 3.6,
+    // Chapter 1 Season 3: 100/105/110 (rare-legendary)
+    draw: 0.55, headMult: 1, dmg: [, , 100, 105, 110], rarities: [2, 3, 4],
+    damage: 100, pellets: 1, rate: 1, mag: 6, reload: 3.6,
     spread: 0.006, bloom: 0, maxSpread: 0.006, recover: 1,
     range: 120, falloffStart: 120, recoil: 0.07, idealRange: 25, shake: 0.35,
     projectile: { speed: 42, gravity: 22, bounce: true, fuse: 1.6, explode: { radius: 4.5, structure: 220 } },
@@ -184,11 +191,19 @@ export const WEAPONS = {
 export const EXOTICS = ['tracker', 'sixshooter', 'dub', 'stormscout'];
 
 // Weighted loot tables: sniper and rocket are rare on the floor, likelier in rare chests / supply drops.
+// Chapter 1 Season 3 loot pool only (the newer guns above still exist for other code, but never drop).
 const WEAPON_WEIGHTS = {
-  floor: { ar: 24, burst: 8, shotgun: 13, pump: 12, smg: 22, pistol: 18, sniper: 3, rocket: 0, drum: 4, dmr: 4, handcannon: 3, dualpistol: 3, flare: 2, bow: 2, launcher: 0, minigun: 1, blade: 1 },
-  chest: { ar: 22, burst: 10, shotgun: 13, pump: 14, smg: 18, pistol: 8, sniper: 9, rocket: 5, drum: 5, dmr: 6, handcannon: 4, dualpistol: 3, flare: 3, bow: 3, launcher: 3, minigun: 2, blade: 2 },
-  rare: { ar: 16, burst: 10, shotgun: 8, pump: 16, smg: 10, pistol: 0, sniper: 20, rocket: 20, drum: 4, dmr: 8, handcannon: 4, dualpistol: 0, flare: 2, bow: 4, launcher: 8, minigun: 5, blade: 3 },
+  floor: { ar: 26, burst: 10, shotgun: 16, pump: 14, smg: 16, pistol: 14, sniper: 3, rocket: 1, handcannon: 2, launcher: 1, minigun: 1 },
+  chest: { ar: 24, burst: 12, shotgun: 15, pump: 15, smg: 13, pistol: 6, sniper: 6, rocket: 3, handcannon: 3, launcher: 2, minigun: 2 },
+  rare: { ar: 30, burst: 10, pump: 0, sniper: 25, rocket: 20, handcannon: 8, launcher: 10, minigun: 8 },
 };
+// Closest rarity this gun comes in (a rare Pump stays rare, a "common" sniper becomes rare).
+export function fitRarity(type, r) {
+  const list = WEAPONS[type]?.rarities;
+  if (!list || r > 4) return r;
+  return list.reduce((a, b) => (Math.abs(b - r) < Math.abs(a - r) ? b : a));
+}
+
 export function rollWeaponType(table = 'floor', rand = Math.random) {
   const w = WEAPON_WEIGHTS[table];
   let r = rand() * Object.values(w).reduce((a, b) => a + b, 0);

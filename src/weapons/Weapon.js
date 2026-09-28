@@ -1,4 +1,4 @@
-import { WEAPONS, RARITIES, OPTIC_ZOOM, MODS } from './WeaponDefs.js';
+import { WEAPONS, RARITIES, OPTIC_ZOOM, MODS, fitRarity } from './WeaponDefs.js';
 
 // higher rarity reloads faster
 const RELOAD_MUL = [1, 0.95, 0.9, 0.85, 0.8, 0.75, 0.85];
@@ -10,7 +10,7 @@ export class Weapon {
     this.type = type;
     this.def = WEAPONS[type];
     this.lastShot = -10;
-    this.rarity = rarity;
+    this.rarity = fitRarity(type, rarity); // each gun only comes in its own rarities
     this.bloom = 0;
     this.cooldown = 0;
     this.reloading = false;
@@ -20,7 +20,8 @@ export class Weapon {
     this.ammo = this.mag;
   }
 
-  get canMod() { return this.rarity < 5 && (!!this.def.mods || ['ar', 'burst', 'smg', 'pistol', 'shotgun', 'pump', 'sniper'].includes(this.type)); }
+  // Chapter 1 guns have no attachments
+  get canMod() { return false; }
   get mag() { return this.mods?.mag === 'drum' ? Math.round(this.def.mag * 1.5) : this.def.mag; }
   get suppressed() { return this.mods?.barrel === 'suppressor'; }
   get recoil() { return this.def.recoil * (this.mods?.barrel === 'brake' ? 0.6 : 1) * (this.mods?.under === 'vertical' ? 0.8 : 1); }
@@ -44,7 +45,8 @@ export class Weapon {
   }
 
   get rarityInfo() { return RARITIES[this.rarity]; }
-  get damage() { return this.def.damage * RARITIES[this.rarity].mult; }
+  // per pellet; guns with a Chapter 1 table use its exact numbers
+  get damage() { const t = this.def.dmg?.[this.rarity]; return t !== undefined ? t / this.def.pellets : this.def.damage * RARITIES[this.rarity].mult; }
   // mythics carry their boss's name ("The Foreman's Burst Rifle")
   get name() { return this.title || (this.def.exotic ? this.def.name : `${RARITIES[this.rarity].name} ${this.def.name}`); }
 

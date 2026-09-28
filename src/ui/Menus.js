@@ -3,7 +3,7 @@ import BLEND_STATUS from 'virtual:blend-status';
 const esc = (t) => String(t).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 import { SLOTS, COSMETIC_LIST, COSMETICS, registerCustomSkin, unregisterCustomSkin } from '../meta/Cosmetics.js';
 import { RARITIES } from '../weapons/WeaponDefs.js';
-import { TRACK, SEASON, xpForLevel, QUEST_REWARD, WEEKLY_REWARD, milestoneReward, arenaDivision, PASS_PAGES, PAGE_UNLOCK, passState, claimPass } from '../meta/Progression.js';
+import { TRACK, SEASON, xpForLevel, QUEST_REWARD, WEEKLY_REWARD, milestoneReward, PASS_PAGES, PAGE_UNLOCK, passState, claimPass } from '../meta/Progression.js';
 import { renderSettings } from './Settings.js';
 
 const HERO_ICON = { Knight: '♜', Barbarian: '♞', Mage: '✦', Rogue: '♝', Rogue_Hooded: '♝', Male_Ranger: '➶', Female_Ranger: '➶', Male_Peasant: '♙', Female_Peasant: '♙' };
@@ -57,7 +57,6 @@ export class Menus {
           <div class="lb-wallet">
             <div class="lb-level"><b id="lb-lvl">1</b><div><div class="xpbar"><i id="lb-xpfill"></i></div><small id="lb-xptext"></small></div></div>
             <div class="lb-crown" title="You won your last match: you start the next one wearing the Victory Crown">♛</div>
-            <div class="lb-arena" id="lb-arena" title="Ranked rank"></div>
             <div class="lb-coins" title="Storm Coins — earned by playing, never sold">${coin}<b id="lb-coins">0</b></div>
           </div>
         </div>
@@ -73,13 +72,9 @@ export class Menus {
               <div class="modes">
                 <button class="mode m-solo" data-mode="solo"><i class="mi">⚔︎</i><b>Solo</b><span>You vs 99 bots</span></button>
                 <button class="mode m-quick" data-mode="quick"><i class="mi">⚡︎</i><b>Quick Match</b><span>29 bots · faster storm</span></button>
-                <button class="mode m-zb" data-mode="zb"><i class="mi">◈</i><b>Zero Build</b><span>No building · overshield</span></button>
-                <button class="mode m-reload" data-mode="reload"><i class="mi">↻</i><b>Reload</b><span>40 players · 2 reboots · small map</span></button>
-                <button class="mode m-blitz" data-mode="blitz"><i class="mi">⏱︎</i><b>Blitz Royale</b><span>32 players · same kit · ~5 min</span></button>
-                <button class="mode arena" data-mode="arena"><i class="mi">♛</i><b>Ranked</b><span id="arena-div">Bronze I</span></button>
               </div>
               <button id="play-btn" class="btn big">PLAY!</button>
-              <div class="sub">Straight onto the Storm Bus</div>
+              <div class="sub">Straight onto the Battle Bus</div>
             </div>
           </section>
           <section class="lb-panel side" data-panel="locker"><div class="locker-slots" id="locker-slots"></div><div class="grid" id="locker-grid"></div></section>
@@ -168,9 +163,6 @@ export class Menus {
     $('#lb-xpfill').style.width = `${Math.min(100, (d.xp / xpForLevel(d.level)) * 100)}%`;
     $('#lb-xptext').textContent = `${d.xp} / ${xpForLevel(d.level)} XP`;
     $('#lb-coins').textContent = d.coins.toLocaleString();
-    const ad = arenaDivision(d.arena?.points || 0);
-    $('#arena-div').innerHTML = `<i style="color:${ad.color}">${ad.name}</i> · ${d.arena?.points || 0} pts`;
-    $('#lb-arena').innerHTML = `<span style="background:${ad.color}"></span>${ad.name}`;
     const mb = this.el.lobby.querySelector(`[data-mode="${this.mode}"]`);
     if (mb) { $('#mc-name').textContent = mb.querySelector('b').textContent; $('#mc-sub').innerHTML = mb.querySelector('span').innerHTML; }
     const quests = this.meta.quests();
@@ -395,10 +387,7 @@ export class Menus {
       ['Time alive', `${Math.floor(s.timeAlive / 3600)}h ${Math.floor((s.timeAlive % 3600) / 60)}m`], ['Best placement', s.bestPlace ? `#${s.bestPlace}` : '—'],
       ['Storm Coins', d.coins], ['Items owned', `${d.owned.length} / ${COSMETIC_LIST.length}`],
     ];
-    const A = d.arena || { points: 0, best: 0, matches: 0, wins: 0 }, ad = arenaDivision(A.points);
-    const arena = [['Rank', `<i style="color:${ad.color}">${ad.name}</i>`], ['Rank points', A.points], ['Best', A.best], ['Ranked matches', A.matches], ['Ranked wins', A.wins], ['Crowned wins', s.crownedWins || 0]];
-    this.$('#career').innerHTML = `<div class="card-h big">Career</div><div class="stats">${rows.map(([k, v]) => `<div><b>${v}</b><span>${k}</span></div>`).join('')}</div>
-      <div class="card-h">Ranked</div><div class="stats">${arena.map(([k, v]) => `<div><b>${v}</b><span>${k}</span></div>`).join('')}</div>`;
+    this.$('#career').innerHTML = `<div class="card-h big">Career</div><div class="stats">${rows.map(([k, v]) => `<div><b>${v}</b><span>${k}</span></div>`).join('')}</div>`;
   }
 
   // ---- screens ----

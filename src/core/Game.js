@@ -538,9 +538,8 @@ export class Game {
     this.homes.reset();
     this.world.destructibles.reset();
     this.traps.reset();
-    // how this match starts: the usual bus, you driving the bus through rings, or Storm Surfing
-    const rs = Math.random();
-    this.startMode = (typeof window !== 'undefined' && window.__startMode) || (rs < 0.2 ? 'surf' : rs < 0.4 ? 'drive' : 'bus');
+    // every match starts from the Battle Bus (the other openings can still be forced for testing)
+    this.startMode = (typeof window !== 'undefined' && window.__startMode) || 'bus';
     this.bus.launch(this.startMode);
     for (const a of this.actors) {
       if (!a.alive) a.revive(0, 0);
@@ -576,18 +575,11 @@ export class Game {
       a.resetAI?.();
     }
     for (const b of this.bots) this._planDrop(b);
-    // the Victory Crown: you keep it from your last win, and one bot starts wearing one
-    if (this.meta.profile.d.crowned) this.player.setCrown(true, Math.max(1, this.meta.profile.d.stats.crownedWins || 0));
-    const cb = this.bots.filter((b) => !b.npc)[Math.floor(Math.random() * this.bots.filter((b) => !b.npc).length)];
-    cb?.setCrown(true, 1 + Math.floor(Math.random() * 4));
     if (this.combat.weakMesh) { this.combat.weakMesh.visible = false; this.combat.weak = null; }
+    // Chapter 1 Season 3: no bosses, rifts or weather
     this.boss.reset();
-    this.boss.spawn();
-    this.rifts.spawn();
     this.bounty = null;
-    const wx = this.weather.roll({ snow: VARIANT.weather === 'snow', desert: VARIANT_KEY === 'desert' });
-    this.dayCycle.start(this.weather.night);
-    if (wx) setTimeout(() => this.state === 'playing' && this.hud.banner(wx, 3), 6500);
+    this.dayCycle.start(false);
     this.rig.yaw = Math.atan2(-this.bus.vel.x, -this.bus.vel.z) + 0.6;
     this.rig.pitch = -0.25;
     this.meta.startMatch();
@@ -596,7 +588,7 @@ export class Game {
     this._botThanks = 0;
     if (this.startMode === 'surf') this.hud.banner(isTouch ? 'Storm Surfing! Steer along the wave · tap JUMP as it launches for a boost' : 'Storm Surfing! A / D to move along the wave · SPACE as it launches for a boost', 7);
     else if (this.startMode === 'drive') this.hud.banner(isTouch ? "You're driving the Battle Bus! Steer through the rings" : "You're driving the Battle Bus! A / D to steer through the rings · SPACE to jump", 7);
-    else this.hud.banner(isTouch ? 'Tap JUMP to drop from the Storm Bus' : 'Press SPACE to jump from the Storm Bus', 6);
+    else this.hud.banner(isTouch ? 'Tap JUMP to drop from the Battle Bus' : 'Press SPACE to jump from the Battle Bus', 6);
     this.sound.play('bus');
     this.sound.sting();
     this.sound.music('bus');
@@ -754,7 +746,6 @@ export class Game {
     this.projectiles.update(dt);
     this.fire.update(dt);
     this.gadgets.update(dt);
-    this.overrides.update(dt);
     // hired NPCs stay near whoever hired them
     for (const b of this.bots) if (b.hiredBy && b.alive) { b.leash.x = b.hiredBy.pos.x; b.leash.z = b.hiredBy.pos.z; } // stays loyal even while its owner waits for a reboot
     // bounty: eliminate the marked player before time runs out
@@ -1414,7 +1405,6 @@ export class Game {
     const ev = this.storm.update(dt * (this.stormScale || 1), this.time);
     if (ev === 'shrink') { this.hud.banner?.(this.storm.moving ? 'The storm eye is moving!' : 'The storm eye is shrinking!', 3); this.sound.play('phase'); }
     else if (ev === 'phase') { this.hud.banner?.('Storm eye forming', 3); this.sound.play('stormChime'); if (this.player.alive) this.meta.track('circle'); }
-    this._updateSurge(dt);
     this.stormTick += dt;
     const outside = this.player.alive && this.player.state !== 'bus' && !this.storm.isInside(this.player.pos.x, this.player.pos.z);
     this.hud.stormTint?.(outside);
@@ -1430,36 +1420,6 @@ export class Game {
         if (a.isPlayer) { this.sound.play('storm'); this.effects.damageNumber(this.player.chest(_origin), dmg, false, false); this.hud.stormFlash?.(); }
         if (a.health <= 0) { a.health = 0; a.die(null); }
       }
-    }
-  }
-
-  // Storm surge: from the third circle on, while more players are alive than the circle allows,
-  // whoever has dealt the least damage takes 25 every 5 s. Deal damage to stay safe.
-  _updateSurge(dt) {
-    const st = this.storm, limits = [0, 0, 0, 60, 45, 32, 22, 14, 9, 6, 4, 3];
-    const scale = (this.actors.filter((a) => !a.npc).length) / 100;
-    const limit = Math.max(3, Math.round((limits[st.phase] || 0) * scale));
-    const alive = this.actors.filter((a) => a.alive && !a.npc && a.state !== 'bus');
-    this.surge = st.phase >= 3 && limit > 3 && alive.length > limit ? { limit, over: alive.length - limit } : null;
-    if (!this.surge) { this._surgeT = 5; return; }
-    const sorted = alive.sort((a, b) => (a.dmgDealt || 0) - (b.dmgDealt || 0));
-    this.surge.need = Math.round((sorted[this.surge.over]?.dmgDealt || 0) + 1);
-    if (!this._surgeWarned || this._surgeWarned !== st.phase) {
-      this._surgeWarned = st.phase;
-      this.hud.banner?.(`STORM SURGE · deal ${this.surge.need}+ damage to stay safe`, 3.5);
-    }
-    this._surgeT = (this._surgeT ?? 5) - dt;
-    if (this._surgeT > 0) return;
-    this._surgeT = 5;
-    for (const a of sorted.slice(0, this.surge.over)) {
-      a.health -= 25;
-      a.lastHurtTime = this.time;
-      if (a.isPlayer) {
-        this.sound.play('storm');
-        this.effects.damageNumber(a.chest(_origin), 25, false, false);
-        this.hud.banner?.(`Storm Surge! Deal ${this.surge.need}+ damage to stay safe`, 2.5);
-      }
-      if (a.health <= 0) { a.health = 0; a.deathCause = 'storm'; a.die(null); }
     }
   }
 

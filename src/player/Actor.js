@@ -14,7 +14,6 @@ const _surf = []; // scratch list for surface()
 export const RUN_SPEED = 6.4;
 export const SPRINT_SPEED = RUN_SPEED * 1.3; // Fortnite Chapter 5: sprint is 1.3x the run speed (was 1.4x)
 export const TAC_SPRINT_SPEED = SPRINT_SPEED * 1.18; // tactical sprint (uses stamina)
-const STAMINA_DRAIN = 22, STAMINA_REGEN = 26;
 const CROUCH_SPEED = 3.4;
 const SLIDE_TIME = 1.1; // flat-ground slide; slopes keep it going
 // Fortnite fall damage by height: none below ~12.5 m (a bit over 3 walls), 11 at 3⅓ walls,
@@ -32,7 +31,6 @@ function fallDamageFor(speed, g = 24) {
 }
 const JUMP_VEL = 8.2;
 const GLIDE_HEIGHT = 60; // the glider opens on its own this high above the ground
-const REDEPLOY_HEIGHT = 14;
 const OVERSHIELD = 50; // Zero Build mode
 
 // Shared body for the player and bots: state machine, physics, animation, health.
@@ -495,7 +493,8 @@ export class Actor {
   }
 
   // falling from high enough (a cliff, a tall build, a launch) to open the glider again
-  canRedeploy() { return this.state === 'ground' && !this.onGround && !this.swimming && this.vel.y < (this.game.zeroBuild ? -1 : -4) && this.heightAboveGround() > (this.game.zeroBuild ? 7 : REDEPLOY_HEIGHT); }
+  // Chapter 1 Season 3 had no redeploy: the glider opens once, from the bus (and from launch pads)
+  canRedeploy() { return false; }
 
   // Sparkles while using an item: blue at the mouth for drinks, green around the chest for heals.
   _useFx(dt, drink) {
@@ -606,10 +605,8 @@ export class Actor {
       // sprint only when moving roughly forward and not busy
       const fwdDot = mlen > 0.1 ? (it.mx * Math.sin(this.aimYaw) + it.mz * Math.cos(this.aimYaw)) / mlen : 0;
       this.sprinting = !!it.sprint && !this.crouched && this.useT <= 0 && mlen > 0.3 && (fwdDot > 0.3 || !this.aiming) && !this.aiming;
-      // tactical sprint burns stamina; it refills after a short breather
-      this.tacSprint = this.sprinting && this.stamina > 0 && this.onGround;
-      if (this.tacSprint) { if (!this.medallions.has('surge') && !(this.slapT > 0) && !this.game.overrides?.has('stamina')) this.stamina = Math.max(0, this.stamina - STAMINA_DRAIN * dt); this.staminaIdle = 0; }
-      else if ((this.staminaIdle += dt) > 0.8) this.stamina = Math.min(100, this.stamina + STAMINA_REGEN * dt);
+      // Chapter 1: a plain sprint with no stamina (tactical sprint came in Chapter 3)
+      this.tacSprint = false;
       let speed = this.sprinting ? (this.tacSprint ? TAC_SPRINT_SPEED : SPRINT_SPEED) * (this.game.overrides?.has('sonic') ? 1.2 : 1) : this.crouched ? CROUCH_SPEED : RUN_SPEED;
       if (this.useT > 0 && !this.useItem?.def.mobile) speed = Math.min(speed, 3.2);
       if (this.aiming && this.weapon && !this.swimming) speed *= this.weapon.def.scope ? 0.55 : 0.7; // ADS walks slower
@@ -621,7 +618,6 @@ export class Actor {
         speed = it.sprint ? 5.8 : 4.4;
         this.crouched = false; if (!this.powerSlide) this.slideT = 0; this.sprinting = false; this.tacSprint = false;
         if (!this._wasSwimming) { this.setBuildMode?.(null); if (this.distToCam < 40) this.game.effects.dust(this.pos, 8, 1.2); }
-        this.stamina = Math.min(100, this.stamina + STAMINA_REGEN * 1.5 * dt); // swimming refills stamina
       } else if (this.inWater) speed *= 0.65;
       this._wasSwimming = this.swimming;
       // flung by a shockwave: keep the momentum instead of braking in the air
@@ -650,11 +646,7 @@ export class Actor {
       }
       // ladders: walk into one to climb
       if (trav.ladders.length && trav.climb(this, it, dt)) return;
-      // mantle onto ledges: jumping into something waist-to-head high, or reaching one mid-air
-      if (mlen > 0.3 && this.slideT <= 0 && ((it.jump && this.onGround) || (!this.onGround && this.vel.y < 4)) && this._tryMantle(it.mx / mlen, it.mz / mlen)) return;
-      // mid-air jump press next to a wall: kick off it
-      if (this.onGround) this.wallJumps = 0;
-      else if (it.jumpPress && !this.swimming && !(it.redeploy && this.canRedeploy()) && this._tryWallJump(it)) return;
+      // (no mantling or wall jumps: Chapter 1 had neither)
       if (it.jump && this.onGround) {
         this.crouched = false;
         this.crouchHeld = false;
@@ -665,13 +657,6 @@ export class Actor {
         if (this.swimming && hsp > 2) {
           // dolphin dive: leap forward out of the water
           this.vel.x *= 1.5; this.vel.z *= 1.5; this.vel.y = JUMP_VEL * 0.8; this.flungT = 0.5;
-        } else if (this.sprinting && hsp > 6) {
-          // Ledge Jump: sprinting off the very edge of a drop sends you further, with more hang time
-          const ex = this.pos.x + (this.vel.x / hsp) * 1.6, ez = this.pos.z + (this.vel.z / hsp) * 1.6;
-          if (this.pos.y - world.groundAt(ex, ez, this.pos.y, 0.3) > 2.5) {
-            this.vel.x *= 1.35; this.vel.z *= 1.35; this.vel.y = JUMP_VEL * 1.12;
-            this.flungT = 0.8; this.floatT = 0.7;
-          }
         }
         this.character.setPose('Jump_Start', null, 0.08, 1.6);
         this.jumpT = 0;
@@ -687,17 +672,8 @@ export class Actor {
       if (this.onGround) this.scrambles = 0;
       if (this.onGround && !wasGround && this.landSpeed > 7) {
         this.onHardLanding?.(this.landSpeed);
-        // Roll Landing: hold or tap Jump just before landing to roll out of it, keep your speed and
-        // get some stamina back (bots roll automatically on big drops)
-        const wantRoll = this.isPlayer ? it.rollReady : this.landSpeed > 11;
-        if (wantRoll && this.landSpeed > 9 && Math.hypot(this.vel.x, this.vel.z) > 2) {
-          this.rollT = 0.5; this.character.setPose('Dodge_Forward', null, 0.06, 1.3);
-          this.stamina = Math.min(100, this.stamina + 16);
-        }
         if (this.landSpeed > FALL_SAFE && !(this.noFallT > 0) && !this.game.events?.softLanding?.(this.pos)) this.fallDamage(fallDamageFor(this.landSpeed));
       }
-      // shoulder bash: sprint, slide or roll into a closed door to burst through it
-      this._bashCheck(dt);
       // sprinting into something low (fence, crate, rail): hurdle over it
       if (this.sprinting && this.blocked && this.onGround && mlen > 0.3) this._tryHurdle(it.mx / mlen, it.mz / mlen);
       // footsteps

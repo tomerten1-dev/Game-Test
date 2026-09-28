@@ -104,7 +104,6 @@ export class HUD {
           <div id="slots"></div>
           <div id="br-extras">
             <div id="ammo-types"></div>
-            <div class="gold-chip" title="Gold bars: spend them at vending machines and upgrade benches"><span class="gold-icon"></span><span id="gold-n">0</span></div>
           </div>
         </div>
       </div>`);
@@ -744,7 +743,6 @@ export class HUD {
       el.innerHTML = Object.entries(AMMO).map(([t, a]) => { const n = who.ammoFor(t); return n === Infinity ? '' : `<span class="at" title="${a.name}" style="--c:${a.color || '#fff'}"><i></i>${n}</span>`; }).join('');
     }
     this.set('keycard', this.el.special || (this.el.special = document.getElementById('special-slots')), p.keycard ? '<div class="sslot" title="Vault Keycard"><span>⌘</span><small>KEYCARD</small></div>' : '', 'innerHTML');
-    this.set('gold', this.el.gold || (this.el.gold = document.getElementById('gold-n')), String(who.gold || 0));
     const mk = [...(p.medallions || [])].join(',');
     if (this.cache.medals !== mk) {
       this.cache.medals = mk;

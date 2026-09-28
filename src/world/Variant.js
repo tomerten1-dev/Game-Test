@@ -30,8 +30,7 @@ export function islandSetting() {
 function resolve() {
   const s = islandSetting();
   if (VARIANTS[s]) return s;
-  const m = new Date().getMonth();
-  return m === 11 || m <= 1 ? 'winter' : 'summer';
+  return 'summer'; // "Auto" is the Season 3 island (no winter map by calendar)
 }
 
 export const VARIANT_KEY = resolve();

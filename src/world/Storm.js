@@ -1,23 +1,19 @@
 import * as THREE from 'three';
 
-// 12 zones sized for the ~2.3 km island: the first circle waits 3 minutes (Fortnite: 3:20) and closes to
-// 1.6 km across, and a full match lasts about 22 minutes. 1 damage a second early, 12 by circle 6, 20 by circle 8;
-// the last four circles move instead of just shrinking.
+// Chapter 1 Season 3: 9 circles that only shrink (moving zones came later). The first one waits 3:20
+// before closing; damage goes straight to health: 1 a second early on, then 2, 5, 8 and 10.
 export const STORM_PHASES = [
-  { wait: 180, shrink: 165, radius: 800, dmg: 1 },
-  { wait: 110, shrink: 110, radius: 560, dmg: 1 },
-  { wait: 80, shrink: 80, radius: 380, dmg: 2 },
-  { wait: 65, shrink: 62, radius: 250, dmg: 5 },
-  { wait: 55, shrink: 50, radius: 160, dmg: 8 },
-  { wait: 45, shrink: 40, radius: 100, dmg: 12 },
-  { wait: 36, shrink: 32, radius: 62, dmg: 15 },
-  { wait: 30, shrink: 26, radius: 40, dmg: 20 },
-  { wait: 24, shrink: 22, radius: 25, dmg: 20 },
-  { wait: 20, shrink: 18, radius: 14, dmg: 20 },
-  { wait: 16, shrink: 14, radius: 6, dmg: 20 },
-  { wait: 12, shrink: 20, radius: 0, dmg: 20 },
+  { wait: 200, shrink: 180, radius: 800, dmg: 1 },
+  { wait: 120, shrink: 120, radius: 500, dmg: 1 },
+  { wait: 90, shrink: 90, radius: 300, dmg: 2 },
+  { wait: 80, shrink: 70, radius: 175, dmg: 5 },
+  { wait: 50, shrink: 40, radius: 95, dmg: 5 },
+  { wait: 30, shrink: 40, radius: 50, dmg: 8 },
+  { wait: 30, shrink: 40, radius: 25, dmg: 10 },
+  { wait: 20, shrink: 45, radius: 10, dmg: 10 },
+  { wait: 15, shrink: 60, radius: 0, dmg: 10 },
 ];
-export const MOVING_FROM = STORM_PHASES.length - 4;
+export const MOVING_FROM = STORM_PHASES.length; // no moving circles in Chapter 1
 const START_RADIUS = 1750;
 
 const vert = /* glsl */ `

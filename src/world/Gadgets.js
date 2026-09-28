@@ -19,7 +19,7 @@ export class Gadgets {
     this.flips = [];
     this.splashes = []; // mist / fizz areas
     this.casts = new Map(); // actor -> fishing cast
-    this._makeSpots();
+    this.spots = []; // no fishing in Chapter 1
   }
 
   // ---------- Shield Bubble: a dome that stops every shot crossing it, both ways ----------
