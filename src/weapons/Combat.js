@@ -123,7 +123,6 @@ export class Combat {
       return true;
     }
     const perTarget = new Map();
-    let buildHits = null;
     for (let i = 0; i < def.pellets; i++) {
       coneDir(aimDir, spread, _dir);
       let r = this.trace(origin, _dir, def.range, shooter);
@@ -154,7 +153,6 @@ export class Combat {
         if (r.collider?.structure) {
           r.collider.structure.damage(w.damage * 0.9, shooter);
           if (shooter.isPlayer && r.collider.structure.owner !== shooter) g.meta?.track('buildDamage', w.damage * 0.9);
-          if (shooter.isPlayer) (buildHits ||= { pos: _end.clone(), dmg: 0 }).dmg += w.damage * 0.9;
         }
         else if (r.collider?.breakable) this.damageProp(r.collider, w.damage, shooter);
         else if (r.collider?.part) r.collider.part.damage(w.damage, shooter); // house walls, doors, windows
@@ -162,7 +160,6 @@ export class Combat {
         if (shooter.isPlayer && i < 1) g.hud?.objHp?.(r.collider, _end);
       }
     }
-    if (buildHits) g.effects.buildNumber(buildHits.pos, buildHits.dmg);
     if (shooter.isPlayer && perTarget.size) g.meta?.track('hit', 1, [...perTarget.values()].some((e) => e.head));
     for (const [target, e] of perTarget) {
       if (def.pellets > 1) {

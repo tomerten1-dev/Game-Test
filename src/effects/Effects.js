@@ -361,19 +361,6 @@ export class Effects {
     n.el.style.display = 'block';
   }
 
-  // smaller grey number when you shoot a build
-  buildNumber(pos, amount) {
-    const n = this.numbers[this.numberCursor];
-    this.numberCursor = (this.numberCursor + 1) % this.numbers.length;
-    n.pos.copy(pos);
-    n.vx = (Math.random() - 0.5) * 0.5;
-    n.life = 0.7;
-    n.el.dataset.kind = 'build';
-    n.el.textContent = Math.round(amount);
-    n.el.className = 'dmg-num build';
-    n.el.style.display = 'block';
-  }
-
   // "+8" material popup when harvesting
   matNumber(pos, amount, mat) {
     const n = this.numbers[this.numberCursor];
