@@ -950,7 +950,7 @@ export class Game {
       const plan = this.traps.preview(p, this.camera.position, dir);
       if (input.pressed('fire')) {
         if (plan && this.traps.place(p, plan)) p.consumeHeld();
-        else this.hud.toast?.('Aim at a floor nearby');
+        else this.hud.toast?.('Aim at a wall, floor or ceiling you built');
       }
       return;
     }
