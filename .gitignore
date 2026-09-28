@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# your own character models (Locker skins) stay on your computer
+skins/*
+!skins/README.md

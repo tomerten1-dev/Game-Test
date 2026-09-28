@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { listSkins, addCustomType } from './CustomSkin.js';
 import { registerCustomSkin } from '../meta/Cosmetics.js';
+
+// every .glb / .gltf in <project>/skins becomes a built-in skin
+const SKIN_FILES = import.meta.glob('/skins/*.{glb,gltf,GLB,GLTF}', { query: '?url', import: 'default', eager: true });
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { addRim, addHueSwap } from '../effects/Shaders.js';
@@ -116,8 +119,19 @@ export class CharacterAssets {
         a.types[t] = { scene: g.scene, scale: HEIGHT / h, footOffset: (-box.min.y * HEIGHT) / h, q: true, head, headAbove: (head?.userData.headAbove ?? 0.2) + (t.includes('Ranger') ? 0.06 : 0) };
       });
     }
-    // your own custom skins (Locker), saved in this browser and loaded every start
+    // your own models: files in the project's skins/ folder are built-in skins (git-ignored, local only)
     a.customSkins = [];
+    for (const [path, url] of Object.entries(SKIN_FILES)) {
+      const file = path.split('/').pop();
+      const id = 'file_' + file.replace(/\.[^.]+$/, '').replace(/[^\w-]/g, '_');
+      try {
+        const buf = await (await fetch(url)).arrayBuffer();
+        const res = await addCustomType(a, buf, 1.92, id);
+        a.customSkins.push({ id, name: file, builtin: true, ...res });
+        if (res.ok) registerCustomSkin(id, file, true);
+      } catch (e) { console.warn('skin file', file, e); }
+    }
+    // ...and models loaded in the Locker, saved in this browser and loaded every start
     for (const sk of await listSkins()) {
       const res = await addCustomType(a, sk.buf, 1.92, sk.id);
       a.customSkins.push({ id: sk.id, name: sk.name, ...res });

@@ -217,20 +217,21 @@ export class Menus {
       const skins = this.game.assets?.customSkins || [];
       const eq = COSMETICS[prof.d.equipped.hero];
       const cur = eq?.custom ? skins.find((k) => `custom_${k.id}` === eq.id) : null;
+      const fromFolder = skins.filter((k) => k.builtin && k.ok).length;
       const bad = skins.filter((k) => !k.ok);
-      const status = cur ? `${cur.name}${cur.animated ? '' : ' · no matching skeleton, so it won\'t animate'}` : skins.length ? `${skins.length} saved in this browser - they load on their own every time` : 'Load a .glb / .gltf character from your computer - it stays saved in this browser';
-      $('#locker-grid').insertAdjacentHTML('afterbegin', `<div class="custom-skin-row"><b>Custom Skins</b><small>${status}${bad.length ? ` · couldn't read ${bad.map((k) => k.name).join(', ')}` : ''}</small><button class="lb-btn" id="cs-load">Load model…</button>${cur || bad.length ? `<button class="lb-btn" id="cs-del">Delete ${cur ? 'this skin' : 'broken'}</button>` : ''}<input type="file" id="cs-file" accept=".glb,.gltf,model/gltf-binary" multiple hidden></div>`);
+      const status = cur ? `${cur.name}${cur.builtin ? ' (skins folder)' : ''}${cur.animated ? '' : ' · no matching skeleton, so it won\'t animate'}` : skins.length ? `${fromFolder} from your skins folder · ${skins.length - fromFolder} saved in this browser` : 'Put .glb files in the project\'s skins/ folder, or load one here (saved in this browser)';
+      $('#locker-grid').insertAdjacentHTML('afterbegin', `<div class="custom-skin-row"><b>Custom Skins</b><small>${status}${bad.length ? ` · couldn't read ${bad.map((k) => k.name).join(', ')}` : ''}</small><button class="lb-btn" id="cs-load">Load model…</button>${(cur && !cur.builtin) || bad.length ? `<button class="lb-btn" id="cs-del">Delete ${cur && !cur.builtin ? 'this skin' : 'broken'}</button>` : ''}<input type="file" id="cs-file" accept=".glb,.gltf,model/gltf-binary" multiple hidden></div>`);
       $('#cs-load').addEventListener('click', (e) => { e.stopPropagation(); $('#cs-file').click(); });
       $('#cs-file').addEventListener('change', async (e) => { for (const f of e.target.files || []) await this.loadCustomSkin(f); });
       $('#cs-del')?.addEventListener('click', async (e) => {
         e.stopPropagation();
-        for (const k of cur ? [cur] : bad) {
+        for (const k of cur && !cur.builtin ? [cur] : bad.filter((x) => !x.builtin)) {
           await deleteSkin(k.id);
           unregisterCustomSkin(k.id);
           delete this.game.assets.types[`Custom:${k.id}`];
           this.game.assets.customSkins = this.game.assets.customSkins.filter((x) => x.id !== k.id);
         }
-        if (cur) prof.equip('hero', 'hero_ranger_m');
+        if (cur && !cur.builtin) prof.equip('hero', 'hero_ranger_m');
         if (this.game.stage) this.game.stage._key = null;
         this.refresh();
       });

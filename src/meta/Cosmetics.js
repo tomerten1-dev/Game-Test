@@ -149,10 +149,12 @@ export const COSMETICS = Object.fromEntries(items.map((i) => [i.id, { ...i, pric
 export const COSMETIC_LIST = items.map((i) => COSMETICS[i.id]);
 
 // Custom skins (your own models, saved in this browser) become hero items at start-up.
-export function registerCustomSkin(id, name) {
+export function registerCustomSkin(id, name, builtin = false) {
   const cid = `custom_${id}`;
   if (COSMETICS[cid]) return cid;
-  const item = { id: cid, type: 'hero', name: name.replace(/\.(glb|gltf)$/i, ''), rarity: 4, value: `Custom:${id}`, custom: true, price: 0 };
+  // "fishstick_skin.glb" -> "Fishstick Skin"
+  const nice = name.replace(/\.(glb|gltf)$/i, '').replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  const item = { id: cid, type: 'hero', name: nice, rarity: builtin ? 4 : 3, value: `Custom:${id}`, custom: true, builtin, price: 0 };
   COSMETICS[cid] = item;
   COSMETIC_LIST.splice(COSMETIC_LIST.findIndex((c) => c.type === 'hero' && !c.custom), 0, item); // before the built-in heroes, in the order you added them
   return cid;
