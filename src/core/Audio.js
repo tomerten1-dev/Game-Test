@@ -12,7 +12,7 @@ const SAMPLE_FILES = ['blaster', 'blaster_repeater', 'enemy_destroy', 'enemy_hur
 const UI_SOUNDS = new Set(['click', 'ping', 'pingDanger', 'buy', 'stormChime', 'phase', 'elim', 'levelUp', 'victory', 'headshot', 'headshotLegacy', 'hit', 'shieldHit']);
 
 const SAMPLE_MAP = {
-  chest: ['chest_open', 1, 0.9],
+  chest: ['chest_open', 1, 0.45],
   pistol: ['blaster', 1.05, 0.8],
   smg: ['blaster_repeater', 1.2, 0.6],
   ar: ['blaster_repeater', 0.88, 0.75, true],
@@ -115,7 +115,7 @@ export class Sound {
       src.buffer = this.buffers.chest_hum; src.loop = true;
       const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
       src.connect(g); g.connect(pan); pan.connect(this.sfx || this.master); src.start();
-      this._hum = { g, pan, level: 0.55 };
+      this._hum = { g, pan, level: 0.18 }; // quiet: a hint that a chest is near, not a wall of sound
     }
     if (!this._hum) {
       const ctx = this.ctx;
@@ -134,7 +134,7 @@ export class Sound {
       }
       lfo.start();
       g.connect(pan); pan.connect(this.sfx || this.master);
-      this._hum = { g, pan, level: 0.05 };
+      this._hum = { g, pan, level: 0.025 };
     }
     let target = 0;
     if (chest && !this.muted) {
