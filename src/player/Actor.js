@@ -7,13 +7,13 @@ import { makeGlider } from './Glider.js';
 import { damp, dampAngle } from '../core/noise.js';
 import { makeWeaponMesh, makePickaxeMesh, makeThrowableMesh } from '../weapons/WeaponModels.js';
 import { makeConsumableMesh } from '../world/ItemMeshes.js';
-import { Pickaxe, Consumable, CONSUMABLES, MAT_CAP } from '../weapons/Items.js';
+import { Pickaxe, Consumable, CONSUMABLES, MAT_CAP, AMMO } from '../weapons/Items.js';
 
 const _surf = []; // scratch list for surface()
 
 export const RUN_SPEED = 6.4;
-export const SPRINT_SPEED = 9.0;
-export const TAC_SPRINT_SPEED = 10.6; // tactical sprint (uses stamina)
+export const SPRINT_SPEED = RUN_SPEED * 1.3; // Fortnite Chapter 5: sprint is 1.3x the run speed (was 1.4x)
+export const TAC_SPRINT_SPEED = SPRINT_SPEED * 1.18; // tactical sprint (uses stamina)
 const STAMINA_DRAIN = 22, STAMINA_REGEN = 26;
 const CROUCH_SPEED = 3.4;
 const SLIDE_TIME = 0.85;
@@ -78,7 +78,7 @@ export class Actor {
     this.pos = new THREE.Vector3();
     this.vel = new THREE.Vector3();
     this.radius = 0.42;
-    this.height = 1.8;
+    this.height = 1.92; // Fortnite players are 192 cm
     this.onGround = false;
     this.intent = { mx: 0, mz: 0, jump: false, deploy: false, sprint: false };
     this.aimYaw = 0;
@@ -159,7 +159,7 @@ export class Actor {
     if (!free) this.ammo[w.def.ammoType] -= take;
   }
 
-  addAmmo(type, n) { this.ammo[type] = Math.min(999, (this.ammo[type] || 0) + n); }
+  addAmmo(type, n) { this.ammo[type] = Math.min(AMMO[type]?.max ?? 999, (this.ammo[type] || 0) + n); }
   addMat(type, n) { this.mats[type] = Math.min(MAT_CAP, this.mats[type] + n); }
 
   // Stack onto existing consumables first, then a free slot. Returns how many didn't fit.

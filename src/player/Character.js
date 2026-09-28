@@ -29,7 +29,7 @@ const Q_SKIN = ['#8a5a3e', '#7a4d34', '#95654a']; // close to the outfits' skin 
 // sit like they do in the KayKit hand slot
 // (measured against the KayKit slot in the idle and aiming poses)
 const Q_SLOT = { pos: [0, 0.08, 0], quat: [-0.399, -0.615, -0.396, -0.554], scale: 0.761 };
-const HEIGHT = 1.95;
+const HEIGHT = 2.02; // model box incl. hair: puts the top of the head at ~1.92 m, Fortnite's player height
 // Main outfit hue band per hero (0..1), used by outfit colours.
 const OUTFIT_HUE = { Knight: [0.95, 0.05], Barbarian: [0.5, 0.06], Mage: [0.93, 0.06], Rogue: [0.43, 0.07], Rogue_Hooded: [0.43, 0.07] };
 

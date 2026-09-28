@@ -1,11 +1,12 @@
 // Non-gun inventory items: the pickaxe, stackable consumables, ammo and building materials.
 
 export const AMMO = {
-  light: { name: 'Light Ammo', color: '#8fd3ff', box: 18, icon: 'L' },
-  medium: { name: 'Medium Ammo', color: '#7be06a', box: 20, icon: 'M' },
-  shells: { name: 'Shells', color: '#ff9f6b', box: 6, icon: 'S' },
-  heavy: { name: 'Heavy Ammo', color: '#d9b3ff', box: 6, icon: 'H' },
-  rockets: { name: 'Rockets', color: '#ff7a59', box: 3, icon: 'R' },
+  // box = stack per pickup, max = how much you can carry (Fortnite: 500 light / medium, 150 shells, 50 heavy; shells come in 4s)
+  light: { name: 'Light Ammo', color: '#8fd3ff', box: 18, max: 500, icon: 'L' },
+  medium: { name: 'Medium Ammo', color: '#7be06a', box: 20, max: 500, icon: 'M' },
+  shells: { name: 'Shells', color: '#ff9f6b', box: 4, max: 150, icon: 'S' },
+  heavy: { name: 'Heavy Ammo', color: '#d9b3ff', box: 6, max: 50, icon: 'H' },
+  rockets: { name: 'Rockets', color: '#ff7a59', box: 3, max: 999, icon: 'R' },
 };
 
 export const MATS = {

@@ -15,6 +15,9 @@ import { StreamedInstancedMesh } from './Streamed.js';
 
 const T = 0.4;           // wall thickness (the kit's wall pieces span z -0.31..0.09)
 const STORY = 3.12;      // kit wall height
+// Fortnite scale: every house is built in kit units and scaled up so one storey is exactly one
+// build wall (3.84 m) tall, like Fortnite's houses. Furniture keeps its real size.
+export const HS = 3.84 / STORY;
 const SLAB = 0.2;
 const DOOR_W = 1.12, DOOR_H = 2.38;
 const WIN_W = 1.2, WIN_Y0 = 1.02, WIN_Y1 = 2.74;
@@ -169,10 +172,10 @@ export class Houses {
   // ---------- building ----------
 
   // Footprint size for a house kind (before rotation).
-  static size(kind) { const k = KINDS[kind] || KINDS.one; return { W: k.W, D: k.D }; }
+  static size(kind) { const k = KINDS[kind] || KINDS.one; return { W: k.W * HS, D: k.D * HS }; }
 
   // Local x of the front door.
-  static doorX(kind) { return (KINDS[kind] || KINDS.one).frontDoor; }
+  static doorX(kind) { return (KINDS[kind] || KINDS.one).frontDoor * HS; }
 
   add({ x, z, y, rot, color = 'blue', kind = 'one' }) {
     const K = KINDS[kind] || KINDS.one;
@@ -191,6 +194,7 @@ export class Houses {
     h.group = new THREE.Group();
     h.group.position.set(x, y, z);
     h.group.rotation.y = rot;
+    h.group.scale.setScalar(HS);
     this.scene.add(h.group);
 
     this._layout(h, r);
@@ -206,12 +210,15 @@ export class Houses {
   finish() { this.kit.finish(this.scene); }
 
   // local (lx, lz) -> world [x, z]
-  w(h, lx, lz) { return [h.x + lx * h.cos + lz * h.sin, h.z - lx * h.sin + lz * h.cos]; }
+  w(h, lx, lz) { lx *= HS; lz *= HS; return [h.x + lx * h.cos + lz * h.sin, h.z - lx * h.sin + lz * h.cos]; }
+
+  // world (x, z) -> local (kit units)
+  loc(h, x, z) { const dx = x - h.x, dz = z - h.z; return [(dx * h.cos - dz * h.sin) / HS, (dx * h.sin + dz * h.cos) / HS]; }
 
   // local axis-aligned box -> world collider box
   wbox(h, x0, x1, y0, y1, z0, z1, extra = {}) {
     const a = this.w(h, x0, z0), b = this.w(h, x1, z1);
-    return { kind: 'box', minX: Math.min(a[0], b[0]), maxX: Math.max(a[0], b[0]), minZ: Math.min(a[1], b[1]), maxZ: Math.max(a[1], b[1]), y0: h.y + y0, y1: h.y + y1, ...extra };
+    return { kind: 'box', minX: Math.min(a[0], b[0]), maxX: Math.max(a[0], b[0]), minZ: Math.min(a[1], b[1]), maxZ: Math.max(a[1], b[1]), y0: h.y + y0 * HS, y1: h.y + y1 * HS, ...extra };
   }
 
   // local ramp rising toward local direction (dx, dz) -> world ramp collider
@@ -225,7 +232,7 @@ export class Houses {
   _piece(h, type, lx, ly, lz, lrot = 0, sx = 1, sy = 1, sz = 1, opts = {}) {
     const [x, z] = this.w(h, lx, lz);
     _q.setFromAxisAngle(UP, h.rot + lrot);
-    _m.compose(_p.set(x, h.y + ly, z), _q, _s.set(sx, sy, sz));
+    _m.compose(_p.set(x, h.y + ly * HS, z), _q, _s.set(sx * HS, sy * HS, sz * HS));
     return this.kit.add(type, _m, { tint: h.tint, ...opts });
   }
 
@@ -511,15 +518,16 @@ export class Houses {
       const info = this.models.get(type);
       if (!info) return;
       const [x, z] = this.w(h, lx, lz);
-      const idx = this.placeProp(type, x, h.y + ly, z, info.size.y * scale, h.rot + lrot, 0);
+      const idx = this.placeProp(type, x, h.y + ly * HS, z, info.size.y * scale, h.rot + lrot, 0);
       if (!col || idx === undefined) return;
       const q = Math.round(lrot / (Math.PI / 2)) % 2 !== 0;
-      const ex = ((q ? info.size.z : info.size.x) * scale) / 2 - 0.05, ez = ((q ? info.size.x : info.size.z) * scale) / 2 - 0.05;
-      const c = this.wbox(h, lx - ex, lx + ex, ly, ly + info.size.y * scale, lz - ez, lz + ez, { crate: true, mat: 'wood', breakable: { type, idx: [idx], hp, loot } });
+      // the collider matches the (unscaled) prop, so its local extents shrink by the house scale
+      const ex = (((q ? info.size.z : info.size.x) * scale) / 2 - 0.05) / HS, ez = (((q ? info.size.x : info.size.z) * scale) / 2 - 0.05) / HS;
+      const c = this.wbox(h, lx - ex, lx + ex, ly, ly + (info.size.y * scale) / HS, lz - ez, lz + ez, { crate: true, mat: 'wood', breakable: { type, idx: [idx], hp, loot } });
       this.colliders.add(c);
       (h.furn ||= []).push(c);
     };
-    const spot = (lx, ly, lz, list, extra = {}) => { const [x, z] = this.w(h, lx, lz); list.push({ x, y: h.y + ly, z, ...extra }); };
+    const spot = (lx, ly, lz, list, extra = {}) => { const [x, z] = this.w(h, lx, lz); list.push({ x, y: h.y + ly * HS, z, ...extra }); };
     const rug = (x0, x1, z0, z1, c1, c2, y = 0) => {
       h.rugs.push([x0, x1, y + 0.012, y + 0.025, z0, z1, (f) => (f === 'py' ? c1 : f === 'ny' ? null : c2)]);
       h.rugs.push([x0 + 0.18, x1 - 0.18, y + 0.025, y + 0.032, z0 + 0.18, z1 - 0.18, (f) => (f === 'py' ? c2 : null)]);
@@ -617,16 +625,16 @@ export class Houses {
     const fx = this.game?.effects;
     for (let i = 0; i < 6; i++) {
       const [x, z] = this.w(h, (Math.random() - 0.5) * h.W, (Math.random() - 0.5) * h.D);
-      this._debris(h, new THREE.Vector3(x, h.y + 1 + Math.random() * h.top, z), i % 2 ? '#e8dcc4' : '#8a5a3a', 30, 0.3);
+      this._debris(h, new THREE.Vector3(x, h.y + 1 + Math.random() * h.top * HS, z), i % 2 ? '#e8dcc4' : '#8a5a3a', 30, 0.3);
     }
     if (fx) this.game.rig.shake = Math.min(1, this.game.rig.shake + (this.game.camera.position.distanceTo(new THREE.Vector3(h.x, h.y, h.z)) < 40 ? 0.5 : 0));
     this.game?.sound.play('explosion', new THREE.Vector3(h.x, h.y + 3, h.z), { range: 120 });
     // upstairs furniture breaks, and loot lying upstairs falls to the ground floor
     const g = this.game;
     for (const c of h.furn || []) if (c.y0 > h.y + 1 && !c.breakable.broken && g) g.world.towns.breakProp(c, g);
-    for (const pk of g?.loot?.pickups || []) if (pk.alive && pk.pos.y > h.y + 1 && Math.abs(pk.pos.x - h.x) < h.W && Math.abs(pk.pos.z - h.z) < h.D) { pk.settled = false; pk.vel.set(0, 0, 0); }
+    for (const pk of g?.loot?.pickups || []) if (pk.alive && pk.pos.y > h.y + 1 && Math.abs(pk.pos.x - h.x) < h.W * HS && Math.abs(pk.pos.z - h.z) < h.D * HS) { pk.settled = false; pk.vel.set(0, 0, 0); }
     // anyone upstairs drops down
-    for (const a of this.game?.actors || []) if (Math.abs(a.pos.x - h.x) < h.W && Math.abs(a.pos.z - h.z) < h.D && a.pos.y > h.y + 1) a.onGround = false;
+    for (const a of this.game?.actors || []) if (Math.abs(a.pos.x - h.x) < h.W * HS && Math.abs(a.pos.z - h.z) < h.D * HS && a.pos.y > h.y + 1) a.onGround = false;
   }
 
   breakGlass(gl) {
@@ -665,7 +673,7 @@ export class Houses {
     }
   }
 
-  _center(h, b) { const [x, z] = this.w(h, (b[0] + b[1]) / 2, (b[4] + b[5]) / 2); return new THREE.Vector3(x, h.y + (b[2] + b[3]) / 2, z); }
+  _center(h, b) { const [x, z] = this.w(h, (b[0] + b[1]) / 2, (b[4] + b[5]) / 2); return new THREE.Vector3(x, h.y + ((b[2] + b[3]) / 2) * HS, z); }
   _panelCenter(p) { return this._center(p.house, this._wallBox(p.house, p.side, p.u0, p.u1, p.y0, p.y0 + STORY)); }
   _doorCenter(d) { return this._center(d.house, this._wallBox(d.house, d.side, d.uc - 0.5, d.uc + 0.5, d.y0, d.y0 + DOOR_H)); }
 
@@ -706,8 +714,7 @@ export class Houses {
   // House containing a world point (inside the walls), or null.
   houseAt(x, z) {
     for (const h of this.list) {
-      const dx = x - h.x, dz = z - h.z;
-      const lx = dx * h.cos - dz * h.sin, lz = dx * h.sin + dz * h.cos;
+      const [lx, lz] = this.loc(h, x, z);
       if (Math.abs(lx) < h.W / 2 && Math.abs(lz) < h.D / 2) return { h, lx, lz };
     }
     return null;
@@ -715,6 +722,7 @@ export class Houses {
 
   _region(h, lx, lz, y) {
     if (Math.abs(lx) >= h.W / 2 || Math.abs(lz) >= h.D / 2) return 'out';
+    y = h.y + (y - h.y) / HS; // heights below are in kit units
     if (y - h.y > h.top - 0.5) return 'roof';
     const s = h.stairs;
     if (s && lx > s.x0 - 0.1 && lx < s.x1 + 0.05 && lz > s.z0 - 0.05 && lz < s.z1 + 0.1 && y - h.y < STORY - 0.15) return 'stair';
@@ -728,7 +736,7 @@ export class Houses {
     const a = this.houseAt(from.x, from.z), b = this.houseAt(tx, tz);
     if (!a && !b) return this._aroundAny(from, tx, tz);
     const h = (a && b && a.h !== b.h) ? a.h : (a || b).h;
-    const loc = (x, z) => { const dx = x - h.x, dz = z - h.z; return [dx * h.cos - dz * h.sin, dx * h.sin + dz * h.cos]; };
+    const loc = (x, z) => this.loc(h, x, z);
     const [flx, flz] = loc(from.x, from.z);
     const [tlx, tlz] = loc(tx, tz);
     const rFrom = this._region(h, flx, flz, from.y);
@@ -821,7 +829,7 @@ export class Houses {
   // A picket fence encloses the front yard: route through its gate (in front of the door).
   setFence(h) {
     h.fence = true;
-    h.gate = [h.K.frontDoor, h.D / 2 + YARD + 1.3];
+    h.gate = [h.K.frontDoor, h.D / 2 + (YARD + 1.3) / HS]; // the fence yard is in metres
     h.portals[0][1] = h.gate;
   }
 
@@ -830,8 +838,8 @@ export class Houses {
     for (const h of this.list) {
       const dx = h.x - from.x, dz = h.z - from.z;
       if (dx * dx + dz * dz > 22 * 22) continue;
-      const lf = [(from.x - h.x) * h.cos - (from.z - h.z) * h.sin, (from.x - h.x) * h.sin + (from.z - h.z) * h.cos];
-      const lt = [(tx - h.x) * h.cos - (tz - h.z) * h.sin, (tx - h.x) * h.sin + (tz - h.z) * h.cos];
+      const lf = this.loc(h, from.x, from.z);
+      const lt = this.loc(h, tx, tz);
       const c = this._around(h, lf[0], lf[1], lt[0], lt[1]);
       if (c) { const [x, z] = this.w(h, c[0], c[1]); return { x, z }; }
     }

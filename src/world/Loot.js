@@ -537,8 +537,13 @@ export class Loot {
       if (actor.isPlayer) g.sound.play('pickup');
       if (left > 0) { p.count = left; return null; }
     } else if (p.type === 'ammo') {
-      actor.addAmmo(p.ammoType, p.amount);
+      // like Fortnite: take what fits under the cap and leave the rest on the ground
+      const room = (AMMO[p.ammoType].max ?? 999) - (actor.ammo[p.ammoType] || 0);
+      if (room <= 0) return `${AMMO[p.ammoType].name} full`;
+      const take = Math.min(room, p.amount);
+      actor.addAmmo(p.ammoType, take);
       if (actor.isPlayer) g.sound.play('ammo');
+      if (take < p.amount) { p.amount -= take; return null; }
     } else if (p.type === 'mat') {
       actor.addMat(p.matType, p.amount);
       if (actor.isPlayer) g.sound.play('pickup');

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Houses, YARD } from './Houses.js';
+import { Houses, YARD, HS } from './Houses.js';
 import { makeWeaponMesh } from '../weapons/WeaponModels.js';
 import { mulberry32 } from '../core/noise.js';
 import { part, merge, mat } from './geomUtils.js';
@@ -204,7 +204,7 @@ export class Towns {
       const info = this.models.get(type);
       const scale = KK_SCALE;
       const size = home ? Houses.size(kind) : null;
-      const w = home ? size.W : info.size.x * scale * 0.86, d = home ? size.D : info.size.z * scale * 0.86, h = home ? (kind === 'two' ? 12.5 : 8.2) : info.size.y * scale;
+      const w = home ? size.W : info.size.x * scale * 0.86, d = home ? size.D : info.size.z * scale * 0.86, h = home ? (kind === 'two' ? 12.5 : 8.2) * HS : info.size.y * scale;
       const sw = rotIdx % 2 ? d : w, sd = rotIdx % 2 ? w : d;
       const box = { minX: x - sw / 2, maxX: x + sw / 2, minZ: z - sd / 2, maxZ: z + sd / 2 };
       if (this._overlaps(box, 3)) continue;

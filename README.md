@@ -56,6 +56,9 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 
 - **Slot 1** is the harvesting axe: hit trees, crates and wooden houses for wood, rocks and walls for stone, cars, lamps and city props for metal. Trees and rocks show a glowing blue **weak point**; hit it for double materials. Trees and rocks have HP: chop a tree down and it **topples over**, and rocks **crumble**. Bullets and explosions wear them down too. Everything grows back next match.
 - **Fortnite numbers (researched):**
+  - Scale matches Fortnite: players are 1.92 m tall, and every house storey is exactly one build wall (3.84 m) high, so walls you build line up with the floors. Doors are ~2.9 m and small houses about 10 × 7 m; furniture keeps its real size.
+  - Sprint is 1.3× the run speed (Fortnite Chapter 5), with tactical sprint a bit faster on stamina.
+  - Ammo caps: 500 light, 500 medium, 150 shells and 50 heavy. Shells come in stacks of 4. Over the cap, the rest stays on the ground.
   - Materials cap at 500 each; metal walls top out at 450.
   - The Assault Rifle is based on the Holo Twister: 27 damage, 5.1 shots/s, 25-round mag, 1.5× headshots.
   - The Pump is based on the Sentinel: 12 pellets, 92 common → 114 legendary, 4 shells, 1.75× headshots.
