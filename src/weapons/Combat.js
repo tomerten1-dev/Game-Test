@@ -23,6 +23,9 @@ export function coneDir(dir, spread, out) {
 }
 
 // Hitscan shooting shared by the player and bots.
+// body hitboxes below the head: [height of the centre, radius]
+const BODY_BOXES = [[1.3, 0.28], [0.95, 0.3], [0.55, 0.26], [0.22, 0.22]];
+
 export class Combat {
   constructor(game) {
     this.game = game;
@@ -48,12 +51,13 @@ export class Combat {
         if (t >= 0 && t < best) { best = t; res.actor = a; res.head = false; res.collider = null; res.terrain = false; }
         continue;
       }
-      const th = raySphere(o.x, o.y, o.z, d.x, d.y, d.z, p.x, p.y + 1.5, p.z, 0.42 + pad * 0.5, best);
+      // hitboxes for a 1.92 m character: head (top ~0.4 m, headshot damage), then chest, hips and legs
+      const th = raySphere(o.x, o.y, o.z, d.x, d.y, d.z, p.x, p.y + 1.71 - a.crouchAmt * 0.15, p.z, 0.21 + pad * 0.5, best);
       if (th >= 0 && th < best) { best = th; res.actor = a; res.head = true; res.collider = null; res.terrain = false; }
-      const tb = raySphere(o.x, o.y, o.z, d.x, d.y, d.z, p.x, p.y + 0.82, p.z, 0.34 + pad, best);
-      if (tb >= 0 && tb < best) { best = tb; res.actor = a; res.head = false; res.collider = null; res.terrain = false; }
-      const tl = raySphere(o.x, o.y, o.z, d.x, d.y, d.z, p.x, p.y + 0.36, p.z, 0.28 + pad, best);
-      if (tl >= 0 && tl < best) { best = tl; res.actor = a; res.head = false; res.collider = null; res.terrain = false; }
+      for (const [y, r] of BODY_BOXES) {
+        const tb = raySphere(o.x, o.y, o.z, d.x, d.y, d.z, p.x, p.y + y, p.z, r + pad, best);
+        if (tb >= 0 && tb < best) { best = tb; res.actor = a; res.head = false; res.collider = null; res.terrain = false; }
+      }
     }
     // Shield Bubbles stop everything that crosses their wall
     if (this.game.gadgets?.bubbles.length) {

@@ -991,7 +991,7 @@ export class Bot extends Actor {
       const errMul = (1.35 - 0.85 * this.settle) * (mySpeed > 4 ? 1.2 : 1) * (this.onGround ? 1 : 1.3) * (1 + Math.min(0.5, tSpeed * 0.03));
       // aim point: rockets at the feet (splash), snipers go for the head, otherwise upper body
       const onFoot = tgt.state === 'ground';
-      const ay = !onFoot ? 0.9 : key === 'rocket' && tgt.onGround ? 0.25 : this.aimHead ? 1.5 : 1.05;
+      const ay = !onFoot ? 0.9 : key === 'rocket' && tgt.onGround ? 0.25 : this.aimHead ? 1.7 : 1.1;
       _tp.set(tgt.pos.x, tgt.pos.y + ay, tgt.pos.z).addScaledVector(this.aimErr, errMul);
       // lead moving targets by the bullet's travel time and hold over for drop
       const pr = w0?.def.projectile;
