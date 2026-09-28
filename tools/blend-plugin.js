@@ -1,4 +1,4 @@
-// Vite plugin: every .blend file in skins/ or cosmetics/ is turned into a .glb (with its textures) by
+// Vite plugin: every .blend file in skins/, cosmetics/ or weapons/ is turned into a .glb (with its textures) by
 // Blender when the dev server / build starts, so the game can read it. The .glb goes in a
 // "_from_blend" folder next to the .blend and is only redone when the .blend changes.
 // Blender is found in its usual install places, on the PATH, or at the BLENDER environment variable.
@@ -6,7 +6,7 @@ import { existsSync, readdirSync, statSync, mkdirSync } from 'node:fs';
 import { join, dirname, basename, resolve } from 'node:path';
 import { execFile, spawnSync } from 'node:child_process';
 
-const ROOTS = ['skins', 'cosmetics'];
+const ROOTS = ['skins', 'cosmetics', 'weapons'];
 const OUT_DIR = '_from_blend';
 
 function findBlends(dir, out = []) {

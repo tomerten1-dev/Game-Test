@@ -31,3 +31,7 @@ skins/*
 cosmetics/**/*.*
 !cosmetics/README.md
 !cosmetics/*/.gitkeep
+
+# your own gun models (see weapons/README.md) - never committed
+weapons/**/*.*
+!weapons/README.md

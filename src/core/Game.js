@@ -12,6 +12,7 @@ import { Models } from './Models.js';
 import { Post } from './Post.js';
 import { Quality } from './Quality.js';
 import { setWeaponModels } from '../weapons/WeaponModels.js';
+import { loadWeaponFolder } from '../weapons/CustomWeapons.js';
 import { quality } from './device.js';
 import { Sound } from './Audio.js';
 import { Effects } from '../effects/Effects.js';
@@ -97,6 +98,7 @@ export class Game {
     progress(0.45, 'Shaping the island…');
     await loadIslandMap();
     await loadCosmeticFolder(); // your gliders / pickaxes / back blings (cosmetics folder)
+    await loadWeaponFolder(); // your gun models (weapons folder)
     await nextFrame();
     this.world = new World(this.scene, this.renderer, this.models);
     progress(0.8, 'Growing trees…');

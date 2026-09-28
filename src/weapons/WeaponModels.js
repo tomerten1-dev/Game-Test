@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { part, merge, mat } from '../world/geomUtils.js';
 import { RARITIES } from './WeaponDefs.js';
+import { customGun } from './CustomWeapons.js';
 
 // Procedural low-poly guns (forward = +Z). Geometry cached per type+rarity.
 const cache = new Map();
@@ -332,7 +333,31 @@ export function makePickaxeMesh() {
   return m;
 }
 
+// A gun model from your weapons/ folder, sized and placed like the gun it replaces: the muzzle where
+// that gun's muzzle is, the body reaching back the same length.
+function buildCustom(type, rarity) {
+  const gun = customGun(type, rarity);
+  if (!gun) return null;
+  const len = KENNEY[type]?.length ?? 0.9;
+  const size = gun.box.getSize(new THREE.Vector3());
+  const s = len / size.z;
+  const inner = new THREE.Group();
+  for (const p of gun.parts) { const m = new THREE.Mesh(p.geometry, p.material); m.castShadow = true; inner.add(m); }
+  inner.scale.setScalar(s);
+  // front of the model at 0.82 of the length, barrel at the height our guns shoot from
+  inner.position.set(0, 0.02 - gun.muzzleY * s, len * 0.82 - gun.box.max.z * s);
+  const group = new THREE.Group();
+  group.add(inner);
+  group.userData.muzzle = new THREE.Vector3(0, 0.02, len * 0.85);
+  group.userData.foregrip = len * 0.45;
+  group.userData.top = 0.02 + (gun.box.max.y - gun.muzzleY) * s;
+  group.userData.custom = true;
+  return group;
+}
+
 export function makeWeaponMesh(type, rarity, mods = null) {
+  const c = buildCustom(type, rarity);
+  if (c) return addMods(c, mods);
   const k = models && KENNEY[type] ? buildKenney(type, rarity) : null;
   if (k) return addMods(k, mods);
   const key = `${type}:${rarity}`;
