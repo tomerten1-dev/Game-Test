@@ -62,8 +62,8 @@ export class Player extends Actor {
     } else sprintOn = input.down('sprint');
     this.intent.sprint = sprintOn || Math.hypot(input.touchMove.x, input.touchMove.y) > 0.95;
     if (input.pressed('crouch') && this.state === 'ground') {
-      // like Fortnite: crouch while running (sprinting or not) slides
-      if (this.onGround && Math.hypot(this.vel.x, this.vel.z) > 4.2 && Math.hypot(m.x, my) > 0.3) { this.crouchHeld = false; this.startSlide(); }
+      // crouch while sprinting slides; walking or running it just crouches (Chapter 1)
+      if (this.onGround && this.sprinting && Math.hypot(this.vel.x, this.vel.z) > 7 && Math.hypot(m.x, my) > 0.3) { this.crouchHeld = false; this.startSlide(); }
       else { this.crouchHeld = !this.crouchHeld; this.crouched = this.crouchHeld; }
     }
     if (this.intent.sprint && input.down('sprint') && this.crouchHeld && this.slideT <= 0) this.crouchHeld = this.crouched = false;
