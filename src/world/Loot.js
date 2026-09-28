@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { part, merge, mat } from './geomUtils.js';
-import { TOWNS, MAP_SCALE, GROW } from './Terrain.js';
+import { TOWNS, MAP_SCALE, GROW, VAULT_TOWN } from './Terrain.js';
 import { Weapon } from '../weapons/Weapon.js';
 import { RARITIES, rollRarity, rollWeaponType } from '../weapons/WeaponDefs.js';
 import { itemGeometry } from '../weapons/WeaponModels.js';
@@ -520,7 +520,7 @@ export class Loot {
       // keycards live in their own slot beside the quick bar, not in the inventory
       if (actor.keycard) return 'You already have a keycard';
       actor.keycard = true;
-      if (actor.isPlayer) { g.sound.play('supply'); g.hud?.toast?.('Vault Keycard: open the vault at Rusty Works'); }
+      if (actor.isPlayer) { g.sound.play('supply'); g.hud?.toast?.(`Vault Keycard: open the vault at ${VAULT_TOWN}`); }
     } else if (p.type === 'consumable') {
       let left = actor.addConsumable(p.ctype, p.count);
       if (left === p.count && actor.isPlayer) {

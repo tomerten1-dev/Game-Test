@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { World } from '../world/World.js';
-import { TOWNS, MAP_SCALE } from '../world/Terrain.js';
+import { TOWNS, MAP_SCALE, VAULT_TOWN } from '../world/Terrain.js';
 import { loadIslandMap } from '../world/IslandMap.js';
 import { CharacterAssets, Q_TYPES } from '../player/Character.js';
 import { Player } from '../player/Player.js';
@@ -948,7 +948,7 @@ export class Game {
       return;
     }
     if (held.isConsumable && held.def.key) {
-      if (input.pressed('fire')) this.hud.toast?.('Take it to the vault at Rusty Works');
+      if (input.pressed('fire')) this.hud.toast?.(`Take it to the vault at ${VAULT_TOWN}`);
       return;
     }
     if (held.isConsumable && held.def.wingsuit) {

@@ -2,19 +2,19 @@ import * as THREE from 'three';
 import { Bot } from '../bots/Bot.js';
 import { Weapon } from '../weapons/Weapon.js';
 import { Loot } from './Loot.js';
-import { TOWNS } from './Terrain.js';
+import { TOWNS, VAULT_TOWN } from './Terrain.js';
 import { MEDALLIONS } from '../weapons/Items.js';
 
 const _v = new THREE.Vector3();
 
 // Bosses: NPCs guarding a town with a couple of guards. Each carries a named mythic weapon and a
 // medallion (a perk for whoever carries it, but carriers show up on everyone's map). The Foreman
-// at Rusty Works also drops the Vault Keycard. NPCs never count as players.
+// at the vault town also drops the Vault Keycard. NPCs never count as players.
 export const BOSSES = [
-  { medal: 'shield', name: 'The Foreman', town: 'Rusty Works', color: '#ff8a2a', char: 'Male_Peasant', hat: 'cowboy', mythic: ['burst', "The Foreman's Burst Rifle"], side: ['pump', 4], guards: ['pump', 'ar', 'ar'], keycard: true },
-  { medal: 'surge', name: 'Captain Tide', town: 'Salty Pier', color: '#39e0c9', char: 'Male_Ranger', hat: 'pirate', mythic: ['pump', "Captain Tide's Pump"], side: ['smg', 4], guards: ['smg', 'ar'] },
-  { medal: 'reload', name: 'The Warden', town: 'Pebble City', color: '#ff6b5d', char: 'Male_Ranger', hat: 'ice_horns', mythic: ['sniper', "The Warden's Sniper"], side: ['ar', 4], guards: ['ar', 'shotgun'] },
-  { medal: 'bloom', name: 'Lady Bloom', town: 'Maple Hollow', color: '#7dff8a', char: 'Female_Ranger', hat: 'halo', mythic: ['smg', "Lady Bloom's SMG"], side: ['shotgun', 4], guards: ['shotgun', 'ar'] },
+  { medal: 'shield', name: 'The Foreman', town: VAULT_TOWN, color: '#ff8a2a', char: 'Male_Peasant', hat: 'cowboy', mythic: ['burst', "The Foreman's Burst Rifle"], side: ['pump', 4], guards: ['pump', 'ar', 'ar'], keycard: true },
+  { medal: 'surge', name: 'Captain Tide', town: 'Lucky Landing', color: '#39e0c9', char: 'Male_Ranger', hat: 'pirate', mythic: ['pump', "Captain Tide's Pump"], side: ['smg', 4], guards: ['smg', 'ar'] },
+  { medal: 'reload', name: 'The Warden', town: 'Tilted Towers', color: '#ff6b5d', char: 'Male_Ranger', hat: 'ice_horns', mythic: ['sniper', "The Warden's Sniper"], side: ['ar', 4], guards: ['ar', 'shotgun'] },
+  { medal: 'bloom', name: 'Lady Bloom', town: 'Pleasant Park', color: '#7dff8a', char: 'Female_Ranger', hat: 'halo', mythic: ['smg', "Lady Bloom's SMG"], side: ['shotgun', 4], guards: ['shotgun', 'ar'] },
 ];
 
 export class BossEvent {
@@ -31,7 +31,7 @@ export class BossEvent {
     this.bosses = [];
     this.npcs = [];
     // like Fortnite, bosses turn up at a different place each match (the Foreman stays by his vault)
-    const pool = TOWNS.filter((x) => x.name !== 'Rusty Works').sort(() => Math.random() - 0.5);
+    const pool = TOWNS.filter((x) => x.name !== VAULT_TOWN).sort(() => Math.random() - 0.5);
     for (const cfg of BOSSES) {
       const t = cfg.keycard ? TOWNS.find((x) => x.name === cfg.town) : pool.pop();
       cfg.at = t?.name;
@@ -99,7 +99,7 @@ export class BossEvent {
     const v = this.vault, g = this.game;
     if (!v || v.opened) return null;
     const slot = actor.items.findIndex((it) => it?.type === 'keycard');
-    if (!actor.keycard && slot < 0) return 'You need the Vault Keycard (the Foreman at Rusty Works has it)';
+    if (!actor.keycard && slot < 0) return `You need the Vault Keycard (the Foreman at ${VAULT_TOWN} has it)`;
     if (actor.keycard) actor.keycard = false;
     else { actor.items[slot] = null; if (actor.slot === slot) actor.switchSlot(0); }
     v.opened = true;

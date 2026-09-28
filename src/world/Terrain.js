@@ -18,26 +18,30 @@ export const WATER_LEVEL = 0;
 
 // Named places, laid out like the Fortnite Chapter 1 Season 3 island (Feb 2018): positions are pixels on
 // that map (1024 px image), converted by fromMap(). `kind` picks the builder in Towns.js (village by
-// default); villages with r >= 36 get two rings of buildings. Names are our own takes on the originals.
+// default); villages with r >= 36 get two rings of buildings.
 const S3_TOWNS = [
-  { name: 'Scrap Junction', at: [205, 125], r: 30, kind: 'factory' },   // Junk Junction
-  { name: 'Spooky Hills', at: [268, 170], r: 26 },                      // Haunted Hills
-  { name: 'Sunny Park', at: [290, 298], r: 44 },                        // Pleasant Park
-  { name: 'Rowdy Acres', at: [540, 232], r: 30, kind: 'farm' },         // Anarchy Acres
-  { name: 'Treasure Lake', at: [372, 398], r: 22 },                     // Loot Lake
-  { name: 'Pepper Town', at: [672, 322], r: 28 },                       // Tomato Town
-  { name: 'Lonesome Lodge', at: [852, 500], r: 26 },                    // Lonely Lodge
-  { name: 'Market Row', at: [760, 540], r: 30, kind: 'city' },          // Retail Row
-  { name: 'Rusty Depot', at: [597, 462], r: 30, kind: 'factory' },      // Dusty Depot
-  { name: 'Sandy Springs', at: [575, 622], r: 40 },                     // Salty Springs
-  { name: 'Leaning Towers', at: [378, 505], r: 40, kind: 'spires' },    // Tilted Towers
-  { name: 'Posh Shores', at: [88, 465], r: 30 },                        // Snobby Shores
-  { name: 'Burger Grove', at: [232, 628], r: 38 },                      // Greasy Grove
-  { name: 'Shaky Shafts', at: [382, 634], r: 28 },                      // Shifty Shafts
-  { name: 'Fateful Fields', at: [610, 772], r: 30, kind: 'farm' },      // Fatal Fields
-  { name: 'Plumbing Plant', at: [362, 878], r: 28, kind: 'factory' },   // Flush Factory
-  { name: 'Lucky Lagoon', at: [578, 922], r: 30 },                      // Lucky Landing
+  { name: 'Junk Junction', at: [205, 125], r: 30, kind: 'factory' },
+  { name: 'Haunted Hills', at: [268, 170], r: 26 },
+  { name: 'Pleasant Park', at: [290, 298], r: 44 },
+  { name: 'Anarchy Acres', at: [540, 232], r: 30, kind: 'farm' },
+  { name: 'Loot Lake', at: [372, 398], r: 22 },
+  { name: 'Tomato Town', at: [672, 322], r: 28 },
+  { name: 'Lonely Lodge', at: [852, 500], r: 26 },
+  { name: 'Retail Row', at: [760, 540], r: 30, kind: 'city' },
+  { name: 'Dusty Depot', at: [597, 462], r: 30, kind: 'factory' },
+  { name: 'Salty Springs', at: [575, 622], r: 40 },
+  { name: 'Tilted Towers', at: [378, 505], r: 40, kind: 'spires' },
+  { name: 'Snobby Shores', at: [88, 465], r: 30 },
+  { name: 'Greasy Grove', at: [232, 628], r: 38 },
+  { name: 'Shifty Shafts', at: [382, 634], r: 28 },
+  { name: 'Fatal Fields', at: [610, 772], r: 30, kind: 'farm' },
+  { name: 'Flush Factory', at: [362, 878], r: 28, kind: 'factory' },
+  { name: 'Lucky Landing', at: [578, 922], r: 30 },
 ];
+// named areas with no town of their own (labelled on the maps like the towns)
+// the one factory town with the steel vault (the Foreman guards it and carries the keycard)
+export const VAULT_TOWN = 'Dusty Depot';
+export const ZONES = [['Wailing Woods', [822, 292]], ['Moisty Mire', [830, 800]]].map(([name, at]) => { const [x, z] = fromMap(...at); return { name, x, z }; });
 export const TOWNS = S3_TOWNS.map(({ at, ...t }) => { const [x, z] = fromMap(...at); return { ...t, x, z }; });
 // dirt roads: every town links to its two nearest neighbours
 export const ROADS = (() => {

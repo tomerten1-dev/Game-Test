@@ -1,4 +1,4 @@
-import { TOWNS, WORLD_HALF } from '../world/Terrain.js';
+import { TOWNS, ZONES, WORLD_HALF } from '../world/Terrain.js';
 import { MAP_N, MAP_CELL } from '../world/IslandMap.js';
 
 // half-extent shown at zoom 1: the island map's square, so the A-J / 1-10 grid lines up with Fortnite's
@@ -150,14 +150,22 @@ export class MapScreen {
 
     // POIs
     ctx.textBaseline = 'middle';
-    ctx.font = `800 ${Math.round(W * 0.028 * Math.min(1.4, this.zoom ** 0.4))}px "Barlow Condensed", sans-serif`;
-    ctx.lineWidth = Math.max(3, W * 0.005);
-    ctx.strokeStyle = 'rgba(15,25,55,0.75)';
-    ctx.fillStyle = '#ffffff';
-    for (const t of TOWNS) {
-      const [x, y] = this.toScreen(t.x, t.z);
-      ctx.strokeText(t.name.toUpperCase(), x, y);
-      ctx.fillText(t.name.toUpperCase(), x, y);
+    // Fortnite-style names: heavy condensed white capitals with a dark outline and a drop shadow
+    const fs = Math.round(W * 0.03 * Math.min(1.4, this.zoom ** 0.4));
+    ctx.font = `${fs}px Anton, Impact, sans-serif`;
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.max(3, fs * 0.22);
+    ctx.strokeStyle = '#0d1022';
+    for (const t of [...TOWNS, ...ZONES]) {
+      let [x, y] = this.toScreen(t.x, t.z);
+      const name = t.name.toUpperCase();
+      const hw = ctx.measureText(name).width / 2 + fs * 0.2; // keep names on the map (Snobby Shores sits on the edge)
+      x = Math.max(hw, Math.min(W - hw, x));
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillText(name, x + fs * 0.06, y + fs * 0.1);
+      ctx.strokeText(name, x, y);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(name, x, y);
     }
 
     // storm

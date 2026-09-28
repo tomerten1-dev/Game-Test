@@ -91,8 +91,8 @@ const WEEKLY = [
   { id: 'w_heal', text: 'Use {n} healing or shield items', event: 'heal', target: 20 },
   { id: 'w_supply', text: 'Open {n} supply drops', event: 'supply', target: 3 },
   { id: 'w_pads', text: 'Bounce on {n} jump or launch pads', event: 'pad', target: 10 },
-  { id: 'w_boss', text: 'Defeat the Foreman at Rusty Works', event: 'boss', target: 1 },
-  { id: 'w_vault', text: 'Open the vault at Rusty Works', event: 'vault', target: 1 },
+  { id: 'w_boss', text: 'Defeat the Foreman at Dusty Depot', event: 'boss', target: 1 },
+  { id: 'w_vault', text: 'Open the vault at Dusty Depot', event: 'vault', target: 1 },
 ];
 
 // ISO-ish week key (Monday start) so everyone gets the same weekly set.

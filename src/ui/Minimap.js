@@ -1,4 +1,4 @@
-import { TOWNS, WORLD_HALF } from '../world/Terrain.js';
+import { TOWNS, ZONES, WORLD_HALF } from '../world/Terrain.js';
 
 const VIEW = 170; // half-extent in meters shown around you
 
@@ -39,15 +39,16 @@ export class Minimap {
     ctx.drawImage(this.terrain, (this.cx - VIEW + WORLD_HALF) * k, (this.cz - VIEW + WORLD_HALF) * k, VIEW * 2 * k, VIEW * 2 * k, 0, 0, W, W);
 
     // town names
-    ctx.font = `700 ${Math.round(W * 0.045)}px "Barlow Condensed", sans-serif`;
+    ctx.font = `${Math.round(W * 0.05)}px Anton, Impact, sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.strokeStyle = 'rgba(20,30,60,0.6)';
-    ctx.lineWidth = 3;
-    for (const t of TOWNS) {
+    ctx.lineJoin = 'round';
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#0d1022';
+    ctx.lineWidth = Math.max(3, W * 0.012);
+    for (const t of [...TOWNS, ...ZONES]) {
       const [x, y] = this.toMap(t.x, t.z);
-      ctx.strokeText(t.name, x, y);
-      ctx.fillText(t.name, x, y);
+      ctx.strokeText(t.name.toUpperCase(), x, y);
+      ctx.fillText(t.name.toUpperCase(), x, y);
     }
 
     const storm = game.storm;

@@ -3,7 +3,7 @@ import { Houses, YARD } from './Houses.js';
 import { makeWeaponMesh } from '../weapons/WeaponModels.js';
 import { mulberry32 } from '../core/noise.js';
 import { part, merge, mat } from './geomUtils.js';
-import { TOWNS, MOUNTAIN, AREA_SCALE, MAP_SCALE } from './Terrain.js';
+import { TOWNS, MOUNTAIN, AREA_SCALE, MAP_SCALE, VAULT_TOWN } from './Terrain.js';
 
 // KayKit Medieval buildings (CC0). Uniform world scale keeps proportions consistent.
 const KK_SCALE = 9.5;
@@ -549,7 +549,7 @@ export class Towns {
       this.houses.push({ ...box, x, z, y: gy, h, rot });
       this.chestSpots.push({ x: x + (rot ? w / 2 + 1.8 : 3), z: z + (rot ? 3 : d / 2 + 1.8), rot });
     }
-    this._vault(t, parts);
+    if (t.name === VAULT_TOWN) this._vault(t, parts); // just one vault on the island
     // smokestack
     const sx = t.x + 12, sz = t.z + 14, sy = this.terrain.heightAt(sx, sz) - 0.3;
     parts.push(part(new THREE.CylinderGeometry(1.4, 2, 26, 12), '#9a4b33', mat(sx, sy + 13, sz)));

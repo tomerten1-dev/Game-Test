@@ -933,3 +933,13 @@ body.hud-editing #top-right, body.hud-editing #bottom-left, body.hud-editing #bo
 .play-right .modes { order: -1; }
 @media (max-width: 1000px) { .lb-tabs { flex-wrap: nowrap; } .lb-tabs button { font-size: 15px; padding: 7px 6px; letter-spacing: 0.4px; } .lb-brand { font-size: 20px; } .lb-level small { display: none; } }
 @media (max-width: 1000px) and (max-height: 500px) { .mode-card, #play-btn, .play-right .sub { width: 280px; } .mode-card b { font-size: 28px; } #play-btn { font-size: 42px; } }
+
+/* Fortnite-logo style wordmark: upright heavy capitals, white fading to pale blue, dark outline and a hard drop */
+.load-title, .lb-brand {
+  font-family: var(--title); font-style: normal; font-weight: 400; letter-spacing: 1.5px; text-transform: uppercase;
+  background: linear-gradient(180deg, #ffffff 0%, #ffffff 48%, #d3e0ff 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  -webkit-text-stroke: 0; text-shadow: none;
+  filter: drop-shadow(0 0 1.5px #151a45) drop-shadow(0 4px 0 #151a45) drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35));
+}
+.lb-brand .bolt { -webkit-text-fill-color: #ffd23f; }
