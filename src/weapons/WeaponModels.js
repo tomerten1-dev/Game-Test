@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { part, merge, mat } from '../world/geomUtils.js';
-import { RARITIES } from './WeaponDefs.js';
 import { customGun } from './CustomWeapons.js';
 
 // Procedural low-poly guns (forward = +Z). Geometry cached per type+rarity.
@@ -13,7 +12,7 @@ const BOX = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 const CYL = (r, l, s = 8) => new THREE.CylinderGeometry(r, r, l, s);
 
 function build(type, rarity) {
-  const acc = new THREE.Color(RARITIES[rarity].color);
+  const acc = new THREE.Color('#4a505b'); // trim (rarity shows as the glow, not a coloured stripe)
   const p = [];
   let muzzle = 0.5, foregrip = 0.3;
   if (type === 'pistol') {
@@ -185,7 +184,6 @@ const KENNEY = {
 // Higher-rarity launchers get the fancier models.
 const RARITY_MODEL = { rocket: { 4: { name: 'guns/rocketvariant' }, 5: { name: 'guns/quadrocket', rotY: -Math.PI / 2, length: 1.05 } } };
 const kenneyMats = new Map();
-const stripeCache = new Map();
 
 function buildKenney(type, rarity) {
   const base = KENNEY[type];
@@ -215,12 +213,6 @@ function buildKenney(type, rarity) {
   group.add(inner);
   if (cfg.dual) { const twin = inner.clone(); twin.position.x -= 0.24; group.add(twin); }
   if (cfg.drum) { const d = new THREE.Mesh(DRUM_GEO, ATT_MAT); d.position.set(0, -0.07, cfg.length * 0.42); group.add(d); }
-  // glowing rarity stripe on top
-  const key = type + rarity;
-  if (!stripeCache.has(key)) stripeCache.set(key, [new THREE.BoxGeometry(0.035, 0.03, cfg.length * 0.55), new THREE.MeshStandardMaterial({ color: RARITIES[rarity].color, emissive: RARITIES[rarity].color, emissiveIntensity: 0.9, roughness: 0.4 })]);
-  const stripe = new THREE.Mesh(...stripeCache.get(key));
-  stripe.position.set(0, info.size.y * s * (cfg.textured ? 0.42 : 0.55) + 0.01, cfg.length * 0.3);
-  group.add(stripe);
   // the real barrel tip: the centre of the front few percent of the model (compact guns like the
   // SMG have their barrel near the top, long rifles near the middle)
   const mk = cfg.name + cfg.length + cfg.rotY;
