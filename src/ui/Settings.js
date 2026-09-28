@@ -48,28 +48,46 @@ export function applySettings(game) {
   game.input.applyBindings(s.keys || {});
 }
 
-// Settings panel (sliders, toggles, graphics, key bindings). Used in the lobby and pause menu.
+// Settings are split into tabs like Fortnite's settings screen.
+export const SETTING_TABS = [['game', 'Game'], ['video', 'Video'], ['audio', 'Audio'], ['hud', 'HUD'], ['keys', 'Keybinds']];
+const SLIDER_TAB = { sensitivity: 'game', fov: 'video', master: 'audio', music: 'audio', sfx: 'audio', uiVol: 'audio', hudScale: 'hud' };
+const TOGGLE_TAB = {
+  autoPickup: 'game', autoSort: 'game', sprintByDefault: 'game', toggleSprint: 'game', tapToSearch: 'game', holdToSwap: 'game', simpleBuild: 'game', preEdits: 'game', editOnRelease: 'game',
+  legacyHitSound: 'audio',
+  stackDamage: 'hud', weaponReticles: 'hud', throwArc: 'hud', questTracker: 'hud', showMinimap: 'hud', showCompass: 'hud', showKillfeed: 'hud', showFps: 'hud',
+};
+let curTab = 'game';
+
+// Settings panel with tabs (Game / Video / Audio / HUD / Keybinds). Used in the lobby and the pause
+// menu (compact: without the lobby-only rows - island season and resetting progress).
 export function renderSettings(el, game, { compact = false } = {}) {
   const prof = game.meta.profile;
   const s = prof.d.settings;
   const save = () => { prof.save(); applySettings(game); };
+  const t = curTab;
+  const seg = (label, buttons) => `<div class="set-row"><span>${label}</span><div class="seg">${buttons}</div></div>`;
+  const onOff = (attr) => `<button ${attr} data-val="0">Off</button><button ${attr} data-val="1">On</button>`;
+  const rows = [];
+  for (const [k, label, min, max, step] of SLIDERS) if (SLIDER_TAB[k] === t) rows.push(`<label class="set-row"><span>${label}</span><input type="range" data-k="${k}" min="${min}" max="${max}" step="${step}" value="${s[k]}"><b data-v="${k}"></b></label>`);
+  if (t === 'video') {
+    rows.push(seg('Graphics quality', ['auto', 'low', 'medium', 'high'].map((q) => `<button data-q="${q}">${q[0].toUpperCase() + q.slice(1)}</button>`).join('')));
+    if (!compact) rows.push(seg('Island season', [['auto', 'Auto'], ['summer', 'Summer'], ['winter', 'Winter'], ['desert', 'Desert']].map(([k, n]) => `<button data-island="${k}">${n}</button>`).join('')),
+      '<div class="set-row island-note hidden"><span></span><div class="seg"><button data-act="reload">Reload to build the new island</button></div></div>');
+  }
+  if (t === 'audio') rows.push(seg('Visualize sound', '<button data-sv="0">Off</button><button data-sv="1">On</button>'));
+  for (const [k, label] of TOGGLES) if (TOGGLE_TAB[k] === t) rows.push(seg(label, onOff(`data-tog="${k}"`)));
+  if (t === 'game') for (const [k, label] of PREF_ROWS) rows.push(seg(label, [0, 2, 3, 4, 5, 6].map((n) => `<button data-pref="${k}" data-n="${n}">${n || 'Any'}</button>`).join('')));
+  if (t === 'hud') rows.push(seg('HUD layout', '<button data-act="hudedit">Edit layout</button><button data-act="hudreset">Reset</button>'));
   el.innerHTML = `
-    <div class="set-grid">
-      ${SLIDERS.map(([k, label, min, max, step]) => `
-        <label class="set-row"><span>${label}</span><input type="range" data-k="${k}" min="${min}" max="${max}" step="${step}" value="${s[k]}"><b data-v="${k}"></b></label>`).join('')}
-      <div class="set-row"><span>Graphics</span><div class="seg">${['auto', 'low', 'medium', 'high'].map((q) => `<button data-q="${q}">${q[0].toUpperCase() + q.slice(1)}</button>`).join('')}</div></div>
-      <div class="set-row"><span>Visualize sound</span><div class="seg"><button data-sv="0">Off</button><button data-sv="1">On</button></div></div>
-      ${TOGGLES.map(([k, label]) => `<div class="set-row"><span>${label}</span><div class="seg"><button data-tog="${k}" data-val="0">Off</button><button data-tog="${k}" data-val="1">On</button></div></div>`).join('')}
-      ${PREF_ROWS.map(([k, label]) => `<div class="set-row"><span>${label}</span><div class="seg">${[0, 2, 3, 4, 5, 6].map((n) => `<button data-pref="${k}" data-n="${n}">${n || 'Any'}</button>`).join('')}</div></div>`).join('')}
-      <div class="set-row"><span>HUD layout</span><div class="seg"><button data-act="hudedit">Edit layout</button><button data-act="hudreset">Reset</button></div></div>
-      ${compact ? '' : `<div class="set-row"><span>Island season</span><div class="seg">${[['auto', 'Auto'], ['summer', 'Summer'], ['winter', 'Winter'], ['desert', 'Desert']].map(([k, n]) => `<button data-island="${k}">${n}</button>`).join('')}</div></div>
-      <div class="set-row island-note hidden"><span></span><div class="seg"><button data-act="reload">Reload to build the new island</button></div></div>`}
-    </div>
-    ${compact ? '' : `<div class="set-sub">Key bindings <small>click a key, then press the new one</small></div>
+    <div class="set-tabs">${SETTING_TABS.map(([k, n]) => `<button data-stab="${k}" class="${k === t ? 'on' : ''}">${n}</button>`).join('')}</div>
+    ${t === 'keys' ? `<div class="set-sub">Key bindings <small>click a key, then press the new one</small></div>
     <div class="binds">${BINDABLE.map(([a, label]) => `<div class="bind"><span>${label}</span><button data-bind="${a}"></button></div>`).join('')}</div>
-    <div class="set-actions"><button class="lb-btn" data-act="keys">Reset keys</button><button class="lb-btn danger" data-act="wipe">Reset all progress</button></div>`}`;
+    <div class="set-actions"><button class="lb-btn" data-act="keys">Reset keys</button></div>`
+    : `<div class="set-grid">${rows.join('')}</div>`}
+    ${t === 'game' && !compact ? '<div class="set-actions"><button class="lb-btn danger" data-act="wipe">Reset all progress</button></div>' : ''}`;
+  el.querySelectorAll('[data-stab]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); curTab = b.dataset.stab; game.sound?.play?.('click'); renderSettings(el, game, { compact }); }));
   const sync = () => {
-    for (const [k, , , , , fmt] of SLIDERS) el.querySelector(`[data-v="${k}"]`).textContent = fmt(Number(s[k]));
+    for (const [k, , , , , fmt] of SLIDERS) { const v = el.querySelector(`[data-v="${k}"]`); if (v) v.textContent = fmt(Number(s[k])); }
     const q = game.quality?.setting || 'auto';
     el.querySelectorAll('[data-q]').forEach((b) => b.classList.toggle('on', b.dataset.q === q));
     el.querySelectorAll('[data-sv]').forEach((b) => b.classList.toggle('on', (b.dataset.sv === '1') === !!s.soundViz));

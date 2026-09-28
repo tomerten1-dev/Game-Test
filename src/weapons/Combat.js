@@ -326,7 +326,9 @@ export class Combat {
     if (c?.structure) { const m = c.structure.mat || 'wood'; c.structure.damage(c.structure.owner && c.structure.owner !== actor ? 75 : 50, actor); g.effects.impact(_end, m === 'wood' ? 'wood' : 'stone'); g.sound.play(`harvest_${m}`, actor.isPlayer ? null : _end); return true; }
     if (c?.breakable) this.damageProp(c, 35, actor);
     if (c?.part) c.part.damage(c.mat === 'glass' ? 1 : 55, actor); // house walls break after a few swings
-    const mat = r.terrain ? null : c?.mat === 'glass' ? null : c?.mat || (c?.tree || c?.crate ? 'wood' : c?.rock || c?.stone ? 'stone' : c?.house ? 'wood' : null);
+    // only things that can be broken give materials (a wall that never breaks can't be farmed forever)
+    const canBreak = !!(c?.obj || c?.part || c?.breakable);
+    const mat = r.terrain || !canBreak ? null : c?.mat === 'glass' ? null : c?.mat || (c?.tree || c?.crate ? 'wood' : c?.rock || c?.stone ? 'stone' : c?.house ? 'wood' : null);
     g.effects.impact(_end, mat === 'wood' ? 'wood' : 'stone', _n.copy(dir).negate());
     if (mat) {
       let amount = 7 + Math.floor(Math.random() * 4);
@@ -341,7 +343,7 @@ export class Combat {
         } else this._placeWeak(c, actor, _end.y, crit);
       } else if (c?.obj) g.world.destructibles.damage(c, 50, actor);
       actor.addMat(mat, amount);
-      if (actor.isPlayer) { g.effects.matNumber?.(_end, amount, mat); g.meta?.track('harvest', amount); }
+      if (actor.isPlayer) g.meta?.track('harvest', amount); // no floating number: the object shows its HP bar, the counter shows the mats
       g.sound.play(`harvest_${mat}`, actor.isPlayer ? null : _end, { range: 50 });
     } else if (actor.isPlayer) g.sound.play('impact');
     return mat || true;

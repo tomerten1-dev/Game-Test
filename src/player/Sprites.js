@@ -74,7 +74,8 @@ export class SpriteCompanion {
   update(dt) {
     const a = this.actor;
     this.t += dt;
-    const vis = a.alive && a.root.visible && a.state !== 'bus';
+    // like Fortnite's Sprites it stays out of the sky: hidden on the bus, skydiving and gliding
+    const vis = a.alive && a.root.visible && !['bus', 'skydive', 'glide', 'wing'].includes(a.state);
     this.mesh.visible = vis;
     if (!vis) return;
     // float beside the right shoulder, bobbing, turning with you

@@ -10,8 +10,9 @@ export const MOODS = {
   night: { dark: 1, name: 'Night', top: '#070d24', horizon: '#26336a', hemiSky: '#7d8fd6', hemiGround: '#2a2f45', hemi: 0.55, sun: '#a9bcff', sunI: 0.85, cloud: '#5a6390', exposure: 1.25, stars: 1, sunGlow: 0.25, env: 0.25 },
 };
 
-// In-match day/night timeline (seconds after the bus leaves) with smooth transitions.
-const CYCLE = [[0, 'day'], [150, 'golden'], [270, 'dusk'], [390, 'night']];
+// In-match lighting timeline (seconds after the bus leaves) with smooth transitions. It stays daylight:
+// the match drifts into a golden afternoon but never gets dark.
+const CYCLE = [[0, 'day'], [240, 'golden']];
 const BLEND = 45;
 const _a = new THREE.Color(), _b = new THREE.Color();
 

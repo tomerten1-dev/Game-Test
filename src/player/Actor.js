@@ -501,6 +501,7 @@ export class Actor {
     if (s === 'glide') this.glideStart = this.game.time;
     this.root.visible = s !== 'bus';
     this.character.model.rotation.x = 0;
+    this.character.armPose = s === 'skydive' ? 'spread' : s === 'glide' ? 'glide' : null; // Fortnite-style sky poses
     if (s === 'dead') this.character.setPose('Death_A', null, 0.15);
     else if (s === 'skydive' || s === 'glide') this.character.setPose('Jump_Idle', null, 0.25);
   }

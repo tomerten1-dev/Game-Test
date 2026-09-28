@@ -122,7 +122,7 @@ export class CharacterAssets {
       });
     }
     // our rig's rest pose: custom skins' animations are retargeted from it
-    if (ual1) a.qRig = { scene: ual1.scene, slot: Q_SLOT };
+    if (ual1) a.qRig = { scene: ual1.scene, slot: Q_SLOT, qHeight: HEIGHT };
     // your own models: files in the project's skins/ folder are built-in skins (git-ignored, local only)
     a.customSkins = [];
     for (const [path, url] of Object.entries(SKIN_FILES)) {
@@ -154,7 +154,19 @@ export class CharacterAssets {
   }
 }
 
-const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _axis = new THREE.Vector3();
+const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _axis = new THREE.Vector3(), _qI = new THREE.Quaternion();
+const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
+const LIMBS = ['upperarm_l', 'upperarm_r', 'lowerarm_l', 'lowerarm_r', 'thigh_l', 'thigh_r', 'calf_l', 'calf_r'];
+// [bone, child, side (+1 left / -1 right), direction in model space: x = out to that side, y = toward the head, z = toward the chest]
+const LIMB_POSE = {
+  spread: [
+    ['upperarm_l', 'lowerarm_l', 1, [1, 0.45, -0.2]], ['upperarm_r', 'lowerarm_r', -1, [1, 0.45, -0.2]],
+    ['thigh_l', 'calf_l', 1, [0.4, -1, -0.25]], ['thigh_r', 'calf_r', -1, [0.4, -1, -0.25]],
+  ],
+  glide: [
+    ['upperarm_l', 'lowerarm_l', 1, [0.35, 1, 0.15]], ['upperarm_r', 'lowerarm_r', -1, [0.35, 1, 0.15]],
+  ],
+};
 
 export class Character {
   constructor(assets, color = '#2ee6c9', type = 'Knight', tint = 0.28, outfit = null) {
@@ -225,6 +237,7 @@ export class Character {
         else if (n === 'chest' || n === 'spine_03') this.chestBone = o;
         else if (n === 'spine' || n === 'spine_01') this.spine = o;
         else if (n === 'head' || n === 'Head') this.head = o;
+        if (LIMBS.includes(n)) (this.limbs ||= {})[n] = o;
       }
     });
     // held items attach to a slot on the right hand (the UAL hand bone points along the fingers)
@@ -253,6 +266,37 @@ export class Character {
   }
 
   get currentName() { return this.curName.lower; }
+
+  // Arms / legs posed on top of the animation (UAL rigs, custom skins included):
+  // 'spread' = Fortnite skydive (belly down, arms and legs out wide), 'glide' = hands up on the glider.
+  _limbPose(dt) {
+    const want = this.armPose && this.limbs ? 1 : 0;
+    this.limbW = damp(this.limbW || 0, want, 6, dt);
+    if (this.limbW < 0.01 || !this.limbs) return;
+    if (this.armPose) this._lastPose = this.armPose;
+    const L = this.limbs, model = this.model;
+    model.updateMatrixWorld(true);
+    // which model-space side is the character's left (rigs differ)
+    if (this._leftX === undefined && L.thigh_l && L.thigh_r) {
+      const a = model.worldToLocal(L.thigh_l.getWorldPosition(new THREE.Vector3())), b = model.worldToLocal(L.thigh_r.getWorldPosition(new THREE.Vector3()));
+      this._leftX = Math.sign(a.x - b.x) || 1;
+    }
+    const mq = model.getWorldQuaternion(new THREE.Quaternion());
+    const pose = LIMB_POSE[this._lastPose] || LIMB_POSE.spread;
+    for (const [bone, child, side, dir] of pose) {
+      const b = L[bone], c = L[child];
+      if (!b || !c) continue;
+      // target direction in model space (x = the limb's own side), then in world space
+      _v.set(dir[0] * side * this._leftX, dir[1], dir[2]).normalize().applyQuaternion(mq);
+      const from = c.getWorldPosition(new THREE.Vector3()).sub(b.getWorldPosition(new THREE.Vector3())).normalize();
+      _q2.setFromUnitVectors(from, _v);
+      _q2.slerp(_qI, 1 - this.limbW);
+      b.getWorldQuaternion(_q).premultiply(_q2);
+      b.parent.getWorldQuaternion(_q2);
+      b.quaternion.copy(_q2.invert().multiply(_q));
+      b.updateMatrixWorld(true);
+    }
+  }
 
   // Actions are made the first time a clip is asked for.
   _action(layer, name) {
@@ -322,7 +366,8 @@ export class Character {
     if (this.chestBone && this._chestRest) this.chestBone.quaternion.copy(this._chestRest);
     this.mixer.update(dt);
     if (this.chestBone) (this._chestRest ||= new THREE.Quaternion()).copy(this.chestBone.quaternion);
-    if (this.weaponMesh) this.weaponMesh.visible = this.inHand || armed;
+    if (this.weaponMesh) this.weaponMesh.visible = (this.inHand || armed) && !this.armPose; // empty hands in the sky
+    this._limbPose(dt);
     const bend = (armed ? -pitch * 0.55 : 0) + crouch * 0.35;
     if (this.chestBone && Math.abs(bend) > 0.001) {
       this.root.updateMatrixWorld(true);

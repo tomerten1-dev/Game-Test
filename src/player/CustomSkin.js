@@ -188,14 +188,24 @@ function boneMap(scene) {
   return out;
 }
 const height = (obj) => { const b = new THREE.Box3().setFromObject(obj); return b.max.y - b.min.y; };
-// right / up / forward of a standing skeleton
+// right / up / forward of a standing skeleton. Forward comes from the feet (toes point forward) when
+// the rig has toe bones - left/right bone names are sometimes mirrored, the feet never are.
 function bodyFrame(b) {
-  if (!b.Head || !b.pelvis || !b.thigh_l || !b.thigh_r) return null;
+  if (!b.Head || !b.pelvis) return null;
   const up = wp(b.Head).sub(wp(b.pelvis));
-  const right = wp(b.thigh_r).sub(wp(b.thigh_l));
-  if (up.lengthSq() < 1e-10 || right.lengthSq() < 1e-10) return null;
+  if (up.lengthSq() < 1e-10) return null;
   up.normalize();
-  right.addScaledVector(up, -right.dot(up)).normalize();
+  const flat = (v) => v.addScaledVector(up, -v.dot(up));
+  let fwd = null;
+  if (b.foot_l && b.ball_l && b.foot_r && b.ball_r) {
+    fwd = flat(wp(b.ball_l).sub(wp(b.foot_l)).add(wp(b.ball_r).sub(wp(b.foot_r))));
+    if (fwd.lengthSq() < 1e-10) fwd = null;
+  }
+  let right = b.thigh_l && b.thigh_r ? flat(wp(b.thigh_r).sub(wp(b.thigh_l))) : null;
+  if (right && right.lengthSq() < 1e-10) right = null;
+  if (fwd) right = new THREE.Vector3().crossVectors(fwd.normalize(), up); // same handedness as thigh_r - thigh_l
+  if (!right) return null;
+  right.normalize();
   return new THREE.Matrix4().makeBasis(right, up, new THREE.Vector3().crossVectors(right, up));
 }
 
@@ -203,7 +213,11 @@ function bodyFrame(b) {
 function sourceRig(assets) {
   const r = assets.qRig;
   if (!r) return null;
-  if (!r.bones) { r.scene.updateMatrixWorld(true); r.bones = boneMap(r.scene); r.height = height(r.scene); r.frame = bodyFrame(r.bones); }
+  if (!r.bones) {
+    r.scene.updateMatrixWorld(true); r.bones = boneMap(r.scene); r.height = height(r.scene); r.frame = bodyFrame(r.bones);
+    // feet -> head bone, as a share of the whole model (our heroes are sized by the whole model)
+    if (r.bones.Head) r.headShare = (wp(r.bones.Head).y - new THREE.Box3().setFromObject(r.scene).min.y) / r.height;
+  }
   return r;
 }
 
@@ -289,7 +303,16 @@ export async function addCustomType(assets, buf, targetHeight, id, opts = {}) {
     if (!(h > 0)) return { ok: false, error: 'The model has no visible geometry' };
     const box = new THREE.Box3().setFromObject(root);
     const type = `Custom:${id}`;
-    const entry = { scene: root, scale: targetHeight / h, footOffset: (-box.min.y * targetHeight) / h, q: true, custom: true, clips: null, head: null, headAbove: 0.12 * (h / targetHeight), colors: skinColors(`custom_${id}`) };
+    // the turn lives one level down: the game tilts the outer object (skydiving, sliding...) and
+    // would otherwise overwrite it
+    const outer = new THREE.Group();
+    outer.add(root);
+    // size by the head bone when there is one, so hats / hair / ears don't shrink the body: the
+    // head ends up exactly as high as on our heroes (hero height x our feet-to-head share)
+    const hb = boneMap(root).Head;
+    const headT = hb ? wp(hb).y - box.min.y : 0;
+    const scale = src?.headShare && headT > h * 0.5 ? (src.qHeight * src.headShare) / headT : targetHeight / h;
+    const entry = { scene: outer, scale, footOffset: -box.min.y * scale, q: true, custom: true, clips: null, head: null, headAbove: 0.12 / scale, colors: skinColors(`custom_${id}`) };
     if (src && assets.q) {
       tb = boneMap(root);
       const sb = src.bones;
@@ -305,7 +328,7 @@ export async function addCustomType(assets, buf, targetHeight, id, opts = {}) {
         D.set(o, d);
       });
       const restT = (o) => (D.get(o) || I).clone().multiply(wq(o));
-      const ratio = h / src.height;
+      const ratio = src.headShare && headT > h * 0.5 ? headT / (src.headShare * src.height) : h / src.height; // skeleton size vs ours
       entry.clips = { upper: retarget(assets.q.upper, src, sb, tb, restT, ratio), lower: retarget(assets.q.lower, src, sb, tb, restT, ratio) };
       // hand slot for held items, moved from our hand bone into the model's
       if (sb.hand_r && tb.hand_r && src.slot) {

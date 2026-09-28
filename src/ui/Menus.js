@@ -101,9 +101,12 @@ export class Menus {
       <div id="pause" class="screen hidden">
         <div class="menu-inner small">
           <div class="logo mid">PAUSED</div>
-          <button id="resume-btn" class="btn">RESUME</button>
-          <div class="lb-card pause-settings" id="pause-settings"></div>
-          <button class="lb-btn danger" id="leave-btn">Leave match</button>
+          <div class="pause-main" id="pause-main">
+            <button id="resume-btn" class="btn">RESUME</button>
+            <button class="lb-btn pause-big" id="pause-set-btn">Settings</button>
+            <button class="lb-btn danger pause-big" id="leave-btn">Leave match</button>
+          </div>
+          <div class="pause-set hidden" id="pause-set"><button class="lb-btn" id="pause-back">‹ Back</button><div class="lb-card pause-settings" id="pause-settings"></div></div>
         </div>
       </div>
       <div id="end" class="screen hidden">
@@ -409,9 +412,22 @@ export class Menus {
     if (v) this.refresh();
   }
 
+  // Fortnite-style pause: Resume / Settings / Leave; settings open on their own (tabbed) page.
   showPause(v) {
     this.el.pause.classList.toggle('hidden', !v);
-    if (v) renderSettings(this.$('#pause-settings'), this.game, { compact: true });
+    if (!v) return;
+    this._pauseSettings(false);
+    if (!this._pauseWired) {
+      this._pauseWired = true;
+      this.$('#pause-set-btn').addEventListener('click', (e) => { e.stopPropagation(); this.game.sound.play('click'); this._pauseSettings(true); });
+      this.$('#pause-back').addEventListener('click', (e) => { e.stopPropagation(); this.game.sound.play('click'); this._pauseSettings(false); });
+    }
+  }
+
+  _pauseSettings(open) {
+    this.$('#pause-main').classList.toggle('hidden', open);
+    this.$('#pause-set').classList.toggle('hidden', !open);
+    if (open) renderSettings(this.$('#pause-settings'), this.game, { compact: true });
   }
 
   showMatchmaking(v) {

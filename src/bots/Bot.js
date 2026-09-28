@@ -687,6 +687,7 @@ export class Bot extends Actor {
     let best = null, bd = maxD;
     for (const c of cols) {
       if (!c.tree && !c.crate) continue;
+      if (!c.obj && !c.breakable) continue; // only things that break give materials
       if (c.kind !== 'circle' && c.kind !== 'box') continue;
       const cx = c.kind === 'circle' ? c.x : (c.minX + c.maxX) / 2, cz = c.kind === 'circle' ? c.z : (c.minZ + c.maxZ) / 2;
       const d = Math.hypot(cx - this.pos.x, cz - this.pos.z);

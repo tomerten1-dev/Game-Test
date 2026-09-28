@@ -5,12 +5,10 @@ import { SKY_TOP, SKY_HORIZON } from '../world/Sky.js';
 //  - rain: streaks around the camera (not indoors), a rain loop, greyer sky, closer fog, dimmer sun
 //  - thunderstorm: rain + lightning strikes (bolt, sky flash, thunder that arrives late with
 //    distance); a strike close by hurts, fells trees and starts a small fire
-//  - night: everyone carries a flashlight (your own lights the way; bots' beams give them away)
 
 const STREAKS = 2600, BOX = 70, HIGH = 40;
 const GREY = new THREE.Color('#8a95a6');
-const _c = new THREE.Color(), _v = new THREE.Vector3(), _d = new THREE.Vector3(), _m = new THREE.Matrix4(), _q = new THREE.Quaternion();
-const DOWN = new THREE.Vector3(0, -1, 0);
+const _c = new THREE.Color();
 
 export class WeatherSystem {
   constructor(game) {
@@ -23,17 +21,16 @@ export class WeatherSystem {
     this.bolts = [];
     this.strikeT = 10;
     this._buildRain();
-    this._buildLights();
   }
 
   // Pick this match's weather. Returns a banner text (or null).
   roll(opts = {}) {
     const snowy = opts.snow, desert = opts.desert;
     const r = Math.random();
-    // rain and thunderstorms are switched off: every match is clear (night matches still happen)
+    // rain, thunderstorms and night matches are switched off: every match is clear daylight
     void r; void snowy; void desert;
     this.kind = 'clear';
-    this.night = Math.random() < 0.2;
+    this.night = false;
     this.start();
     const w = this.kind === 'storm' ? 'Thunderstorm' : this.kind === 'rain' ? 'Rain' : null;
     return this.night ? (w ? `Night match · ${w}` : 'Night match') : w;
@@ -57,7 +54,6 @@ export class WeatherSystem {
     this.bolts = [];
     this.streaks.visible = false;
     this._setLoop(0);
-    this._lightsOff();
   }
 
   // ---------- rain ----------
@@ -169,67 +165,6 @@ export class WeatherSystem {
     if (y > 1) g.projectiles?.areas.push({ type: 'fire', pos, owner: null, r: 2.2, t: 5, dur: 5, emit: 0, dps: 10, tick: 0 });
   }
 
-  // ---------- flashlights ----------
-  _buildLights() {
-    const scene = this.game.scene;
-    const mk = (i) => { const l = new THREE.SpotLight('#fff1d6', 0, 55, 0.42, 0.55, 1.4); l.castShadow = false; scene.add(l); scene.add(l.target); return l; };
-    this.playerLight = mk(1.4);
-    this.botLights = [mk(), mk()];
-    // visible beams for bots (so you can spot them in the dark)
-    const cone = new THREE.ConeGeometry(2.4, 11, 16, 1, true);
-    cone.translate(0, -5.5, 0); // apex at the origin, opening along -y
-    this.beams = new THREE.InstancedMesh(cone, new THREE.MeshBasicMaterial({ color: '#fff0c8', transparent: true, opacity: 0.07, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), 28);
-    this.beams.count = 0;
-    this.beams.frustumCulled = false;
-    scene.add(this.beams);
-  }
-
-  _lightsOff() {
-    this.playerLight.intensity = 0;
-    for (const l of this.botLights) l.intensity = 0;
-    this.beams.count = 0;
-  }
-
-  _updateLights(dark) {
-    const g = this.game, p = g.player;
-    if (dark < 0.05 || !p) { this._lightsOff(); return; }
-    // yours: from the chest along where you aim
-    const dir = g.camera.getWorldDirection(_d);
-    if (p.alive && p.state === 'ground') {
-      this.playerLight.position.set(p.pos.x + dir.x * 0.4, p.pos.y + 1.45, p.pos.z + dir.z * 0.4);
-      this.playerLight.target.position.copy(this.playerLight.position).addScaledVector(dir, 12);
-      this.playerLight.intensity = 70 * dark;
-    } else this.playerLight.intensity = 0;
-    // bots: two real lights on the nearest, beams on everyone close enough to matter
-    const near = [];
-    for (const b of g.bots) {
-      if (!b.alive || b.state !== 'ground' || b.hiddenIn) continue;
-      const d2 = (b.pos.x - p.pos.x) ** 2 + (b.pos.z - p.pos.z) ** 2;
-      if (d2 < 130 * 130) near.push([d2, b]);
-    }
-    near.sort((a, b) => a[0] - b[0]);
-    this.botLights.forEach((l, i) => {
-      const b = near[i]?.[1];
-      if (!b || near[i][0] > 70 * 70) { l.intensity = 0; return; }
-      const fx = Math.sin(b.aimYaw), fz = Math.cos(b.aimYaw);
-      l.position.set(b.pos.x + fx * 0.4, b.pos.y + 1.45, b.pos.z + fz * 0.4);
-      l.target.position.set(l.position.x + fx * 12, l.position.y - 1.5, l.position.z + fz * 12);
-      l.intensity = 45 * dark;
-    });
-    let n = 0;
-    for (const [, b] of near) {
-      if (n >= this.beams.instanceMatrix.count) break;
-      const fx = Math.sin(b.aimYaw), fz = Math.cos(b.aimYaw);
-      _v.set(fx, -0.12, fz).normalize();
-      _q.setFromUnitVectors(DOWN, _v);
-      _m.compose(_d.set(b.pos.x + fx * 0.4, b.pos.y + 1.45, b.pos.z + fz * 0.4), _q, _v.set(1, 1, 1));
-      this.beams.setMatrixAt(n++, _m);
-    }
-    this.beams.count = n;
-    this.beams.instanceMatrix.needsUpdate = true;
-    this.beams.material.opacity = 0.075 * dark;
-  }
-
   // ---------- per frame ----------
   update(dt) {
     const g = this.game;
@@ -261,6 +196,5 @@ export class WeatherSystem {
       if (th.t <= 0) { g.sound.play(th.near ? 'thunderNear' : 'thunder'); this.thunder.splice(i, 1); }
     }
     this._tint();
-    this._updateLights(dark);
   }
 }
