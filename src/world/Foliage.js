@@ -7,9 +7,16 @@ import { mulberry32, smoothstep } from '../core/noise.js';
 import { jitter, gradientY } from './geomUtils.js';
 import { TOWNS, WORLD_HALF, ISLAND_RADIUS, PALETTE, AREA_SCALE, BIOMES, biomeAt, TUNNELS } from './Terrain.js';
 import { quality } from '../core/device.js';
-import { ISLAND_MAP, mapAt } from './IslandMap.js';
+import { ISLAND_MAP, mapAt, fromMap } from './IslandMap.js';
 import { Nature } from './Nature.js';
 import { VARIANT, VARIANTS, tint } from './Variant.js';
+// Fortnite's island is open fields and towns with forests in patches: far fewer trees and rocks than
+// the dense woods we had (was ~18k trees / 7.5k rocks)
+const TREE_DENSITY = 0.4, ROCK_DENSITY = 0.4;
+// dense woods the map's forest layer misses (its trees are drawn very dark): Wailing Woods and the
+// woods east of Lonely Lodge - [map x, map y, radius] in 1024 px map coordinates
+const WOODS = [[822, 292, 78], [905, 440, 48]].map(([x, y, r]) => { const [wx, wz] = fromMap(x, y); return { x: wx, z: wz, r: r * 2.62 }; });
+const woodsAt = (x, z) => { let f = 0; for (const w of WOODS) f = Math.max(f, 1 - Math.hypot(x - w.x, z - w.z) / w.r); return Math.min(1, f * 3); };
 
 const TREE_GREENS = tint(VARIANT.treeGreens, ['#4caf50', '#5fc25a', '#3f9e4c', '#78cc5c', '#56b84e'].map((c) => new THREE.Color(c)));
 const AUTUMN = tint(VARIANT.autumn, ['#f39a34', '#e9722c', '#f4b83f', '#d9582b'].map((c) => new THREE.Color(c)));
@@ -120,7 +127,7 @@ export class Foliage {
 
   _trees() {
     const r = this.rand;
-    const count = Math.round(quality.trees * AREA_SCALE * (VARIANT.trees ?? 1));
+    const count = Math.round(quality.trees * AREA_SCALE * (VARIANT.trees ?? 1) * TREE_DENSITY);
     const trunkGeo = new THREE.CylinderGeometry(0.16, 0.26, 1, 6);
     trunkGeo.translate(0, 0.5, 0);
     const trunkMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9 });
@@ -143,8 +150,8 @@ export class Foliage {
       const c = this._candidate(2.6, 34, 0.8);
       if (!c) continue;
       if (ISLAND_MAP.ready) {
-        // forests where the island map has them (dense woods, tree lines), a few trees elsewhere
-        if (r() > 0.08 + 0.92 * mapAt('forest', c.x, c.z)) continue;
+        // forests where the island map has them (dense woods, tree lines), very few trees elsewhere
+        if (r() > 0.025 + 0.975 * Math.max(mapAt('forest', c.x, c.z), woodsAt(c.x, c.z))) continue;
       } else {
         // cluster trees into forests
         const f = forest.fbm(c.x * 0.018 + 100, c.z * 0.018, 3);
@@ -241,7 +248,7 @@ export class Foliage {
   _rocks() {
     if (this.models?.get('kk/rock_single_A')) return this._kkRocks();
     const r = this.rand;
-    const count = Math.round(150 * AREA_SCALE);
+    const count = Math.round(150 * AREA_SCALE * ROCK_DENSITY);
     let geo = new THREE.DodecahedronGeometry(1, 1);
     geo.deleteAttribute('uv');
     geo = jitter(geo, 0.35, r);
@@ -284,7 +291,7 @@ export class Foliage {
     const pl = Object.fromEntries(types.map((t) => [t, []]));
     const pending = [];
     let n = 0;
-    for (let i = 0; i < 1200 * AREA_SCALE && n < 160 * AREA_SCALE; i++) {
+    for (let i = 0; i < 1200 * AREA_SCALE && n < 160 * AREA_SCALE * ROCK_DENSITY; i++) {
       const mountainBias = r() < 0.4;
       const c = mountainBias ? this._candidate(12, 48, 0.4) : this._candidate(0.5, 30, 0.6);
       if (!c) continue;
@@ -382,7 +389,7 @@ export class Foliage {
     const pl = { 'formation-large-stone': [], 'formation-stone': [] };
     const grey = ['#b8bcc2', '#a7aab0', '#c9ccd1', '#9ea3aa'];
     let n = 0;
-    for (let i = 0; i < 1500 * AREA_SCALE && n < 34 * AREA_SCALE; i++) {
+    for (let i = 0; i < 1500 * AREA_SCALE && n < 34 * AREA_SCALE * ROCK_DENSITY; i++) {
       const onMountain = r() < 0.6;
       const c = onMountain ? this._candidate(10, 44, 0.5) : this._candidate(0.8, 14, 0.55);
       if (!c) continue;

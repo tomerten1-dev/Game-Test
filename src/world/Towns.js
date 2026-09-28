@@ -4,6 +4,7 @@ import { makeWeaponMesh } from '../weapons/WeaponModels.js';
 import { mulberry32 } from '../core/noise.js';
 import { part, merge, mat } from './geomUtils.js';
 import { TOWNS, MOUNTAIN, AREA_SCALE, MAP_SCALE, VAULT_TOWN } from './Terrain.js';
+import { fromMap } from './IslandMap.js';
 
 // KayKit Medieval buildings (CC0). Uniform world scale keeps proportions consistent.
 const KK_SCALE = 9.5;
@@ -16,6 +17,18 @@ const FLAGS = ['kk/flag_blue', 'kk/flag_red', 'kk/flag_yellow', 'kk/flag_green']
 const BREAKABLE = /furn_|sack|bucket|wheelbarrow|barrel|crate|city_trash|city_bench|city_firehydrant|city_dumpster|weaponrack|props\/|Pallet|Fuel_|Textiles|Wood_Planks/i;
 // what the harvesting axe gets from a kit prop
 const KIT_MAT = (type) => (/Stone|Bricks/.test(type) ? 'stone' : /Fuel|Parts|Iron|Gold|Anvil/.test(type) ? 'metal' : undefined);
+
+// Buildings outside the named towns, read off the Chapter 1 Season 3 map: [x, y (1024 px map), count]
+const MAP_HOUSES = [
+  // north-west
+  [251, 93, 1], [404, 172, 2], [362, 157, 1], [150, 210, 4], [161, 267, 1], [199, 338, 1], [314, 385, 1], [108, 421, 2], [241, 488, 3], [443, 315, 1],
+  // north-east
+  [576, 269, 2], [530, 190, 1], [636, 331, 1], [761, 196, 2], [744, 219, 1], [809, 182, 1], [715, 163, 1], [667, 172, 1], [742, 410, 4], [896, 406, 1], [900, 208, 1], [918, 280, 1], [872, 150, 1],
+  // south-west
+  [368, 750, 2], [439, 827, 4], [71, 567, 1], [128, 592, 1], [208, 582, 1], [289, 585, 1], [486, 563, 1], [192, 704, 1], [254, 702, 1],
+  // south-east
+  [638, 538, 3], [600, 812, 1], [775, 746, 3], [622, 885, 1], [574, 878, 1], [733, 878, 1], [786, 918, 1], [827, 629, 1], [830, 591, 1], [699, 591, 1],
+];
 
 export class Towns {
   constructor(scene, terrain, colliders, models) {
@@ -34,6 +47,7 @@ export class Towns {
     // enterable homes (interiors, doors, stairs); their furniture goes through the prop instancer
     this.homes = new Houses(scene, colliders, mulberry32(77), models, (type, x, y, z, height, rot, colR) => this._propAt(type, x, y, z, height, rot, colR));
     for (const town of TOWNS) this._town(town, parts, crates);
+    this._mapHouses(parts, crates);
     this.homes.finish();
     this.chestSpots.push(...this.homes.chestSpots);
     this._scatterCrates(crates);
@@ -187,13 +201,14 @@ export class Towns {
     // one ring of houses, or (big villages) an inner ring round the plaza and an outer one
     const rings = opts.rings || [[opts.ring || [0.5, 0.72], opts.count || 6 + Math.floor(r() * 3)]];
     let total = 0;
-    const specials = [...SPECIALS].sort(() => r() - 0.5).slice(0, 2);
+    const specials = opts.bare ? [] : [...SPECIALS].sort(() => r() - 0.5).slice(0, 2); // lone spots: plain homes
     for (const [ring, count] of rings) {
     let placed = 0;
     for (let i = 0; i < count * 6 && placed < count; i++) {
       const a = (placed / count) * Math.PI * 2 + r() * 0.5 + i * 0.37;
       const dist = town.r * (ring[0] + r() * (ring[1] - ring[0]));
       const x = town.x + Math.cos(a) * dist, z = town.z + Math.sin(a) * dist;
+      if (this.terrain.heightAt(x, z) < 1.2) continue; // not in the water
       // face the plaza, snapped to 90 degrees
       const face = Math.atan2(town.x - x, town.z - z);
       const rotIdx = ((Math.round(face / (Math.PI / 2)) % 4) + 4) % 4;
@@ -252,7 +267,7 @@ export class Towns {
     }
     }
     // windmill(s) on the outskirts
-    for (let wi = 0; wi < (opts.windmills || 1); wi++) {
+    for (let wi = 0; wi < (opts.windmills ?? 1); wi++) {
       const a = r() * Math.PI * 2, wx = town.x + Math.cos(a) * town.r * 1.12, wz = town.z + Math.sin(a) * town.r * 1.12;
       const type = WINDMILLS[Math.floor(r() * WINDMILLS.length)];
       const info = this.models.get(type);
@@ -264,6 +279,7 @@ export class Towns {
         this.houses.push({ ...box, x: wx, z: wz, y: wy, h: 14, rot: 0 });
       }
     }
+    if (opts.bare) return; // lone houses: no plaza dressing
     // market stalls around the plaza (opposite the café), or tents in the smaller villages
     if (opts.fountain !== false) this._market(town, cafeAt + Math.PI);
     else for (let i = 0; i < 2; i++) {
@@ -286,6 +302,16 @@ export class Towns {
       this._crateStack(crates, town.x + Math.cos(a) * dist, town.z + Math.sin(a) * dist, r() < 0.3 ? 2 : 1);
     }
     this.chestSpots.push({ x: town.x + 4.2, z: town.z + 1.5, rot: Math.PI / 2 });
+  }
+
+  // The buildings between the towns on the Fortnite Chapter 1 Season 3 map (lone houses, farmsteads,
+  // cabins): [map x, map y, houses] in the map image's 1024 px coordinates.
+  _mapHouses(parts, crates) {
+    for (const [mx, my, n] of MAP_HOUSES) {
+      const [x, z] = fromMap(mx, my);
+      const spot = { name: '', x, z, r: n > 1 ? 10 + n * 4 : 7 };
+      this._village(spot, parts, crates, { fountain: false, ring: n > 1 ? [0.35, 0.9] : [0, 0.35], count: n, windmills: 0, bare: true });
+    }
   }
 
   _crateStack(crates, x, z, n) {
