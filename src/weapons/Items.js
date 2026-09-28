@@ -27,7 +27,7 @@ export const MEDALLIONS = {
 export const CONSUMABLES = {
   bandage: { name: 'Bandages', heal: 15, cap: 75, time: 4, max: 15, stack: 5, icon: '✚', color: '#f2efe6' },
   medkit: { name: 'Medkit', heal: 100, cap: 100, time: 10, max: 3, stack: 1, desc: 'Heals to 100 health · 10 s to use (Chapter 1)', icon: '✚', color: '#ff5a5f' },
-  smallshield: { name: 'Small Shield Potion', shield: 25, cap: 50, time: 2, max: 10, stack: 3, icon: '◆', color: '#6fd0ff' },
+  smallshield: { name: 'Small Shield Potion', shield: 25, cap: 50, time: 2, max: 6, stack: 3, icon: '◆', color: '#6fd0ff' },
   bigshield: { name: 'Shield Potion', shield: 50, cap: 100, time: 5, max: 2, stack: 1, desc: '+50 shield · 5 s to drink (Chapter 1)', icon: '⛊', color: '#3d8dff' },
   medmist: { name: 'Med-Mist', throw: 'medmist', max: 3, stack: 1, icon: 'MST', color: '#7dffb2', radius: 4.5, fuse: 1, duration: 8, desc: 'Throw it: a healing mist (+10 health a second) for 8 s' },
   slurp: { name: 'Slurp Juice', heal: 75, shield: 75, cap: 100, time: 2, max: 2, stack: 1, overTime: 2, both: true, icon: 'SLP', color: '#b86bff', desc: '+1 health and +1 shield every half second, up to 75 each' },
