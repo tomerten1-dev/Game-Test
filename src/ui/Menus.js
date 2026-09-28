@@ -1,4 +1,5 @@
 import { saveSkin, deleteSkin, newSkinId, addCustomType, blobFiles, isModelFile, MODEL_EXT, EXTRA_EXT, skinColors, setSkinColor } from '../player/CustomSkin.js';
+import BLEND_STATUS from 'virtual:blend-status';
 const esc = (t) => String(t).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 import { SLOTS, COSMETIC_LIST, COSMETICS, registerCustomSkin, unregisterCustomSkin } from '../meta/Cosmetics.js';
 import { SPRITES, spriteLevel } from '../player/Sprites.js';
@@ -221,8 +222,9 @@ export class Menus {
       const cur = eq?.custom ? skins.find((k) => `custom_${k.id}` === eq.id) : null;
       const fromFolder = skins.filter((k) => k.builtin && k.ok).length;
       const bad = skins.filter((k) => !k.ok);
+      const blendBad = BLEND_STATUS.filter((b) => !b.ok); // .blend files the dev server couldn't convert
       const status = cur ? `${cur.name}${cur.builtin ? ' (skins folder)' : ''}${cur.animated ? '' : ' · no matching skeleton, so it won\'t animate'}` : skins.length ? `${fromFolder} from your skins folder · ${skins.length - fromFolder} saved in this browser` : 'Put models (.glb .gltf .fbx .dae .obj) in the project\'s skins/ folder, or load one here (saved in this browser)';
-      $('#locker-grid').insertAdjacentHTML('afterbegin', `<div class="custom-skin-row"><b>Custom Skins</b><small>${status}${bad.length ? ` · couldn't read ${bad.map((k) => k.name).join(', ')}` : ''}</small><button class="lb-btn" id="cs-load">Load model…</button>${(cur && !cur.builtin) || bad.length ? `<button class="lb-btn" id="cs-del">Delete ${cur && !cur.builtin ? 'this skin' : 'broken'}</button>` : ''}<input type="file" id="cs-file" accept="${[...MODEL_EXT, ...EXTRA_EXT].map((x) => `.${x}`).join(',')}" multiple hidden><small class="cs-hint">Tip: select the model together with its texture files (.png / .jpg) and .bin so it keeps its colours</small></div>`);
+      $('#locker-grid').insertAdjacentHTML('afterbegin', `<div class="custom-skin-row"><b>Custom Skins</b><small>${status}${bad.length ? ` · couldn't read ${bad.map((k) => k.name).join(', ')}` : ''}${cur?.missing?.length ? ` · <span class="cs-warn">no colours: the model needs ${cur.missing.slice(0, 4).map(esc).join(', ')}${cur.missing.length > 4 ? '…' : ''} - put ${cur.missing.length > 1 ? 'them' : 'it'} next to the model</span>` : ''}${blendBad.length ? ` · <span class="cs-warn">${blendBad.map((b) => `${esc(b.file.split('/').pop())}: ${esc(b.reason)}`).join(' · ')}</span>` : ''}</small><button class="lb-btn" id="cs-load">Load model…</button>${(cur && !cur.builtin) || bad.length ? `<button class="lb-btn" id="cs-del">Delete ${cur && !cur.builtin ? 'this skin' : 'broken'}</button>` : ''}<input type="file" id="cs-file" accept="${[...MODEL_EXT, ...EXTRA_EXT].map((x) => `.${x}`).join(',')}" multiple hidden><small class="cs-hint">Tip: select the model together with its texture files (.png / .jpg) and .bin so it keeps its colours</small></div>`);
       $('#cs-load').addEventListener('click', (e) => { e.stopPropagation(); $('#cs-file').click(); });
       $('#cs-file').addEventListener('change', (e) => this.loadCustomSkins([...(e.target.files || [])]));
       // colour each part of your model yourself (handy for models that come without textures)

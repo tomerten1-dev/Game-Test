@@ -79,8 +79,10 @@ export function setSkinColor(id, part, hex) {
 
 // ---- reading model files ---------------------------------------------------------------------------
 // files: { basename (lower case): url } - where textures / .bin / .mtl are found
-export async function readScene(buf, name, files = {}) {
+// missing: filled with the names of texture files the model asks for but that aren't there
+export async function readScene(buf, name, files = {}, missing = []) {
   const manager = new THREE.LoadingManager();
+  manager.onError = (url) => { const b = baseName(url); if (!missing.includes(b)) missing.push(b); };
   manager.setURLModifier((url) => (/^(data|blob):/.test(url) ? url : files[baseName(url)] || url));
   manager.addHandler(/\.tga$/i, new TGALoader(manager));
   const e = ext(name);
@@ -256,7 +258,8 @@ function retarget(clips, src, sb, tb, restT, ratio) {
 // Returns { ok, animated, matched, parts, error, type }.
 export async function addCustomType(assets, buf, targetHeight, id, opts = {}) {
   try {
-    const scene = await readScene(buf, opts.name || 'model.glb', opts.files);
+    const missing = [];
+    const scene = await readScene(buf, opts.name || 'model.glb', opts.files, missing);
     let skinned = false, n = 0;
     const parts = [];
     scene.traverse((o) => {
@@ -317,7 +320,7 @@ export async function addCustomType(assets, buf, targetHeight, id, opts = {}) {
       }
     }
     assets.types[type] = entry;
-    return { ok: true, animated: skinned && matched >= 10, matched, parts, type };
+    return { ok: true, animated: skinned && matched >= 10, matched, parts, missing, type };
   } catch (e) {
     return { ok: false, error: e.message || String(e) };
   }
