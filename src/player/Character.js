@@ -346,7 +346,7 @@ export class Character {
     if (mesh) {
       this.weaponHolder.add(mesh);
       // hold point ~ between the grip and the foregrip
-      mesh.scale.setScalar(1.55);
+      mesh.scale.setScalar(1.1); // a rifle is ~1.05 m in the hands, as in Fortnite
       mesh.position.set(0, 0, -(mesh.userData.foregrip ?? 0.3) * 0.5);
     }
   }

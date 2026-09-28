@@ -221,11 +221,27 @@ function buildKenney(type, rarity) {
   const stripe = new THREE.Mesh(...stripeCache.get(key));
   stripe.position.set(0, info.size.y * s * (cfg.textured ? 0.42 : 0.55) + 0.01, cfg.length * 0.3);
   group.add(stripe);
-  group.userData.muzzle = new THREE.Vector3(0, 0.02, cfg.length * 0.85);
+  // the real barrel tip: the centre of the front few percent of the model (compact guns like the
+  // SMG have their barrel near the top, long rifles near the middle)
+  const mk = cfg.name + cfg.length + cfg.rotY;
+  if (!muzzleCache.has(mk)) {
+    inner.updateMatrix();
+    const v = new THREE.Vector3(), pts = [];
+    let zMax = -Infinity;
+    for (const p of info.parts) {
+      const pos = p.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i += 2) { v.fromBufferAttribute(pos, i).applyMatrix4(inner.matrix); pts.push(v.y, v.z); zMax = Math.max(zMax, v.z); }
+    }
+    let y = 0, n = 0;
+    for (let i = 0; i < pts.length; i += 2) if (pts[i + 1] > zMax - cfg.length * 0.06) { y += pts[i]; n++; }
+    muzzleCache.set(mk, new THREE.Vector3(0, n ? y / n : 0.02, zMax + 0.02));
+  }
+  group.userData.muzzle = muzzleCache.get(mk).clone();
   group.userData.foregrip = cfg.length * 0.45;
   group.userData.top = info.size.y * s * 0.45;
   return group;
 }
+const muzzleCache = new Map();
 
 // Throwables / placeables (grenade, launch pad): small procedural meshes.
 const itemGeoCache = {};
@@ -345,7 +361,7 @@ function buildCustom(type, rarity) {
   for (const p of gun.parts) { const m = new THREE.Mesh(p.geometry, p.material); m.castShadow = true; inner.add(m); }
   inner.scale.setScalar(s);
   // front of the model at 0.82 of the length, barrel at the height our guns shoot from
-  inner.position.set(0, 0.02 - gun.muzzleY * s, len * 0.82 - gun.box.max.z * s);
+  inner.position.set(-(gun.box.min.x + gun.box.max.x) / 2 * s, 0.02 - gun.muzzleY * s, len * 0.82 - gun.box.max.z * s);
   const group = new THREE.Group();
   group.add(inner);
   group.userData.muzzle = new THREE.Vector3(0, 0.02, len * 0.85);

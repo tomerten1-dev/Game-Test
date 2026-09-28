@@ -36,6 +36,21 @@ function parseName(name) {
   return type ? { type, rarities } : null;
 }
 
+// Eigenvectors of a symmetric 3x3 matrix, largest eigenvalue first (Jacobi rotations).
+function principalAxes(A) {
+  const a = A.map((r) => r.slice()), V = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  for (let it = 0; it < 50; it++) {
+    let p = 0, q = 1;
+    for (const [i, j] of [[0, 1], [0, 2], [1, 2]]) if (Math.abs(a[i][j]) > Math.abs(a[p][q])) { p = i; q = j; }
+    if (Math.abs(a[p][q]) < 1e-12) break;
+    const th = 0.5 * Math.atan2(2 * a[p][q], a[q][q] - a[p][p]), cs = Math.cos(th), sn = Math.sin(th);
+    for (let k = 0; k < 3; k++) { const x = a[k][p], y = a[k][q]; a[k][p] = cs * x - sn * y; a[k][q] = sn * x + cs * y; }
+    for (let k = 0; k < 3; k++) { const x = a[p][k], y = a[q][k]; a[p][k] = cs * x - sn * y; a[q][k] = sn * x + cs * y; }
+    for (let k = 0; k < 3; k++) { const x = V[k][p], y = V[k][q]; V[k][p] = cs * x - sn * y; V[k][q] = sn * x + cs * y; }
+  }
+  return [0, 1, 2].sort((i, j) => a[j][j] - a[i][i]).map((i) => new THREE.Vector3(V[0][i], V[1][i], V[2][i]).normalize());
+}
+
 // One static, forward-facing copy of the model: meshes baked into plain geometry (skinned guns too).
 function bake(scene) {
   scene.updateMatrixWorld(true);
@@ -50,31 +65,45 @@ function bake(scene) {
     parts.push({ geometry, material: Array.isArray(o.material) ? mats : mats[0] });
   });
   if (!parts.length) return null;
-  const box = new THREE.Box3();
-  for (const p of parts) { p.geometry.computeBoundingBox(); box.union(p.geometry.boundingBox); }
-  const size = box.getSize(new THREE.Vector3());
-  // the barrel runs along the longest horizontal side
-  const axis = size.x >= size.z ? 'x' : 'z';
-  const lo = box.min[axis], hi = box.max[axis], span = hi - lo;
-  // the muzzle end is the thinner one: compare how wide the model is near each end
-  const ends = [new THREE.Box3(), new THREE.Box3()];
-  const v = new THREE.Vector3();
+  // Orientation from the shape itself (models are often saved tilted, e.g. posed in a hand):
+  // the main axis of the vertices is the barrel, the second one runs from the top of the gun to the
+  // bottom of the grip / magazine.
+  const v = new THREE.Vector3(), c = new THREE.Vector3();
+  let n = 0;
+  for (const p of parts) { const pos = p.geometry.attributes.position; for (let i = 0; i < pos.count; i++) { c.add(v.fromBufferAttribute(pos, i)); n++; } }
+  c.divideScalar(n);
+  const C = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
   for (const p of parts) {
     const pos = p.geometry.attributes.position;
-    for (let i = 0; i < pos.count; i += 1) {
-      v.fromBufferAttribute(pos, i);
-      const t = (v[axis] - lo) / span;
-      if (t < 0.12) ends[0].expandByPoint(v); else if (t > 0.88) ends[1].expandByPoint(v);
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).sub(c);
+      const q = [v.x, v.y, v.z];
+      for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) C[r][k] += q[r] * q[k];
     }
   }
-  const area = (b) => { if (b.isEmpty()) return Infinity; const s = b.getSize(new THREE.Vector3()); return s.y * (axis === 'x' ? s.z : s.x); };
-  const forwardIsHi = area(ends[1]) <= area(ends[0]);
-  const dir = new THREE.Vector3(); dir[axis] = forwardIsHi ? 1 : -1;
-  const turn = new THREE.Quaternion().setFromUnitVectors(dir, new THREE.Vector3(0, 0, 1));
-  const muzzleEnd = (forwardIsHi ? ends[1] : ends[0]).getCenter(new THREE.Vector3());
-  const m = new THREE.Matrix4().makeRotationFromQuaternion(turn);
-  // grip and magazine hang below the barrel: if most of the model is above it, it's upside down
-  if (box.max.y - muzzleEnd.y > muzzleEnd.y - box.min.y) m.premultiply(new THREE.Matrix4().makeRotationZ(Math.PI));
+  const [e1, e2] = principalAxes(C);
+  // project: a along the barrel, b across it (top <-> grip)
+  const proj = [];
+  for (const p of parts) { const pos = p.geometry.attributes.position; for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i).sub(c); proj.push([v.dot(e1), v.dot(e2)]); } }
+  // the grip / magazine is the long tail across the barrel: that side is down
+  let s3 = 0, bMin = Infinity, bMax = -Infinity;
+  for (const [, b] of proj) { s3 += b * b * b; bMin = Math.min(bMin, b); bMax = Math.max(bMax, b); }
+  const down = s3 > 0 ? 1 : -1; // +e2 is down when the tail points that way
+  // the grip sits in the rear half of the gun
+  let gA = 0, gN = 0;
+  const cut = down > 0 ? bMax - (bMax - bMin) * 0.3 : bMin + (bMax - bMin) * 0.3;
+  for (const [a, b] of proj) if (down > 0 ? b > cut : b < cut) { gA += a; gN++; }
+  const fwd = gN && gA / gN > 0 ? -1 : 1; // grip toward +e1 -> the muzzle is at -e1
+  const F = e1.clone().multiplyScalar(fwd), U = e2.clone().multiplyScalar(-down);
+  const X = new THREE.Vector3().crossVectors(U, F).normalize();
+  U.crossVectors(F, X).normalize();
+  // rotation taking F -> +Z, U -> +Y, X -> +X, about the centre
+  const m = new THREE.Matrix4().makeBasis(X, U, F).transpose().multiply(new THREE.Matrix4().makeTranslation(-c.x, -c.y, -c.z));
+  // muzzle: the front few percent of the gun
+  let aMax = -Infinity; for (const [a] of proj) aMax = Math.max(aMax, a * fwd);
+  const muzzleEnd = new THREE.Vector3(); let mN = 0;
+  for (const p of parts) { const pos = p.geometry.attributes.position; for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i); if (v.clone().sub(c).dot(e1) * fwd > aMax - 0.06 * (aMax * 2)) { muzzleEnd.add(v); mN++; } } }
+  muzzleEnd.divideScalar(mN || 1);
   const out = new THREE.Box3();
   for (const p of parts) { p.geometry.applyMatrix4(m); p.geometry.computeBoundingBox(); out.union(p.geometry.boundingBox); p.geometry.computeBoundingSphere(); }
   const muzzle = muzzleEnd.applyMatrix4(m);
