@@ -93,7 +93,7 @@ const items = [
   // kicks (shoes over the outfit's boots)
   // sprays (from the emote wheel's second page)
   { id: 'spray_gg', type: 'spray', name: 'GG', rarity: 0, value: { text: 'GG', a: '#20d6c0', b: '#2f6bff' }, starter: true },
-  { id: 'spray_bolt', type: 'spray', name: 'Storm Bolt', rarity: 1, value: { text: '⚡', a: '#ffd23f', b: '#ff7a3a' }, starter: true },
+  { id: 'spray_bolt', type: 'spray', name: 'Storm Bolt', rarity: 1, value: { text: '⚡︎', a: '#ffd23f', b: '#ff7a3a' }, starter: true },
   { id: 'spray_llama', type: 'spray', name: 'Llama Love', rarity: 1, value: { text: 'LLAMA', a: '#c77dff', b: '#7ee8fa' } },
   { id: 'spray_crown', type: 'spray', name: 'Crowned', rarity: 3, value: { text: '♛', a: '#ffe066', b: '#b37400' } },
   // loading screens (shown as the match loads in)

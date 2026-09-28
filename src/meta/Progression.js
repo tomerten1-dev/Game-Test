@@ -242,18 +242,18 @@ export function arenaPoints(points, { place, kills }) {
 
 // ---------- match medals (accolades) ----------
 export const MEDALS = [
-  { id: 'victory', name: 'Victory Royale', icon: '👑', xp: 0, test: (s) => s.place === 1 },
+  { id: 'victory', name: 'Victory Royale', icon: '♛', xp: 0, test: (s) => s.place === 1 },
   { id: 'crowned', name: 'Crowned', icon: '♛', xp: 300, test: (s) => s.place === 1 && s.crowned },
-  { id: 'first', name: 'First Blood', icon: '🩸', xp: 150, test: (s) => s.firstBlood },
-  { id: 'sharp', name: 'Sharpshooter', icon: '🎯', xp: 200, test: (s) => s.shots >= 20 && s.hits / s.shots >= 0.5 },
-  { id: 'head', name: 'Headhunter', icon: '💥', xp: 150, test: (s) => s.heads >= 5 },
-  { id: 'marksman', name: 'Marksman', icon: '🔭', xp: 200, test: (s) => s.longest >= 100 },
-  { id: 'spree', name: 'Rampage', icon: '🔥', xp: 250, test: (s) => s.kills >= 5 },
-  { id: 'demo', name: 'Demolition', icon: '🧨', xp: 150, test: (s) => s.buildDamage >= 1000 },
-  { id: 'builder', name: 'Master Builder', icon: '🧱', xp: 100, test: (s) => s.built >= 60 },
-  { id: 'lumber', name: 'Lumberjack', icon: '🪓', xp: 100, test: (s) => s.trees >= 5 },
-  { id: 'treasure', name: 'Treasure Hunter', icon: '🧰', xp: 100, test: (s) => s.chests >= 6 },
-  { id: 'boss', name: 'Boss Slayer', icon: '💀', xp: 300, test: (s) => s.bossKills >= 1 },
-  { id: 'survivor', name: 'Survivor', icon: '⏱', xp: 100, test: (s) => s.place <= 10 },
+  { id: 'first', name: 'First Blood', icon: '✦', xp: 150, test: (s) => s.firstBlood },
+  { id: 'sharp', name: 'Sharpshooter', icon: '◎', xp: 200, test: (s) => s.shots >= 20 && s.hits / s.shots >= 0.5 },
+  { id: 'head', name: 'Headhunter', icon: '✹', xp: 150, test: (s) => s.heads >= 5 },
+  { id: 'marksman', name: 'Marksman', icon: '⌖', xp: 200, test: (s) => s.longest >= 100 },
+  { id: 'spree', name: 'Rampage', icon: '✺', xp: 250, test: (s) => s.kills >= 5 },
+  { id: 'demo', name: 'Demolition', icon: '✸', xp: 150, test: (s) => s.buildDamage >= 1000 },
+  { id: 'builder', name: 'Master Builder', icon: '▦', xp: 100, test: (s) => s.built >= 60 },
+  { id: 'lumber', name: 'Lumberjack', icon: '⚒︎', xp: 100, test: (s) => s.trees >= 5 },
+  { id: 'treasure', name: 'Treasure Hunter', icon: '◈', xp: 100, test: (s) => s.chests >= 6 },
+  { id: 'boss', name: 'Boss Slayer', icon: '☠︎', xp: 300, test: (s) => s.bossKills >= 1 },
+  { id: 'survivor', name: 'Survivor', icon: '⏱︎', xp: 100, test: (s) => s.place <= 10 },
 ];
 export function matchMedals(s) { return MEDALS.filter((m) => { try { return m.test(s); } catch { return false; } }); }

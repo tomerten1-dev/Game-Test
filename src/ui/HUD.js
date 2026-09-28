@@ -79,7 +79,7 @@ export class HUD {
           <div id="medals"></div>
           <div class="bar-row overshield hidden" id="os-row"><span class="bar-ico">◈</span><div class="bar"><div class="fill" id="os-fill"></div></div><span class="bar-num" id="os-num">0</span></div>
           <div class="bar-row shield"><span class="bar-ico">⛊</span><div class="bar"><div class="fill" id="shield-fill"></div></div><span class="bar-num" id="shield-num">0</span></div>
-          <div class="bar-row stamina" id="stamina-row"><span class="bar-ico">⚡</span><div class="bar"><div class="fill" id="stamina-fill"></div></div></div>
+          <div class="bar-row stamina" id="stamina-row"><span class="bar-ico">⚡︎</span><div class="bar"><div class="fill" id="stamina-fill"></div></div></div>
           <div class="bar-row health"><span class="bar-ico">✚</span><div class="bar"><div class="fill" id="health-fill"></div></div><span class="bar-num" id="health-num">100</span></div>
         </div>
 
@@ -614,7 +614,7 @@ export class HUD {
     else {
       const w = killer.weapon;
       const m = Math.round(Math.hypot(killer.pos.x - victim.pos.x, killer.pos.y - victim.pos.y, killer.pos.z - victim.pos.z));
-      row.innerHTML = `${name(killer)} <span class="kf-w" style="color:${w ? RARITIES[w.rarity].color : '#fff'}" title="${w ? w.name : 'Harvesting Axe'}">${w ? w.def.icon : '⛏'}</span> ${name(victim)} <span class="kf-d">${m} m</span>`;
+      row.innerHTML = `${name(killer)} <span class="kf-w" style="color:${w ? RARITIES[w.rarity].color : '#fff'}" title="${w ? w.name : 'Harvesting Axe'}">${w ? w.def.icon : '⛏︎'}</span> ${name(victim)} <span class="kf-d">${m} m</span>`;
     }
     this.el.killfeed.prepend(row);
     while (this.el.killfeed.children.length > 5) this.el.killfeed.lastChild.remove();
@@ -661,7 +661,7 @@ export class HUD {
       }
       let el = this._watchEl;
       if (!el) { el = this._watchEl = document.createElement('div'); el.id = 'watchers'; (document.getElementById('quest-track')?.parentElement || this.el.hud).appendChild(el); }
-      el.textContent = n ? `👁 ${n} watching` : '';
+      el.textContent = n ? `◉ ${n} watching` : '';
       el.classList.toggle('hidden', !n);
     }
     const sp = g.spectating;
@@ -712,7 +712,7 @@ export class HUD {
       const url = itemIcon(it);
       const ic = s.querySelector('.icon');
       if (url) ic.innerHTML = `<img src="${url}" alt="">`;
-      else ic.textContent = !it ? '' : it.isGun ? it.def.icon : it.isConsumable ? it.def.icon : '⛏';
+      else ic.textContent = !it ? '' : it.isGun ? it.def.icon : it.isConsumable ? it.def.icon : '⛏︎';
       s.classList.toggle('has-img', !!url);
       // Chapter 1 style: guns show the reserve ammo you carry for them (with a tiny ammo mark), items their stack
       const res = it?.isGun && it.def.ammoType !== 'none' ? who.ammoFor(it.def.ammoType) : null;

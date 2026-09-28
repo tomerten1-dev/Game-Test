@@ -87,7 +87,7 @@ export class Inventory {
     this.slotsEl.innerHTML = p.items.map((it, i) => {
       const col = !it ? 'rgba(255,255,255,0.15)' : it.isGun ? RARITIES[it.rarity].color : it.isConsumable ? it.def.color : '#e8d7b0';
       const url = itemIcon(it);
-      const icon = url ? `<img src="${url}" alt="">` : !it ? '' : it.isGun ? it.def.icon : it.isConsumable ? it.def.icon : '⛏';
+      const icon = url ? `<img src="${url}" alt="">` : !it ? '' : it.isGun ? it.def.icon : it.isConsumable ? it.def.icon : '⛏︎';
       const sub = !it ? 'Empty' : it.isGun ? `${it.ammo}/${it.mag}` : it.isConsumable ? `×${it.count}` : '';
       const drag = i > 0 && it ? 'draggable="true"' : '';
       return `<div class="inv-slot${i === this.sel ? ' sel' : ''}${i === 0 ? ' fixed' : ''}" data-slot="${i}" data-act="sel" data-arg="${i}" ${drag} style="--rar:${col}">

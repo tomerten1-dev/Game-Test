@@ -184,7 +184,7 @@ export class Game {
     let el = document.getElementById('loading-screen');
     if (!el) { el = document.createElement('div'); el.id = 'loading-screen'; document.getElementById('ui')?.appendChild(el) || document.body.appendChild(el); }
     el.style.background = `linear-gradient(160deg, ${v.a}, ${v.b})`;
-    el.innerHTML = `<div class="ls-bolt">⚡</div><div class="ls-title">${v.title}</div><div class="ls-tip">${LOAD_TIPS[Math.floor(Math.random() * LOAD_TIPS.length)]}</div>`;
+    el.innerHTML = `<div class="ls-bolt">⚡︎</div><div class="ls-title">${v.title}</div><div class="ls-tip">${LOAD_TIPS[Math.floor(Math.random() * LOAD_TIPS.length)]}</div>`;
     el.classList.remove('out'); el.classList.add('on');
     clearTimeout(this._lsT);
     this._lsT = setTimeout(() => el.classList.add('out'), 1600);

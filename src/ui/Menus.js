@@ -6,10 +6,10 @@ import { RARITIES } from '../weapons/WeaponDefs.js';
 import { TRACK, SEASON, xpForLevel, QUEST_REWARD, WEEKLY_REWARD, milestoneReward, arenaDivision, PASS_PAGES, PAGE_UNLOCK, passState, claimPass } from '../meta/Progression.js';
 import { renderSettings } from './Settings.js';
 
-const HERO_ICON = { Knight: '🛡️', Barbarian: '🪓', Mage: '🔮', Rogue: '🗡️', Rogue_Hooded: '🏹', Male_Ranger: '🏹', Female_Ranger: '🏹', Male_Peasant: '🌾', Female_Peasant: '🌾' };
-const HAT_ICON = { party: '🥳', cowboy: '🤠', ice_horns: '❄️', pumpkin: '🎃', pirate: '🏴‍☠️', ninja: '🥷', astro: '🧑‍🚀', halo: '😇' };
-const BACK_ICON = { antenna: '📡', quiver: '🏹', shield: '🛡️', llama: '🦙', guitar: '🎸', cape: '🧣', sword: '⚔️', jetpack: '🚀', wings: '🪽', crystal: '💎' };
-const TOOL_ICON = { pan: '🍳', wrench: '🔧', candy: '🍬', hammer: '🔨', crystal: '❄️', neon: '⚡', gold: '🪙' };
+const HERO_ICON = { Knight: '♜', Barbarian: '♞', Mage: '✦', Rogue: '♝', Rogue_Hooded: '♝', Male_Ranger: '➶', Female_Ranger: '➶', Male_Peasant: '♙', Female_Peasant: '♙' };
+const HAT_ICON = { party: '▲', cowboy: '◓', ice_horns: '✳', pumpkin: '●', pirate: '✖', ninja: '◆', astro: '◉', halo: '◯' };
+const BACK_ICON = { antenna: '↟', quiver: '➶', shield: '⬢', llama: '◈', guitar: '♪', cape: '▼', sword: '†', jetpack: '⇧', wings: '⋎', crystal: '◇' };
+const TOOL_ICON = { pan: '◍', wrench: '⌐', candy: '✱', hammer: '⚒︎', crystal: '✧', neon: 'ϟ', gold: '◎' };
 const TIPS = [
   'Harvest with the axe before a fight — walls save lives.',
   'Supply drops follow the next safe zone. Watch for blue smoke.',
@@ -24,10 +24,10 @@ const coin = '<i class="coin"></i>';
 
 export function itemIcon(c) {
   const v = c.value;
-  if (c.custom) return `<i class="ic ic-hero">${c.type === 'glider' ? '🪂' : c.type === 'pickaxe' ? '⛏' : c.type === 'backbling' ? '🎒' : '★'}</i>`; // your own models
+  if (c.custom) return `<i class="ic ic-hero">${c.type === 'glider' ? '▲' : c.type === 'pickaxe' ? '⛏︎' : c.type === 'backbling' ? '⬢' : '★'}</i>`; // your own models
   if (c.type === 'hero') return `<i class="ic ic-hero" style="${c.tint ? `--tint:${c.tint}` : ''}">${HAT_ICON[c.hat] || HERO_ICON[v] || '★'}</i>`;
   if (c.type === 'backbling') return `<i class="ic ic-hero">${BACK_ICON[v] || '∅'}</i>`;
-  if (c.type === 'pickaxe') return `<i class="ic ic-hero">${TOOL_ICON[v] || '🪓'}</i>`;
+  if (c.type === 'pickaxe') return `<i class="ic ic-hero">${TOOL_ICON[v] || '⛏︎'}</i>`;
   if (c.type === 'glider') return `<i class="ic ic-glider" style="--a:${v[0]};--b:${v[1]}"></i>`;
   if (c.type === 'trail') return `<i class="ic ic-trail" style="background:${!v ? 'rgba(255,255,255,0.15)' : v === 'rainbow' ? 'linear-gradient(90deg,#ff5a5f,#ffd23f,#6ef0a8,#5fd4ff,#a15cff)' : `linear-gradient(90deg,transparent,${v[0]},${v[1]})`}"></i>`;
   if (c.type === 'emote') return '<i class="ic ic-emote">♪</i>';
@@ -49,7 +49,7 @@ export class Menus {
     root.insertAdjacentHTML('beforeend', `
       <div id="lobby" class="lobby hidden">
         <div class="lb-top">
-          <div class="lb-brand"><span class="bolt">⚡</span>STORMBOUND</div>
+          <div class="lb-brand"><span class="bolt">⚡︎</span>STORMBOUND</div>
           <nav class="lb-tabs">
             ${[['play', 'Play'], ['locker', 'Locker'], ['shop', 'Item Shop'], ['quests', 'Quests'], ['career', 'Career'], ['settings', 'Settings']]
     .map(([k, n]) => `<button data-tab="${k}">${n}</button>`).join('')}
@@ -71,12 +71,12 @@ export class Menus {
             <div class="play-right" id="play-right">
               <button class="mode-card" id="mode-card"><small>Battle Royale</small><b id="mc-name">Solo</b><span id="mc-sub"></span><em>Change</em></button>
               <div class="modes">
-                <button class="mode m-solo" data-mode="solo"><i class="mi">⚔</i><b>Solo</b><span>You vs 99 bots</span></button>
-                <button class="mode m-quick" data-mode="quick"><i class="mi">⚡</i><b>Quick Match</b><span>29 bots · faster storm</span></button>
+                <button class="mode m-solo" data-mode="solo"><i class="mi">⚔︎</i><b>Solo</b><span>You vs 99 bots</span></button>
+                <button class="mode m-quick" data-mode="quick"><i class="mi">⚡︎</i><b>Quick Match</b><span>29 bots · faster storm</span></button>
                 <button class="mode m-zb" data-mode="zb"><i class="mi">◈</i><b>Zero Build</b><span>No building · overshield</span></button>
                 <button class="mode m-reload" data-mode="reload"><i class="mi">↻</i><b>Reload</b><span>40 players · 2 reboots · small map</span></button>
-                <button class="mode m-blitz" data-mode="blitz"><i class="mi">⏱</i><b>Blitz Royale</b><span>32 players · same kit · ~5 min</span></button>
-                <button class="mode arena" data-mode="arena"><i class="mi">🏆</i><b>Ranked</b><span id="arena-div">Bronze I</span></button>
+                <button class="mode m-blitz" data-mode="blitz"><i class="mi">⏱︎</i><b>Blitz Royale</b><span>32 players · same kit · ~5 min</span></button>
+                <button class="mode arena" data-mode="arena"><i class="mi">♛</i><b>Ranked</b><span id="arena-div">Bronze I</span></button>
               </div>
               <button id="play-btn" class="btn big">PLAY!</button>
               <div class="sub">Straight onto the Storm Bus</div>

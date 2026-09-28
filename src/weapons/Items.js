@@ -54,9 +54,9 @@ export const CONSUMABLES = {
   campfire: { name: 'Campfire', place: 'campfire', max: 2, stack: 1, icon: 'CMP', color: '#ffa04a', desc: 'Place it: heals everyone nearby over time' },
   // thrown / placed items share the consumable stack logic
   grenade: { name: 'Grenade', throw: 'grenade', max: 6, stack: 3, icon: '●', color: '#8fd16a', damage: 70, radius: 5, fuse: 2.2 },
-  smoke: { name: 'Smoke Grenade', throw: 'smoke', max: 4, stack: 2, icon: '☁', color: '#c9d3dc', radius: 6.5, fuse: 1.4, duration: 12 },
+  smoke: { name: 'Smoke Grenade', throw: 'smoke', max: 4, stack: 2, icon: '☁︎', color: '#c9d3dc', radius: 6.5, fuse: 1.4, duration: 12 },
   impulse: { name: 'Impulse Grenade', throw: 'impulse', max: 4, stack: 2, icon: '✺', color: '#6fd0ff', radius: 6, fuse: 1.1, push: 17 },
-  fire: { name: 'Fire Flask', throw: 'fire', max: 4, stack: 2, icon: '♨', color: '#ff8a2a', radius: 3.6, fuse: 1.2, duration: 6, dps: 14 },
+  fire: { name: 'Fire Flask', throw: 'fire', max: 4, stack: 2, icon: '♨︎', color: '#ff8a2a', radius: 3.6, fuse: 1.2, duration: 6, dps: 14 },
   shockwave: { name: 'Shockwave Grenade', throw: 'shockwave', max: 6, stack: 2, icon: 'SHK', color: '#8f7bff', radius: 5.5, fuse: 3, push: 30, impact: true, desc: 'Launches everyone nearby (you too) · no fall damage' },
   grappler: { name: 'Grappler', grapple: true, max: 10, stack: 10, icon: 'GRP', color: '#ffd23f', desc: 'Pull yourself to where you aim · 10 charges' },
   rift: { name: 'Rift-to-Go', rift: true, time: 0.6, max: 1, stack: 1, icon: 'RFT', color: '#c86bff', desc: 'Warp high into the sky and glide' },
