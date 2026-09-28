@@ -571,6 +571,7 @@ export class Events {
       const nx = l.x + (ax / al) * 6.5 * dt, nz = l.z + (az / al) * 6.5 * dt;
       const ny = this.world.heightAt(nx, nz);
       if (ny < 1 || Math.abs(ny - l.y) > 1.2) { l.fleeT = 0; continue; } // cliff or water: stop
+      if (this.world.colliders.query(nx - 0.8, nx + 0.8, nz - 0.8, nz + 0.8, []).some((c) => c !== l.col && c.y1 > ny + 0.3 && c.y0 < ny + 2)) { l.fleeT = 0; continue; } // wall in the way
       l.x = nx; l.z = nz; l.y = ny;
       l.group.position.set(nx, ny + Math.abs(Math.sin(g.time * 12)) * 0.12, nz);
       l.group.rotation.y = Math.atan2(ax, az);
@@ -978,7 +979,7 @@ export class Events {
     const boss = this.game.boss;
     for (const b of boss?.bosses || []) if (b.alive) out.push({ x: b.pos.x, z: b.pos.z, color: b.bossCfg.color, shape: 'square', label: 'Boss' });
     // medallion carriers are revealed to everyone
-    for (const a of this.game.actors) if (a.alive && !a.npc && !a.isPlayer && a.medallions?.size) out.push({ x: a.pos.x, z: a.pos.z, color: '#ffd23f', shape: 'medal', label: 'Medallion carrier' });
+    if (this.game.mode !== 'blitz') for (const a of this.game.actors) if (a.alive && !a.npc && !a.isPlayer && a.medallions?.size) out.push({ x: a.pos.x, z: a.pos.z, color: '#ffd23f', shape: 'medal', label: 'Medallion carrier' });
     out.push(...(this.game.overrides?.mapIcons() || []));
     out.push(...(this.game.rifts?.mapIcons() || []));
     const v = boss?.vault;

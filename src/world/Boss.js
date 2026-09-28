@@ -11,10 +11,10 @@ const _v = new THREE.Vector3();
 // medallion (a perk for whoever carries it, but carriers show up on everyone's map). The Foreman
 // at Rusty Works also drops the Vault Keycard. NPCs never count as players.
 export const BOSSES = [
-  { medal: 'shield', name: 'The Foreman', town: 'Rusty Works', color: '#ff8a2a', char: 'Barbarian', mythic: ['burst', "The Foreman's Burst Rifle"], side: ['pump', 4], guards: ['pump', 'ar', 'ar'], keycard: true },
-  { medal: 'surge', name: 'Captain Tide', town: 'Salty Pier', color: '#39e0c9', char: 'Rogue', mythic: ['pump', "Captain Tide's Pump"], side: ['smg', 4], guards: ['smg', 'ar'] },
-  { medal: 'reload', name: 'The Warden', town: 'Pebble City', color: '#ff6b5d', char: 'Knight', mythic: ['sniper', "The Warden's Sniper"], side: ['ar', 4], guards: ['ar', 'shotgun'] },
-  { medal: 'bloom', name: 'Lady Bloom', town: 'Maple Hollow', color: '#7dff8a', char: 'Mage', mythic: ['smg', "Lady Bloom's SMG"], side: ['shotgun', 4], guards: ['shotgun', 'ar'] },
+  { medal: 'shield', name: 'The Foreman', town: 'Rusty Works', color: '#ff8a2a', char: 'Male_Peasant', hat: 'cowboy', mythic: ['burst', "The Foreman's Burst Rifle"], side: ['pump', 4], guards: ['pump', 'ar', 'ar'], keycard: true },
+  { medal: 'surge', name: 'Captain Tide', town: 'Salty Pier', color: '#39e0c9', char: 'Male_Ranger', hat: 'pirate', mythic: ['pump', "Captain Tide's Pump"], side: ['smg', 4], guards: ['smg', 'ar'] },
+  { medal: 'reload', name: 'The Warden', town: 'Pebble City', color: '#ff6b5d', char: 'Male_Ranger', hat: 'ice_horns', mythic: ['sniper', "The Warden's Sniper"], side: ['ar', 4], guards: ['ar', 'shotgun'] },
+  { medal: 'bloom', name: 'Lady Bloom', town: 'Maple Hollow', color: '#7dff8a', char: 'Female_Ranger', hat: 'halo', mythic: ['smg', "Lady Bloom's SMG"], side: ['shotgun', 4], guards: ['shotgun', 'ar'] },
 ];
 
 export class BossEvent {
@@ -38,7 +38,8 @@ export class BossEvent {
       if (!t) continue;
       if (cfg.keycard && !v) continue;
       const home = cfg.keycard ? { x: v.front.x - 6, z: v.front.z + 4, r: 32 } : { x: t.x + 5, z: t.z + 3, r: t.r };
-      const boss = new Bot(g, cfg.name, cfg.color, 0.95, cfg.char);
+      const boss = new Bot(g, cfg.name, cfg.color, 0.95, cfg.char, cfg.color);
+      boss.applyGear({ hat: cfg.hat });
       boss.npc = 'boss';
       boss.bossCfg = cfg;
       boss.health = 400; boss.maxHealth = 400; boss.shield = 200;

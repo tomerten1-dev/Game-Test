@@ -137,24 +137,27 @@ function build(type, rarity) {
 const ATT_MAT = new THREE.MeshStandardMaterial({ color: '#23272f', roughness: 0.5, metalness: 0.4 });
 const LENS_MAT = new THREE.MeshStandardMaterial({ color: '#ff3b3b', emissive: '#ff2020', emissiveIntensity: 0.8 });
 const DRUM_GEO = new THREE.CylinderGeometry(0.085, 0.085, 0.07, 14).rotateZ(Math.PI / 2);
+const MOD_GEO = {};
+const modGeo = (k, make) => (MOD_GEO[k] ||= make()); // one geometry per attachment shape, shared by every gun
+const SPEED_MAT = new THREE.MeshStandardMaterial({ color: '#d9a13a', roughness: 0.5 });
 function addMods(group, mods) {
   if (!mods) return group;
   const mz = group.userData.muzzle, len = mz.z;
   const top = (group.userData.top ?? 0.1);
   const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; group.add(o); return o; };
   if (mods.optic === 'reddot' || mods.optic === 'holo') {
-    add(new THREE.BoxGeometry(0.05, 0.05, mods.optic === 'holo' ? 0.12 : 0.07), ATT_MAT, 0, top + 0.035, len * 0.3);
-    add(new THREE.BoxGeometry(0.03, 0.03, 0.005), LENS_MAT, 0, top + 0.04, len * 0.3 + 0.03);
+    add(modGeo(mods.optic, () => new THREE.BoxGeometry(0.05, 0.05, mods.optic === 'holo' ? 0.12 : 0.07)), ATT_MAT, 0, top + 0.035, len * 0.3);
+    add(modGeo('lens', () => new THREE.BoxGeometry(0.03, 0.03, 0.005)), LENS_MAT, 0, top + 0.04, len * 0.3 + 0.03);
   } else if (mods.optic) {
     const L = mods.optic === 'x4' ? 0.3 : 0.2;
-    add(new THREE.CylinderGeometry(0.035, 0.035, L, 10).rotateX(Math.PI / 2), ATT_MAT, 0, top + 0.05, len * 0.3);
+    add(modGeo(mods.optic, () => new THREE.CylinderGeometry(0.035, 0.035, L, 10).rotateX(Math.PI / 2)), ATT_MAT, 0, top + 0.05, len * 0.3);
   }
   if (mods.mag === 'drum') add(DRUM_GEO, ATT_MAT, 0, -0.1, len * 0.4);
-  else if (mods.mag === 'speed') add(new THREE.BoxGeometry(0.05, 0.13, 0.07), new THREE.MeshStandardMaterial({ color: '#d9a13a', roughness: 0.5 }), 0, -0.1, len * 0.4);
-  if (mods.under === 'laser') add(new THREE.BoxGeometry(0.04, 0.04, 0.12), LENS_MAT, 0, -0.04, len * 0.72);
-  else if (mods.under) add(new THREE.BoxGeometry(0.04, mods.under === 'vertical' ? 0.12 : 0.07, 0.06), ATT_MAT, 0, -0.08, len * 0.68);
-  if (mods.barrel === 'suppressor') { add(new THREE.CylinderGeometry(0.035, 0.035, 0.24, 10).rotateX(Math.PI / 2), ATT_MAT, 0, mz.y, len + 0.1); mz.z += 0.2; }
-  else if (mods.barrel === 'brake') { add(new THREE.CylinderGeometry(0.03, 0.03, 0.08, 8).rotateX(Math.PI / 2), ATT_MAT, 0, mz.y, len + 0.03); mz.z += 0.06; }
+  else if (mods.mag === 'speed') add(modGeo('speed', () => new THREE.BoxGeometry(0.05, 0.13, 0.07)), SPEED_MAT, 0, -0.1, len * 0.4);
+  if (mods.under === 'laser') add(modGeo('laser', () => new THREE.BoxGeometry(0.04, 0.04, 0.12)), LENS_MAT, 0, -0.04, len * 0.72);
+  else if (mods.under) add(modGeo(mods.under, () => new THREE.BoxGeometry(0.04, mods.under === 'vertical' ? 0.12 : 0.07, 0.06)), ATT_MAT, 0, -0.08, len * 0.68);
+  if (mods.barrel === 'suppressor') { add(modGeo('supp', () => new THREE.CylinderGeometry(0.035, 0.035, 0.24, 10).rotateX(Math.PI / 2)), ATT_MAT, 0, mz.y, len + 0.1); mz.z += 0.2; }
+  else if (mods.barrel === 'brake') { add(modGeo('brake', () => new THREE.CylinderGeometry(0.03, 0.03, 0.08, 8).rotateX(Math.PI / 2)), ATT_MAT, 0, mz.y, len + 0.03); mz.z += 0.06; }
   return group;
 }
 

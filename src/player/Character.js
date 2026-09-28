@@ -9,6 +9,8 @@ export const KK_TYPES = ['Knight', 'Barbarian', 'Mage', 'Rogue', 'Rogue_Hooded']
 // (CC0). The outfits come without heads, so the library's mannequin supplies one.
 export const Q_TYPES = ['Male_Ranger', 'Female_Ranger', 'Male_Peasant', 'Female_Peasant'];
 export const CHARACTER_TYPES = [...KK_TYPES, ...Q_TYPES];
+// old KayKit hero types -> the outfit character that replaces them (heroes, skins and bosses keep their colours / hats)
+const KK_TO_Q = { Knight: 'Male_Ranger', Barbarian: 'Male_Peasant', Rogue: 'Female_Ranger', Rogue_Hooded: 'Male_Ranger', Mage: 'Female_Peasant' };
 // The game asks for KayKit clip names; these are the Universal Animation Library equivalents.
 const Q_ANIM = {
   Idle: 'Idle_Loop', Unarmed_Idle: 'Idle_Loop', Walking_A: 'Walk_Loop', Walking_C: 'Walk_Formal_Loop', Walking_Backwards: 'Walk_Loop',
@@ -125,6 +127,8 @@ const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Qua
 export class Character {
   constructor(assets, color = '#2ee6c9', type = 'Knight', tint = 0.28, outfit = null) {
     this.assets = assets;
+    // every character uses the same human outfit rigs (the chunky KayKit heroes looked out of place)
+    type = KK_TO_Q[type] || type;
     const src = assets.types[type] || assets.types.Knight;
     this.root = new THREE.Group();
     const model = SkeletonUtils.clone(src.scene);

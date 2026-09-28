@@ -243,7 +243,7 @@ export class Loot {
     this.game.sound.play('ammo', actor.isPlayer ? null : _v.set(b.x, b.y, b.z));
     const types = new Set();
     const w = actor.weapon;
-    if (w) types.add(w.def.ammoType);
+    if (w && AMMO[w.def.ammoType]) types.add(w.def.ammoType); // bows / blades use no ammo
     const all = Object.keys(AMMO).filter((t) => t !== 'heavy');
     while (types.size < 2) types.add(all[Math.floor(Math.random() * all.length)]);
     if (Math.random() < 0.4) this.spawnPickup({ type: 'gold', amount: 10 }, _v.set(b.x, b.y + 0.6, b.z), new THREE.Vector3(0, 4.5, 0));

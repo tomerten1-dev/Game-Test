@@ -16,6 +16,7 @@ export const OVERRIDES = {
   extralife: { name: 'Extra Life', desc: 'Everyone alive comes back once when eliminated' },
   morexp: { name: 'More XP', desc: '+50% XP from this match' },
 };
+const OFF_MAT = new THREE.MeshStandardMaterial({ color: '#555a66' }); // a claimed console's dark screen
 const TIMES = [80, 230, 380]; // seconds into the match when a console switches on
 const CLAIM_WINDOW = 45; // if nobody reaches it in time, some other player claims it
 
@@ -30,7 +31,7 @@ export class Overrides {
   has(k) { return this.active.has(k); }
 
   reset() {
-    for (const c of this.consoles) this.game.scene.remove(c.group);
+    for (const c of this.consoles) { this.game.scene.remove(c.group); if (c.col) this.game.world.colliders.remove(c.col); }
     this.consoles = [];
     this.active.clear();
     this.idx = 0;
@@ -56,9 +57,10 @@ export class Overrides {
       group.add(beam);
       group.position.set(x, y, z);
       g.scene.add(group);
-      g.world.colliders.add({ kind: 'circle', x, z, r: 0.6, y0: y, y1: y + 1.5, crate: true });
+      const col = { kind: 'circle', x, z, r: 0.6, y0: y, y1: y + 1.5, crate: true };
+      g.world.colliders.add(col);
       const opts = Object.keys(OVERRIDES).filter((k) => !this.active.has(k)).sort(() => Math.random() - 0.5).slice(0, 3);
-      const c = { x, y, z, group, beam, opts, t: 0, town: t.name, claimed: false };
+      const c = { x, y, z, group, beam, opts, t: 0, town: t.name, claimed: false, col };
       this.consoles.push(c);
       g.hud?.banner?.(`Override Console online at ${t.name}!`, 3.5);
       g.sound.play('supply');
@@ -77,7 +79,7 @@ export class Overrides {
     if (c.claimed || !OVERRIDES[key]) return;
     c.claimed = true;
     c.beam.visible = false;
-    c.group.children[2].material = new THREE.MeshStandardMaterial({ color: '#555a66' });
+    c.group.children[2].material = OFF_MAT;
     this.active.add(key);
     const g = this.game;
     if (key === 'overshield') for (const a of g.actors) if (a.alive && !a.npc) a.shield = Math.min(100, a.shield + 50);

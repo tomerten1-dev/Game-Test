@@ -115,6 +115,7 @@ export function renderSettings(el, game, { compact = false } = {}) {
     if (!window.confirm('Reset level, coins, locker and stats? This cannot be undone.')) return;
     prof.reset();
     Object.assign(prof.d.settings, DEFAULT_SETTINGS);
+    game.sound.lobbyPick = null;
     applySettings(game);
     game.menus?.refresh();
   });

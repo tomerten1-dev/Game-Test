@@ -29,12 +29,16 @@ const _sph = new THREE.Sphere(new THREE.Vector3(), 2.2);
 const _sc = new THREE.Color();
 const _mq = [];
 
-// Cosmetic weapon wrap: recolour the gun body (keeps the rarity stripe).
+// Cosmetic weapon wrap: recolour the gun body (keeps the rarity stripe). Wrapped materials are cached.
+const WRAPPED = new Map();
 export function applyWrap(mesh, wrap) {
   if (!wrap || !mesh) return mesh;
   mesh.traverse((o) => {
     if (!o.isMesh || o.material.emissiveIntensity > 0.8) return;
+    const key = o.material.uuid + wrap.color;
+    if (WRAPPED.has(key)) { o.material = WRAPPED.get(key); return; }
     const m = o.material.clone();
+    WRAPPED.set(key, m);
     m.color.lerp(new THREE.Color(wrap.color), 0.75);
     if (m.vertexColors) m.color.set(wrap.color);
     m.emissive = new THREE.Color(wrap.emissive);
@@ -610,6 +614,7 @@ export class Actor {
       let speed = this.sprinting ? (this.tacSprint ? TAC_SPRINT_SPEED : SPRINT_SPEED) * (this.game.overrides?.has('sonic') ? 1.2 : 1) : this.crouched ? CROUCH_SPEED : RUN_SPEED;
       if (this.useT > 0 && !this.useItem?.def.mobile) speed = Math.min(speed, 3.2);
       if (this.aiming && this.weapon && !this.swimming) speed *= this.weapon.def.scope ? 0.55 : 0.7; // ADS walks slower
+      if (this.weapon?.def.heavy) speed *= 0.88; // the minigun is heavy
       if (this.speedT > 0) { this.speedT -= dt; speed *= 1.2; } // peppers, spicy food
       if (this.slapT > 0) this.slapT -= dt;
       if (this.swimming) {
@@ -899,19 +904,6 @@ export class Actor {
       ch.setPose('Jump_Idle', null, 0.3);
       ch.model.rotation.x = damp(ch.model.rotation.x, 1.25, 4, dt);
       ch.model.position.y = damp(ch.model.position.y, 0.9, 4, dt);
-    } else if (this.state === 'wing') {
-      // Wingsuit: a short boost up, then fly where you look. Diving builds speed, pulling up trades
-      // it for height; landing never hurts.
-      if (this.wingBoost > 0) { this.wingBoost -= dt; world.moveBody(this, dt, 1); if (this.onGround) { this.land(); return; } if (this.wingBoost > 0) return; this.wingSpeed = 16; }
-      const pch = Math.max(-1.3, Math.min(0.45, this.aimPitch || 0)), yaw = this.aimYaw;
-      this.wingSpeed = Math.max(9, Math.min(48, (this.wingSpeed || 16) + (-Math.sin(pch) * 20 - 0.01 * this.wingSpeed * this.wingSpeed + 3) * dt));
-      const cp = Math.cos(pch);
-      this.vel.set(Math.sin(yaw) * cp * this.wingSpeed, Math.sin(pch) * this.wingSpeed - 2.5, Math.cos(yaw) * cp * this.wingSpeed);
-      this.bodyYaw = yaw;
-      world.moveBody(this, dt, 0);
-      this.noFallT = 3;
-      if (this.onGround) this.land();
-      else if (it.jumpPress) { this.setState('glide'); }
     } else if (this.state === 'glide') {
       if (hspeed > 1) this.bodyYaw = dampAngle(this.bodyYaw, Math.atan2(this.vel.x, this.vel.z), 4, dt);
       ch.setPose('Jump_Idle', null, 0.3);
@@ -1066,7 +1058,14 @@ export class Actor {
   }
 
   // Warm-up respawn: back on your feet somewhere else with a fresh loadout slot.
+  // Drop anything we were in the middle of (ziplines, ascenders, grapples, mantles, splats).
+  _clearMoves() {
+    this.zip = null; this.asc = null; this.grapple = null;
+    this.mantleT = 0; this.splatT = 0; this.slideT = 0; this.autoRun = null;
+  }
+
   revive(x, z) {
+    this._clearMoves();
     this.alive = true;
     this.beamT = 0;
     if (this.hiddenCorpse) { this.hiddenCorpse = false; this.root.visible = true; }
@@ -1084,6 +1083,7 @@ export class Actor {
   die(killer) {
     if (!this.alive) return;
     if (this.hiddenIn) this.game.events?.unhide(this);
+    this._clearMoves();
     // 1-Up Token: the elimination counts, but you redeploy from the sky with everything you carried
     const g = this.game;
     const tok = g.warmup <= 0 && g.mode !== 'arena' && !this.npc ? (this.extraLife ? 99 : this.items.findIndex((it) => it?.def?.oneup)) : -1;

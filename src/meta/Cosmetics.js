@@ -28,11 +28,11 @@ const items = [
   { id: 'hero_peasant_m', type: 'hero', name: 'Village Hand', rarity: 1, value: 'Male_Peasant', starter: true, styles: [['Classic', null], ['Harvest', '#d9a13a'], ['Slate', '#5a6475']] },
   { id: 'hero_peasant_f', type: 'hero', name: 'Harvest Keeper', rarity: 1, value: 'Female_Peasant', starter: true, styles: [['Classic', null], ['Meadow', '#6fbf5a'], ['Plum', '#7a3f8f']] },
   // heroes (KayKit adventurers)
-  { id: 'hero_rogue_hooded', type: 'hero', name: 'Hooded Scout', rarity: 1, value: 'Rogue_Hooded', starter: true },
-  { id: 'hero_knight', type: 'hero', name: 'Sir Bolt', rarity: 1, value: 'Knight', starter: true },
-  { id: 'hero_rogue', type: 'hero', name: 'Quickstep', rarity: 2, value: 'Rogue' },
-  { id: 'hero_barbarian', type: 'hero', name: 'Big Grumble', rarity: 3, value: 'Barbarian' },
-  { id: 'hero_mage', type: 'hero', name: 'Storm Weaver', rarity: 4, value: 'Mage' },
+  { id: 'hero_rogue_hooded', type: 'hero', name: 'Hooded Scout', rarity: 1, value: 'Rogue_Hooded', tint: '#2f5d3a', starter: true },
+  { id: 'hero_knight', type: 'hero', name: 'Sir Bolt', rarity: 1, value: 'Knight', tint: '#8f9bb0', starter: true },
+  { id: 'hero_rogue', type: 'hero', name: 'Quickstep', rarity: 2, value: 'Rogue', tint: '#6b3fa0' },
+  { id: 'hero_barbarian', type: 'hero', name: 'Big Grumble', rarity: 3, value: 'Barbarian', tint: '#8a5a2b' },
+  { id: 'hero_mage', type: 'hero', name: 'Storm Weaver', rarity: 4, value: 'Mage', tint: '#3a5fd9' },
   // skins: a hero with its own colours and headgear
   { id: 'skin_party', type: 'hero', name: 'Party Pal', rarity: 1, value: 'Barbarian', tint: '#ff7ab8', hat: 'party' },
   { id: 'skin_dusty', type: 'hero', name: 'Dusty', rarity: 2, value: 'Rogue', tint: '#c9a06a', hat: 'cowboy' },

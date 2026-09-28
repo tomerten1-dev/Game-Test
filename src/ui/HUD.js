@@ -662,7 +662,7 @@ export class HUD {
         }
       }
       let el = this._watchEl;
-      if (!el) { el = this._watchEl = document.createElement('div'); el.id = 'watchers'; this.el.hud.appendChild(el); }
+      if (!el) { el = this._watchEl = document.createElement('div'); el.id = 'watchers'; (document.getElementById('quest-track')?.parentElement || this.el.hud).appendChild(el); }
       el.textContent = n ? `👁 ${n} watching` : '';
       el.classList.toggle('hidden', !n);
     }
@@ -717,7 +717,7 @@ export class HUD {
       else ic.textContent = !it ? '' : it.isGun ? it.def.icon : it.isConsumable ? it.def.icon : '⛏';
       s.classList.toggle('has-img', !!url);
       s.querySelector('.count').textContent = it?.isConsumable ? String(it.count) : it?.isGun ? String(it.ammo) : '';
-      s.classList.toggle('low', !!it?.isGun && it.ammo <= Math.ceil(it.mag * 0.25));
+      s.classList.toggle('low', !!it?.isGun && it.def.ammoType !== 'none' && it.mag > 1 && it.ammo <= Math.ceil(it.mag * 0.25));
     });
     for (const k of ['wood', 'stone', 'metal']) this.set('mat' + k, this.el.mats[k], String(who.mats[k]));
     // ammo by type next to the materials, and special items (keycard) beside the quick bar
@@ -738,6 +738,13 @@ export class HUD {
     const bm = p.buildMode || '';
     if (this.cache.bm !== bm) {
       this.cache.bm = bm;
+      // key hints follow your bindings (and Simple Build)
+      if (bm) {
+        const kl = (a, d) => keyLabel(g.input.keyFor?.(a) || d).replace('Mouse ', 'M');
+        this.bpEls.forEach((el) => { const k = el.querySelector('.key'); if (k) k.textContent = kl(el.dataset.p, ''); });
+        const hint = this.root.querySelector('.build-hint');
+        if (hint) hint.textContent = setting(g, 'simpleBuild', false) ? `Fire: wall · Aim: floor / ramp / cone · ${kl('buildmat', 'KeyL')}: material · ${kl('reload', 'KeyR')}: turn ramp` : `Click: place · Right-click: material · ${kl('reload', 'KeyR')}: turn ramp · ${kl('edit', 'KeyG')}: edit · 1–6: exit`;
+      }
       this.buildBar.classList.toggle('hidden', !bm);
       this.el.slots.classList.toggle('dim', !!bm);
       this.bpEls.forEach((el) => el.classList.toggle('active', el.dataset.p === bm));
@@ -748,7 +755,7 @@ export class HUD {
     }
     const rl = w?.reloading, using = p.useT > 0 && p.useItem;
     // low-ammo hint: mag at a quarter or less and spare ammo to load
-    const lowAmmo = !!w?.isGun && !rl && !using && w.mag > 1 && w.ammo <= Math.floor(w.mag / 4) && p.ammoFor(w.def.ammoType) > 0;
+    const lowAmmo = who === p && !!w?.isGun && !rl && !using && w.mag > 1 && w.ammo <= Math.floor(w.mag / 4) && p.ammoFor(w.def.ammoType) > 0;
     if (this.cache.lowAmmo !== lowAmmo) {
       this.cache.lowAmmo = lowAmmo;
       const h = document.getElementById('reload-hint');
@@ -775,7 +782,7 @@ export class HUD {
     }
 
     // equipped sprite: name, level and power cooldown
-    const spr = p.sprite;
+    const spr = who === p ? p.sprite : null; // your own sprite only (not while spectating)
     const spTxt = spr ? `${spr.def.name} · Lv ${spr.level}|${spr.kind === 'water' ? (spr.cooldownLeft > 0 ? `${Math.ceil(spr.cooldownLeft)}s` : `${keyLabel(g.input.keyFor('sprite') || 'KeyK')} ready`) : 'passive'}` : '';
     if (this.cache.sprite !== spTxt) {
       this.cache.sprite = spTxt;

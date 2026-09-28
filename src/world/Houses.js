@@ -516,6 +516,7 @@ export class Houses {
       const ex = ((q ? info.size.z : info.size.x) * scale) / 2 - 0.05, ez = ((q ? info.size.x : info.size.z) * scale) / 2 - 0.05;
       const c = this.wbox(h, lx - ex, lx + ex, ly, ly + info.size.y * scale, lz - ez, lz + ez, { crate: true, mat: 'wood', breakable: { type, idx: [idx], hp, loot } });
       this.colliders.add(c);
+      (h.furn ||= []).push(c);
     };
     const spot = (lx, ly, lz, list, extra = {}) => { const [x, z] = this.w(h, lx, lz); list.push({ x, y: h.y + ly, z, ...extra }); };
     const rug = (x0, x1, z0, z1, c1, c2, y = 0) => {
@@ -618,6 +619,10 @@ export class Houses {
     }
     if (fx) this.game.rig.shake = Math.min(1, this.game.rig.shake + (this.game.camera.position.distanceTo(new THREE.Vector3(h.x, h.y, h.z)) < 40 ? 0.5 : 0));
     this.game?.sound.play('explosion', new THREE.Vector3(h.x, h.y + 3, h.z), { range: 120 });
+    // upstairs furniture breaks, and loot lying upstairs falls to the ground floor
+    const g = this.game;
+    for (const c of h.furn || []) if (c.y0 > h.y + 1 && !c.breakable.broken && g) g.world.towns.breakProp(c, g);
+    for (const pk of g?.loot?.pickups || []) if (pk.alive && pk.pos.y > h.y + 1 && Math.abs(pk.pos.x - h.x) < h.W && Math.abs(pk.pos.z - h.z) < h.D) { pk.settled = false; pk.vel.set(0, 0, 0); }
     // anyone upstairs drops down
     for (const a of this.game?.actors || []) if (Math.abs(a.pos.x - h.x) < h.W && Math.abs(a.pos.z - h.z) < h.D && a.pos.y > h.y + 1) a.onGround = false;
   }

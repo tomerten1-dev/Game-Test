@@ -145,7 +145,8 @@ export function dailyQuests(day) {
 // Item Shop: one featured pair + six daily picks, rotating at midnight. Prices in Storm Coins only.
 export function shopOffers(day, profile) {
   const r = mulberry32(daySeed(day, 99));
-  const pool = COSMETIC_LIST.filter((c) => !c.starter);
+  const passItems = new Set(PASS_PAGES.flat());
+  const pool = COSMETIC_LIST.filter((c) => !c.starter && !passItems.has(c.id)); // Battle Pass rewards are earned, not sold
   const pick = (list, n) => {
     const src = [...list], out = [];
     while (out.length < n && src.length) out.push(src.splice(Math.floor(r() * src.length), 1)[0]);

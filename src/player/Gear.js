@@ -200,7 +200,9 @@ export function attachBackBling(character, id) {
 export function attachHat(character, id) {
   const g = makeHat(id);
   if (!g) return null;
-  g.position.copy(headAnchor(character));
+  // hats were made for big cartoon heads: shrink them onto the outfit characters' heads
+  if (character.q) g.scale.setScalar(0.52);
+  g.position.copy(headAnchor(character, character.q ? -0.02 : 0));
   character.root.add(g);
   character.root.updateMatrixWorld(true);
   if (character.head) character.head.attach(g);

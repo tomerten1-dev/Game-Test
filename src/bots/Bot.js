@@ -15,8 +15,8 @@ const _hit = {};
 
 // AI bot: a slow "think" picks goals/targets; a per-frame update steers, aims and shoots.
 export class Bot extends Actor {
-  constructor(game, name, color, skill, type = 'Knight') {
-    super(game, { name, color, type });
+  constructor(game, name, color, skill, type = 'Knight', outfit = null) {
+    super(game, { name, color, type, outfit, tint: outfit ? 0.1 : undefined });
     this.skill = skill; // 0..1
     this.thinkT = Math.random() * THINK;
     this.goal = new THREE.Vector3();

@@ -5,6 +5,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 export const GRID = 5.12;
 export const HEIGHT = 3.84;
 const HG = GRID / 2;
+// slot keys use centimetres so 5.12 m grid maths (floating point) always gives the same key for a slot
+const cm = (v) => Math.round(v * 100);
 export const COST = 10;
 export const PIECES = ['wall', 'floor', 'ramp', 'cone'];
 export const BUILD_MATS = ['wood', 'stone', 'metal'];
@@ -224,7 +226,7 @@ export class Building {
   // otherwise sits on the terrain (or on whatever the actor is standing on).
   _levelY(actor, x, z, ext) {
     const feet = actor.pos.y;
-    let anchor = null, bd = 7;
+    let anchor = null, bd = GRID * 1.5; // reach the diagonal neighbour cell
     for (const s of this.structures) {
       if (s.falling) continue;
       const d = Math.hypot(s.cx - x, s.cz - z);
@@ -251,7 +253,7 @@ export class Building {
       else { cz = (dz > 0 ? iz + 1 : iz) * GRID; cx = ix * GRID + GRID / 2; alongX = true; }
       y0 = this._levelY(actor, cx, cz, alongX ? [GRID / 2, 0] : [0, GRID / 2]) + up * HEIGHT;
       p.alongX = alongX;
-      key = `w:${cx}:${cz}:${alongX ? 1 : 0}`;
+      key = `w:${cm(cx)}:${cm(cz)}:${alongX ? 1 : 0}`;
       const h = 0.12;
       box = alongX ? [cx - HG, cx + HG, y0, y0 + HEIGHT, cz - h, cz + h] : [cx - h, cx + h, y0, y0 + HEIGHT, cz - HG, cz + HG];
     } else {
@@ -263,7 +265,7 @@ export class Building {
       const lowX = type === 'ramp' ? cx - dx * GRID / 2 : cx, lowZ = type === 'ramp' ? cz - dz * GRID / 2 : cz;
       y0 = this._levelY(actor, lowX, lowZ, type === 'ramp' ? [0, 0] : [GRID / 2, GRID / 2]);
       if (type === 'floor' || type === 'cone') y0 += up * HEIGHT;
-      key = `${type === 'floor' ? 'f' : 'm'}:${cx}:${cz}`;
+      key = `${type === 'floor' ? 'f' : 'm'}:${cm(cx)}:${cm(cz)}`;
       const top = type === 'floor' ? y0 + 0.04 : type === 'cone' ? y0 + CONE_H : y0 + HEIGHT;
       box = [cx - HG, cx + HG, type === 'floor' ? y0 - FLOOR_T : y0, top, cz - HG, cz + HG];
     }
@@ -391,7 +393,7 @@ export class Building {
   // A plan for a floor directly under a planned ramp (same cell, same base).
   floorUnder(plan) {
     const { cx, cz, y0 } = plan;
-    return { type: 'floor', cx, cz, y0, dirX: 0, dirZ: 1, box: [cx - HG, cx + HG, y0 - 0.22, y0 + 0.04, cz - HG, cz + HG], key: `f:${cx}:${cz}:${Math.round(y0 * 4)}` };
+    return { type: 'floor', cx, cz, y0, dirX: 0, dirZ: 1, box: [cx - HG, cx + HG, y0 - 0.22, y0 + 0.04, cz - HG, cz + HG], key: `f:${cm(cx)}:${cm(cz)}:${Math.round(y0 * 4)}` };
   }
 
   // Quick "90s": wall in your own cell and drop a ramp inside it whose low end is where you stand.
@@ -415,7 +417,7 @@ export class Building {
   edgeWallPlan(cx, cz, dx, dz, y0) {
     const wx = cx + dx * GRID / 2, wz = cz + dz * GRID / 2, alongX = dx === 0, h = 0.12;
     const box = alongX ? [wx - HG, wx + HG, y0, y0 + HEIGHT, wz - h, wz + h] : [wx - h, wx + h, y0, y0 + HEIGHT, wz - HG, wz + HG];
-    return { type: 'wall', dirX: dx, dirZ: dz, alongX, cx: wx, cz: wz, y0, box, key: `w:${wx}:${wz}:${alongX ? 1 : 0}:${Math.round(y0 * 4)}` };
+    return { type: 'wall', dirX: dx, dirZ: dz, alongX, cx: wx, cz: wz, y0, box, key: `w:${cm(wx)}:${cm(wz)}:${alongX ? 1 : 0}:${Math.round(y0 * 4)}` };
   }
 
   // Ramp toward yaw plus a wall covering its far end ("ramp rush"). Returns the ramp or null.

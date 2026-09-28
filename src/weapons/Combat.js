@@ -202,8 +202,8 @@ export class Combat {
 
   // Shadow Tracker: the target shows on your map (and through walls) for a few seconds.
   markTarget(target, by) {
-    target.markedUntil = this.game.time + 8;
-    target.markedBy = by;
+    target.markedUntil = Math.max(target.markedUntil || 0, this.game.time + 8);
+    if (!target.markedBy?.isPlayer || by?.isPlayer) target.markedBy = by; // don't steal the player's bounty mark
   }
 
   // Kinetic Blade: a wide slash (every third one in a row hits harder); structures take big damage.

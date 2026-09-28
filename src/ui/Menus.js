@@ -13,7 +13,7 @@ const TIPS = [
   'Supply drops follow the next safe zone. Watch for blue smoke.',
   'Stand still for a perfectly accurate first shot.',
   'Jump pads cancel fall damage.',
-  'Rare chests glow purple and hold two weapons.',
+  'Rare chests shine brighter gold and hold rarer loot.',
   'Storm Coins are earned by playing — spend them in the Item Shop.',
   'Press G on your own wall to cut a door or window.',
 ];
@@ -75,7 +75,7 @@ export class Menus {
                 <button class="mode m-quick" data-mode="quick"><i class="mi">⚡</i><b>Quick Match</b><span>29 bots · faster storm</span></button>
                 <button class="mode m-zb" data-mode="zb"><i class="mi">◈</i><b>Zero Build</b><span>No building · overshield</span></button>
                 <button class="mode m-reload" data-mode="reload"><i class="mi">↻</i><b>Reload</b><span>40 players · 2 reboots · small map</span></button>
-                <button class="mode m-blitz" data-mode="blitz"><i class="mi">⏱</i><b>Blitz Royale</b><span>32 players · same kit · 5-7 min</span></button>
+                <button class="mode m-blitz" data-mode="blitz"><i class="mi">⏱</i><b>Blitz Royale</b><span>32 players · same kit · ~5 min</span></button>
                 <button class="mode arena" data-mode="arena"><i class="mi">🏆</i><b>Ranked</b><span id="arena-div">Bronze I</span></button>
               </div>
               <button id="play-btn" class="btn big">PLAY</button>

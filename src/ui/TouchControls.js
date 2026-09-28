@@ -21,6 +21,9 @@ export class TouchControls {
           <button class="tbtn mat" data-a="buildmat">MAT</button>
           <button class="tbtn edit" data-a="edit">EDIT</button>
           <button class="tbtn emote" data-a="emote">♪</button>
+          <button class="tbtn sprite" data-a="sprite">SPR</button>
+          <button class="tbtn ping" data-a="ping">PING</button>
+          <button class="tbtn inv" data-a="inventory">BAG</button>
         </div>
       </div>`);
     this.el = root.querySelector('#touch');
@@ -57,7 +60,7 @@ export class TouchControls {
         e.stopPropagation();
         b.classList.add('down');
         input.press(a);
-        if (a === 'fire' || a === 'jump') input.touchHeld.add(a);
+        if (a === 'fire' || a === 'jump' || a === 'interact' || a === 'emote' || a === 'edit') input.touchHeld.add(a); // held buttons (search chests, emote wheel)
         if (a === 'fire') for (const t of e.changedTouches) this.lookIds.set(t.identifier, { x: t.clientX, y: t.clientY, btn: b });
       }, { passive: false });
       const up = (e) => {

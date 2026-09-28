@@ -50,7 +50,7 @@ export class SpriteCompanion {
     if (this.cooldownLeft > 0) return `Sprite recharging · ${Math.ceil(this.cooldownLeft)} s`;
     if (a.health >= 100 && a.shield >= 100) return 'Health and shield are full';
     const amt = this.def.heal[this.level - 1];
-    a.regen = { left: amt, rate: 20, acc: 0, both: true };
+    a.regen = { left: amt + (a.regen?.left || 0), rate: 20, acc: 0, both: true };
     this.readyAt = g.time + this.def.cd[this.level - 1];
     g.sound.play('shield', a.isPlayer ? null : a.pos, { range: 30 });
     for (let i = 0; i < 24; i++) g.effects.sparks.emit(a.pos.x, a.pos.y + 1, a.pos.z, (Math.random() - 0.5) * 3, 1 + Math.random() * 3, (Math.random() - 0.5) * 3, new THREE.Color('#6fd8ff'), 0.6, 0.16, 2);

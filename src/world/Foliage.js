@@ -4,7 +4,7 @@ import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferG
 import { addWind, WIND } from '../effects/Shaders.js';
 import { mulberry32, smoothstep } from '../core/noise.js';
 import { jitter, gradientY } from './geomUtils.js';
-import { TOWNS, WORLD_HALF, ISLAND_RADIUS, PALETTE, AREA_SCALE, BIOMES, biomeAt } from './Terrain.js';
+import { TOWNS, WORLD_HALF, ISLAND_RADIUS, PALETTE, AREA_SCALE, BIOMES, biomeAt, TUNNELS } from './Terrain.js';
 import { quality } from '../core/device.js';
 import { Nature } from './Nature.js';
 import { VARIANT, VARIANTS, tint } from './Variant.js';
@@ -110,6 +110,7 @@ export class Foliage {
       if (h < minH || h > maxH) continue;
       if (this.terrain.normalAt(x, z).y < minNy) continue;
       if (this._inTown(x, z)) continue;
+      if (TUNNELS.some((t) => x > t.ax - 4 && x < t.bx + 4 && Math.abs(z - t.az) < t.w + 3)) continue; // keep the tunnel clear
       return { x, z, h };
     }
     return null;

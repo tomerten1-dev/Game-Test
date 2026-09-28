@@ -48,7 +48,7 @@ Production build: `npm run build` (output in `dist/`), preview it with `npm run 
 | N | Mute |
 | Esc | Pause |
 
-Every key above can be changed in **Settings → Key bindings** (movement, jump, sprint, crouch, reload, interact, the build pieces, edit, quick 90s, map, emote, mute, weapon slots 1–6, inventory, drop, ping and shoulder swap).
+Every key above can be changed in **Settings → Key bindings** (movement, jump, sprint, crouch, reload, interact, the build pieces, edit, quick 90s, map, emote, mute, weapon slots 1–6, inventory, drop, ping, shoulder swap, auto-run, Sprite power, change build material and reset edit).
 
 **Touch devices** get a floating joystick on the left, drag-to-look on the right, and buttons for Fire (hold), Jump, Crouch, Reload, Use and quick-build (Wall, Floor, Ramp, Cone, MAT to switch material). Push the stick all the way to sprint. Tap the inventory slots to switch, and tap the minimap for the full map.
 
@@ -68,7 +68,7 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 - **Movement (Chapter 6–7 style):**
   - **Wall Scramble** (jump into a wall in front of you) and Wall Kick (a wall beside you).
   - **Ledge Jump** (sprint off an edge for extra distance) and **Roll Landing** (hold or tap Jump as you land: keep your speed, +16 stamina, less fall damage).
-  - Outside Arena a deadly fall leaves you on **1 HP** with a short splat.
+  - Outside Ranked a deadly fall leaves you on **1 HP** with a short splat.
   - **Shoulder-bash** doors by sprinting, sliding or rolling into them.
   - **Auto-run** (=), sprint-by-default and toggle-sprint settings.
   - Slides keep going downhill.
@@ -235,7 +235,7 @@ public/models/        models: chars/ (KayKit heroes), kk/ (KayKit world), env/ (
   (three.js r186 folded `PCFSoftShadowMap` into `PCFShadowMap`. Soft edges come from `shadow.radius`.)
 - **Terrain:** a 460 m height grid from fbm noise. `heightAt(x, z)` is bilinear, and everything (movement, grass, bullets, camera) uses it. Towns are flattened plateaus.
 - **Foliage:** instanced trees (round, pine, some autumn), rocks and bushes. Grass is one instanced draw call with a wind-sway vertex shader that samples a height texture and wraps around the player.
-- **Characters:** KayKit Adventurers (Knight, Barbarian, Mage, Rogue, Hooded Rogue). Each player/bot is a `SkeletonUtils.clone` with a subtle color tint; you are the teal hooded rogue with a glowing backpack antenna. Animation runs on two layers: the legs play run / strafe / backpedal / jump while the upper body plays aim / shoot / reload. Crossfades take 0.2 s and running speed follows movement speed.
+- **Characters:** Quaternius outfit characters (Ranger and Peasant, male and female). Everyone, bosses included, uses these same rigs so no one looks out of place; the older KayKit hero skins map onto them with their own colour tint and hats sit on the head bone. Each player/bot is a `SkeletonUtils.clone` with a subtle color tint; the default outfit is the Trail Ranger. Animation runs on two layers: the legs play run / strafe / backpedal / jump while the upper body plays aim / shoot / reload. Crossfades take 0.2 s and running speed follows movement speed.
 - **Houses:** built from Medieval Village MegaKit pieces on the kit's 2 m grid (all houses share one instanced mesh per piece; a broken wall panel just hides its instances) in local space, then placed with a 90° rotation so every collider stays an axis-aligned box. Stairs and roofs use ramp colliders. Bots route through the house with a small portal graph (outside ↔ front door ↔ room A ↔ interior door ↔ room B, and room A ↔ stairs ↔ upstairs), walk around corners when the door is on the far side, and walk off roofs they land on.
 - **Performance:** instancing, object pools for effects, bot "think" every ~0.3 s, animation LOD for far characters, and lower pixel ratio / shadows / grass on mobile.
 - **Post-processing:** [`postprocessing`](https://github.com/pmndrs/postprocessing) + [`n8ao`](https://github.com/N8python/n8ao): ambient occlusion, bloom on glowing things (loot beams, chests, muzzle flashes, sun), a warm/cool color grade and SMAA.

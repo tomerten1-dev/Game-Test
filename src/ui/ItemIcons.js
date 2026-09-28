@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { makeHarvestTool } from '../player/Gear.js';
 import { makeWeaponMesh, makePickaxeMesh } from '../weapons/WeaponModels.js';
 import { makeConsumableMesh } from '../world/ItemMeshes.js';
 
@@ -30,14 +31,14 @@ function setup() {
 function objectFor(item) {
   if (!item) return null;
   if (item.isGun) return makeWeaponMesh(item.type, item.rarity);
-  if (item.isPickaxe) return makePickaxeMesh();
+  if (item.isPickaxe) return (item.skin && makeHarvestTool(item.skin)) || makePickaxeMesh();
   if (item.isConsumable) return makeConsumableMesh(item.type);
   return null;
 }
 
 function keyFor(item) {
   if (item.isGun) return `g:${item.type}:${item.rarity}`;
-  if (item.isPickaxe) return 'pickaxe';
+  if (item.isPickaxe) return `pickaxe:${item.skin || ''}`;
   return `c:${item.type}`;
 }
 

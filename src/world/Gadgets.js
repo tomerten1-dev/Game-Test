@@ -27,7 +27,7 @@ export class Gadgets {
     const def = CONSUMABLES.bubble, g = this.game;
     const y = g.world.groundAt(pos.x, pos.z, pos.y + 0.5, 0.3);
     this.bubbleMat ||= new THREE.MeshStandardMaterial({ color: '#8fe3ff', emissive: '#3aa8ff', emissiveIntensity: 0.35, transparent: true, opacity: 0.22, roughness: 0.1, side: THREE.DoubleSide, depthWrite: false });
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 18, 0, Math.PI * 2, 0, Math.PI / 2), this.bubbleMat);
+    const mesh = new THREE.Mesh(this.domeGeo ||= new THREE.SphereGeometry(1, 32, 18, 0, Math.PI * 2, 0, Math.PI / 2), this.bubbleMat);
     mesh.position.set(pos.x, y, pos.z);
     mesh.scale.setScalar(0.1);
     mesh.renderOrder = 4;
@@ -60,7 +60,7 @@ export class Gadgets {
     const def = CONSUMABLES.stormflip, g = this.game;
     const inStorm = !g.storm.isInside(pos.x, pos.z);
     const mat = new THREE.MeshStandardMaterial({ color: inStorm ? '#7fd8ff' : '#c05cff', emissive: inStorm ? '#3aa8ff' : '#8a2be2', emissiveIntensity: 0.5, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false });
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 16), mat);
+    const mesh = new THREE.Mesh(this.flipGeo ||= new THREE.SphereGeometry(1, 28, 16), mat);
     mesh.position.copy(pos);
     mesh.scale.setScalar(0.1);
     g.scene.add(mesh);
@@ -124,7 +124,7 @@ export class Gadgets {
     who.state = 'ground';
     for (const pl of plans) {
       const st = B.build(who, pl, 'metal');
-      if (st) { st.hp = st.maxHp; st.buildT = st.buildTime; }
+      if (st) { st.hp = st.maxHp; st.buildT = st.buildTime; st.mesh.material.transparent = false; st.mesh.material.opacity = 1; st.mesh.material.needsUpdate = true; }
     }
     who.state = oldState;
     Object.assign(who.mats, saved);
@@ -205,6 +205,7 @@ export class Gadgets {
   _reel(a, c, silent = false) {
     const g = this.game;
     g.scene.remove(c.bob, c.line);
+    c.line.geometry.dispose();
     this.casts.delete(a);
     if (silent) return;
     if (c.bite <= 0) { if (a.isPlayer) g.hud?.toast?.(c.wait > 0 ? 'Too early' : 'It got away'); return; }
@@ -245,7 +246,7 @@ export class Gadgets {
       const s = f.r * (f.t < 0.8 ? Math.max(0.01, f.t / 0.8) : Math.min(1, f.grow / 2));
       f.mesh.scale.setScalar(s);
       f.mesh.material.opacity = 0.16 + 0.06 * Math.sin(now * 4);
-      if (f.t <= 0) { g.scene.remove(f.mesh); this.flips.splice(this.flips.indexOf(f), 1); }
+      if (f.t <= 0) { g.scene.remove(f.mesh); f.mesh.material.dispose(); this.flips.splice(this.flips.indexOf(f), 1); }
     }
     for (const a of [...this.splashes]) {
       a.t -= dt;

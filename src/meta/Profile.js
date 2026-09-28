@@ -38,7 +38,8 @@ export class Profile {
     };
     // Battle Pass pages: levels already earned become claims (rewards already unlocked stay unlocked)
     if (this.data.passClaims === undefined) {
-      const trackItems = Object.values(TRACK).filter((r) => r.item).map((r) => r.item);
+      // only items the old track actually unlocked (levels reached), not shop purchases
+      const trackItems = Object.entries(TRACK).filter(([l, r]) => r.item && +l <= (this.data.level || 1)).map(([, r]) => r.item);
       const got = trackItems.filter((id) => this.data.owned.includes(id)).length;
       this.data.passClaims = Math.max(0, (this.data.level || 1) - 1 - got);
     }

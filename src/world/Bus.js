@@ -285,7 +285,7 @@ export class Bus {
         r.mesh.rotation.z += dt;
         if (this.pos.distanceTo(r.pos) < 11) { r.hit = true; r.mesh.material.color.set('#5bd43b'); onRing?.(r); }
       }
-      if (this.progress >= 1.05 || (this.progress > 0.5 && this.pos.length() > 470)) { this.active = false; this.mesh.visible = false; this._clearExtras(); }
+      if (this.progress >= 1.05 || (this.progress > 0.5 && this.pos.length() > 470 * MAP_SCALE)) { this.active = false; this.mesh.visible = false; this._clearExtras(); }
       for (const f of this.mesh.userData.flames) f.scale.set(1, 0.8 + Math.random() * 0.4, 1);
       return;
     }

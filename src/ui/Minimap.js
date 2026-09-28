@@ -18,6 +18,7 @@ export class Minimap {
     const size = this.canvas.clientWidth || 180;
     this.canvas.width = this.canvas.height = Math.round(size * dpr);
     this.scale = this.canvas.width / (VIEW * 2);
+    if (this.game.player) this.draw(); // resizing clears the canvas
   }
 
   toMap(x, z) { return [(x - this.cx + VIEW) * this.scale, (z - this.cz + VIEW) * this.scale]; }

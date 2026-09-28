@@ -468,7 +468,7 @@ export class Game {
     this.deathInfo = null;
     this.respawns = [];
     this.hud.showSpectate(null);
-    if (!this._firstMatch) this.loot.reset();
+    this.loot.reset(); // (also on the first match: loot luck and fishing rods depend on the mode)
     this._firstMatch = false;
 
     this.player = new Player(this);
@@ -544,6 +544,7 @@ export class Game {
     for (const a of this.actors) {
       if (!a.alive) a.revive(0, 0);
       a.items = [new Pickaxe(), null, null, null, null, null];
+      a.items[0].skin = a.pickaxeSkin || null; // the hotbar icon shows your harvesting tool
       a.slot = -1;
       a.switchSlot(0);
       a.setBuildMode?.(null);
@@ -578,6 +579,7 @@ export class Game {
     if (this.meta.profile.d.crowned) this.player.setCrown(true, Math.max(1, this.meta.profile.d.stats.crownedWins || 0));
     const cb = this.bots.filter((b) => !b.npc)[Math.floor(Math.random() * this.bots.filter((b) => !b.npc).length)];
     cb?.setCrown(true, 1 + Math.floor(Math.random() * 4));
+    if (this.combat.weakMesh) { this.combat.weakMesh.visible = false; this.combat.weak = null; }
     this.boss.reset();
     this.boss.spawn();
     this.rifts.spawn();
@@ -753,7 +755,7 @@ export class Game {
     this.gadgets.update(dt);
     this.overrides.update(dt);
     // hired NPCs stay near whoever hired them
-    for (const b of this.bots) if (b.hiredBy && b.alive) { b.leash.x = b.hiredBy.pos.x; b.leash.z = b.hiredBy.pos.z; if (!b.hiredBy.alive) b.hiredBy = null; }
+    for (const b of this.bots) if (b.hiredBy && b.alive) { b.leash.x = b.hiredBy.pos.x; b.leash.z = b.hiredBy.pos.z; } // stays loyal even while its owner waits for a reboot
     // bounty: eliminate the marked player before time runs out
     if (this.bounty && (this.time > this.bounty.until || !this.bounty.target.alive)) {
       const bt = this.bounty; this.bounty = null;
@@ -857,7 +859,7 @@ export class Game {
     if (input.pressed('reload') && !p.buildMode) this.combat.reload(p);
     if (input.pressed('sprite')) { const msg = p.sprite ? p.sprite.useAbility() : 'Equip a Sprite in the Locker'; if (msg) this.hud.toast?.(msg); }
     if (input.pressed('drop') && !p.buildMode && p.state === 'ground') this.dropFromSlot(p.slot, Infinity);
-    if (input.pressed('ping') && p.state !== 'bus') {
+    if (input.pressed('ping') && p.state !== 'bus' && !this.map.open) {
       const dir = this.camera.getWorldDirection(_dir);
       this.pings.ping(_origin.copy(this.camera.position).addScaledVector(dir, this.rig.curDist), dir);
     }
@@ -1230,8 +1232,9 @@ export class Game {
     this._updateGrappleLine();
     const it = p.tickUse(dt);
     if (!it) return;
-    if (!it.def.rift) this.meta.track('heal');
-    this.sound.play(it.def.rift ? 'launch' : it.def.heal ? 'heal' : 'shield');
+    const healing = !!(it.def.heal || it.def.shield || it.def.overTime);
+    if (healing) this.meta.track('heal');
+    this.sound.play(it.def.rift || it.def.sos ? 'launch' : it.def.heal ? 'heal' : it.def.shield || it.def.fizz ? 'shield' : 'click');
     if (it.count > 0 && p.held === it && this.input.down('fire')) p.startUse();
   }
 
@@ -1242,7 +1245,15 @@ export class Game {
       this.respawns.splice(this.respawns.indexOf(r), 1);
       const a = r.a;
       a.rebootPending = false;
-      if (this.state !== 'playing' || this.storm.phase >= 6) { a.deathCause ||= 'reboot'; continue; }
+      if (this.state !== 'playing' || this.storm.phase >= 6) {
+        // reboots switched off before this one came up: out for good
+        a.deathCause ||= 'reboot';
+        if (a.isPlayer && this.state === 'playing') {
+          this.deathInfo = { place: this.aliveCount + 1, killer: a.killer && a.killer !== a ? a.killer : null, time: this.time };
+          this.endMatch(false, this.deathInfo.place, this.deathInfo.killer);
+        } else this._checkEnd();
+        continue;
+      }
       const c = this.storm.safeCenter(), rad = this.storm.safeRadius() * 0.7, ang = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * rad;
       const x = c.x + Math.cos(ang) * d, z = c.y + Math.sin(ang) * d;
       a.revive(x, z);
@@ -1253,6 +1264,7 @@ export class Game {
       a.jumpFromBus(new THREE.Vector3(x, this.world.heightAt(x, z) + 80, z), new THREE.Vector3());
       a.resetAI?.();
       if (a.isPlayer) { this.spectating = null; this.hud.showSpectate(null); this.hud.banner('Rebooted! Back in the fight', 2.5); }
+      this._checkEnd();
     }
   }
 
@@ -1378,7 +1390,7 @@ export class Game {
     const dirn = this.input.pressed('fire') ? 1 : this.input.pressed('aim') ? -1 : 0;
     if (!dirn || !this.spectating) return;
     const cur = this.spectating;
-    const list = this.actors.filter((a) => a.alive && !a.npc && !a.isPlayer && a.state !== 'bus').sort((a, b) => a.pos.distanceTo(cur.pos) - b.pos.distanceTo(cur.pos));
+    const list = this.actors.filter((a) => a.alive && !a.npc && !a.isPlayer && a.state !== 'bus'); // stable order, so next / previous really cycles
     if (list.length < 2) return;
     const i = list.indexOf(cur);
     this.startSpectate(list[(i + dirn + list.length) % list.length]);
@@ -1522,7 +1534,14 @@ export class Game {
     } else if (!p.alive && this.spectating && this.aliveCount === 1) {
       this.hud.banner(`${this.spectating.name} wins!`, 3);
       setTimeout(() => this.finishSpectate(), 2500);
-    } else if (p.alive && this.aliveCount === 1) {
+    } else this._checkEnd();
+  }
+
+  // Last one standing? (Also called after Reload reboots, which can end a match on their own.)
+  _checkEnd() {
+    const p = this.player;
+    if (this.state !== 'playing' || p.victory) return;
+    if (p.alive && this.aliveCount === 1) {
       p.victory = true;
       this.hud.banner('#1 VICTORY!', 4);
       this.sound.music(null);

@@ -133,7 +133,7 @@ export class Traps {
       if (t.cd > 0) { t.cd -= dt; continue; }
       let fired = false;
       for (const a of actors) {
-        if (!a.alive || a === t.owner || a.state === 'bus' || a.hiddenIn) continue;
+        if (!a.alive || a === t.owner || a.hiredBy === t.owner || a.state === 'bus' || a.hiddenIn) continue;
         if (Math.abs(a.pos.x - t.pos.x) > 3 || Math.abs(a.pos.z - t.pos.z) > 3 || Math.abs(a.pos.y - t.pos.y) > 3.5) continue;
         if (!Traps.inZone(t, a)) continue;
         if (!fired) this._fire(t);

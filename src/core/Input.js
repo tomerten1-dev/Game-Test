@@ -12,7 +12,7 @@ export const DEFAULT_KEYMAP = {
   KeyB: 'build', KeyG: 'edit', KeyT: 'emote', KeyH: 'ninety',
   Digit1: 'slot1', Digit2: 'slot2', Digit3: 'slot3', Digit4: 'slot4', Digit5: 'slot5', Digit6: 'slot6',
   ShiftLeft: 'sprint', ShiftRight: 'sprint',
-  KeyC: 'crouch', ControlLeft: 'crouch',
+  KeyC: 'crouch', // (no Ctrl: Ctrl+W would close the browser tab)
   Escape: 'pause',
   KeyM: 'map', KeyN: 'mute',
   KeyP: 'ping', KeyJ: 'drop', Tab: 'inventory', KeyY: 'shoulder', Equal: 'autorun', KeyK: 'sprite', KeyL: 'buildmat', KeyU: 'resetEdit',
@@ -63,6 +63,8 @@ export class Input {
       e.preventDefault(); e.stopPropagation();
       const cb = this.capture; this.capture = null;
       this._noMenuUntil = performance.now() + 600;
+      // swallow the click that follows, so it doesn't press whatever is under the cursor
+      window.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); }, { capture: true, once: true });
       cb(`Mouse${e.button}`);
     }, true);
     window.addEventListener('contextmenu', (e) => { if (performance.now() < (this._noMenuUntil || 0)) e.preventDefault(); });

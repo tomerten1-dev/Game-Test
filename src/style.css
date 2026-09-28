@@ -183,6 +183,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1830; col
 .tbtn.mat { right: 104px; bottom: 176px; font-size: 11px; width: 50px; height: 50px; }
 .tbtn.edit { right: 160px; bottom: 196px; font-size: 11px; width: 50px; height: 50px; }
 .tbtn.emote { right: 18px; bottom: 272px; font-size: 20px; width: 50px; height: 50px; }
+.tbtn.sprite { right: 76px; bottom: 272px; font-size: 11px; width: 50px; height: 50px; }
+.tbtn.ping { right: 134px; bottom: 272px; font-size: 11px; width: 50px; height: 50px; }
+.tbtn.inv { right: 18px; bottom: 330px; font-size: 11px; width: 50px; height: 50px; }
 
 body.touch #bottom-right { bottom: 8px; right: auto; left: 50%; transform: translateX(-50%); align-items: center; gap: 2px; }
 body.touch #weapon-name { font-size: 14px; }
@@ -446,7 +449,7 @@ body.touch .kbd { display: none; }
 #edit-hint b { color: #ffd23f; }
 
 /* boss health bar */
-#bossbar { position: absolute; left: 50%; top: 58px; transform: translateX(-50%); flex-direction: column; align-items: center; gap: 3px; }
+#bossbar { position: absolute; left: 50%; top: 104px; transform: translateX(-50%); flex-direction: column; align-items: center; gap: 3px; }
 #bossbar b { font-family: var(--title); font-weight: 400; letter-spacing: 1px; font-size: 18px; color: #ffb36b; text-shadow: 0 2px 0 rgba(0,0,0,0.5); }
 #bossbar .bb { display: flex; width: min(360px, 50vw); height: 10px; border-radius: 6px; background: rgba(0,0,0,0.45); overflow: hidden; }
 #bb-health { background: linear-gradient(90deg, #ff6b3d, #ffb36b); } #bb-shield { background: linear-gradient(90deg, #4fb5ff, #8fd3ff); }
@@ -518,7 +521,8 @@ body.touch .kbd { display: none; }
 #loot-card .lc-row i.up { color: #5dff8a; }
 #loot-card .lc-row i.down { color: #ff5d73; }
 #loot-card .lc-vs { margin-top: 5px; font-size: 11px; opacity: 0.6; }
-body.touch #loot-card { left: auto; right: 12px; top: 30%; width: 160px; font-size: 12px; }
+body.touch #loot-card { left: 12px; right: auto; top: 22%; width: 160px; font-size: 12px; }
+body.touch #reload-hint { top: calc(50% - 64px); }
 /* Zero Build overshield */
 .bar-row.overshield .bar { height: 10px; }
 .bar-row.overshield .bar-ico { font-size: 13px; color: #d6b8ff; }
@@ -856,5 +860,5 @@ body.hud-editing #top-right, body.hud-editing #bottom-left, body.hud-editing #bo
 @media (max-width: 700px) { .modes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .modes .mode { min-width: 0; }
 
-#watchers { position: absolute; right: 18px; top: 372px; font-family: var(--title); font-size: 14px; color: #fff; background: rgba(8,14,36,0.55); border-radius: 8px; padding: 3px 9px; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
+#watchers { position: static; align-self: flex-end; margin-top: 6px; font-family: var(--title); font-size: 14px; color: #fff; background: rgba(8,14,36,0.55); border-radius: 8px; padding: 3px 9px; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
 #watchers.hidden { display: none; }

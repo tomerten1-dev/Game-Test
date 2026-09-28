@@ -51,7 +51,7 @@ export class MapScreen {
     c.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       if (e.button === 2) { game.pings.setMarker(null); return; }
-      if (e.button === 1) return; // the ping key (middle mouse by default) is handled by the game
+      if (e.button === 1) { this.pingHere(e.offsetX, e.offsetY); return; } // middle-click pings the map spot
       this.drag = { x: e.clientX, y: e.clientY, cx: this.cx, cz: this.cz, moved: false };
       c.setPointerCapture?.(e.pointerId);
     });

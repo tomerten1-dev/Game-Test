@@ -317,7 +317,7 @@ export class Projectiles {
       const c = r.collider;
       g.effects.impact(pt, c?.structure ? (c.structure.mat === 'wood' ? 'wood' : 'stone') : c ? 'stone' : 'terrain', _n.copy(_dir).negate());
       if (c?.structure) { c.structure.damage(p.damage, owner); if (owner?.isPlayer && c.structure.owner !== owner) g.meta?.track('buildDamage', p.damage); }
-      else if (c?.breakable) g.combat.damageProp(c, p.damage);
+      else if (c?.breakable) g.combat.damageProp(c, p.damage, owner);
       else if (c?.part) c.part.damage(p.damage, owner);
       else if (c?.obj) g.world.destructibles.damage(c, p.damage, owner);
       if (owner?.isPlayer) g.hud?.objHp?.(c, pt);
