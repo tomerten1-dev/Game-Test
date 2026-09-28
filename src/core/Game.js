@@ -74,7 +74,7 @@ export class Game {
     this.renderer = renderer;
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1400);
+    this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1100); // fog hides the rest
     this.timer = new THREE.Timer();
     this.time = 0;
     this.actors = [];

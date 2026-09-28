@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { StreamedInstancedMesh } from './Streamed.js';
 
 // Enterable houses built from the Medieval Village MegaKit (Quaternius, CC0): plaster / brick wall
 // pieces on a 2 m grid with round-top doors and windows, tiled gable roofs with brick gable ends,
@@ -115,7 +116,7 @@ class KitBatch {
     group.name = 'house-kit';
     for (const [key, s] of this.slots) {
       const tinted = s.colors.some(Boolean);
-      const im = new THREE.InstancedMesh(s.part.geometry, s.part.material, s.mats.length);
+      const im = new StreamedInstancedMesh(s.part.geometry, s.part.material, s.mats.length);
       s.mats.forEach((mt, i) => {
         im.setMatrixAt(i, mt);
         if (tinted) im.setColorAt(i, s.colors[i] || _c.set('#ffffff'));

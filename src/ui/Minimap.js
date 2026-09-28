@@ -1,6 +1,6 @@
 import { TOWNS, WORLD_HALF } from '../world/Terrain.js';
 
-const VIEW = 120; // half-extent in meters shown around you
+const VIEW = 170; // half-extent in meters shown around you
 
 // Top-down map: terrain colors, storm, next circle, bus path, player arrow.
 export class Minimap {
@@ -8,7 +8,7 @@ export class Minimap {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.game = game;
-    this.terrain = game.world.terrain.buildMinimapCanvas(640);
+    this.terrain = game.world.terrain.buildMinimapCanvas(2048);
     this.cx = 0; this.cz = 0;
     this.resize();
   }

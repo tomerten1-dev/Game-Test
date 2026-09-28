@@ -31,7 +31,7 @@ export class MapScreen {
     this.ctx = this.canvas.getContext('2d');
     this.stormEl = root.querySelector('#bm-storm');
     this.aliveEl = root.querySelector('#bm-alive');
-    this.terrain = game.world.terrain.buildMinimapCanvas(900);
+    this.terrain = game.world.terrain.buildMinimapCanvas(2048);
     this.open = false;
     this.zoom = 1;
     this.cx = 0;
@@ -42,7 +42,7 @@ export class MapScreen {
     c.addEventListener('wheel', (e) => {
       e.preventDefault();
       const [wx, wz] = this.toWorld(e.offsetX * this.dpr, e.offsetY * this.dpr);
-      this.zoom = Math.min(4, Math.max(1, this.zoom * (e.deltaY < 0 ? 1.2 : 1 / 1.2)));
+      this.zoom = Math.min(8, Math.max(1, this.zoom * (e.deltaY < 0 ? 1.2 : 1 / 1.2)));
       // keep the point under the cursor fixed
       const [nx, nz] = this.toWorld(e.offsetX * this.dpr, e.offsetY * this.dpr);
       this.cx += wx - nx; this.cz += wz - nz;

@@ -5,12 +5,14 @@ import { SHADOW } from './Bake.js';
 // Smooth fbm island. Heights live in a grid; heightAt() is bilinear so gameplay
 // and the rendered mesh always agree.
 
-// Everything island-sized scales with MAP_SCALE (the island grew 1.3x: ~780 m of land across).
-export const MAP_SCALE = 1.3;
-export const WORLD_HALF = 520;   // grid covers [-520, 520]
-export const CELL = 2.5;          // meters between samples
-export const ISLAND_RADIUS = 390;
+// Everything island-sized scales with MAP_SCALE. At 3.9 the island is ~2.3 km of land across
+// (about 4-5 km²), the size of a Fortnite Battle Royale island.
+export const MAP_SCALE = 3.9;
+export const WORLD_HALF = 1560;  // grid covers [-1560, 1560]
+export const CELL = 4;            // meters between samples
+export const ISLAND_RADIUS = 300 * MAP_SCALE;
 export const AREA_SCALE = (ISLAND_RADIUS / 170) ** 2; // vs. the original 20-player island
+export const GROW = (MAP_SCALE / 1.3) ** 2; // land area vs. the previous (780 m) island, for fixed counts
 export const WATER_LEVEL = 0;
 
 // Named places. `kind` picks the builder in Towns.js (village by default).
@@ -26,17 +28,41 @@ const RAW_TOWNS = [
   { name: 'Salty Pier', x: -20, z: 238, r: 24, kind: 'pier' },
   { name: 'Windy Farms', x: 110, z: -238, r: 28, kind: 'farm' },
   { name: 'Pine Hollow', x: -238, z: 70, r: 24 },
+  // the big island has room for more named places, like Fortnite's ~20 POIs
+  { name: 'Brick Plaza', x: 95, z: 40, r: 27, kind: 'city' },
+  { name: 'Mossy Mills', x: 80, z: -60, r: 26 },
+  { name: 'Hilltop Hamlet', x: -40, z: 120, r: 24 },
+  { name: 'Frosty Flats', x: -60, z: -232, r: 26 },
+  { name: 'Snowpeak Lodge', x: 40, z: -262, r: 24 },
+  { name: 'Oak Ridge', x: -205, z: -150, r: 26 },
+  { name: 'Harvest Fields', x: -258, z: -28, r: 28, kind: 'farm' },
+  { name: 'Coral Cove', x: 228, z: 150, r: 25 },
+  { name: 'Sandy Shores', x: 120, z: 228, r: 25 },
+  { name: 'Dusty Dunes', x: -118, z: 250, r: 26 },
+  { name: 'Cliffside', x: 250, z: -150, r: 24 },
 ];
 export const TOWNS = RAW_TOWNS.map((t) => ({ ...t, x: Math.round(t.x * MAP_SCALE), z: Math.round(t.z * MAP_SCALE) }));
-export const MOUNTAIN = { x: -125 * MAP_SCALE, z: 150 * MAP_SCALE, r: 95, h: 62 };
+// dirt roads: every town links to its two nearest neighbours
+export const ROADS = (() => {
+  const out = [], seen = new Set();
+  for (const a of TOWNS) {
+    const near = TOWNS.filter((b) => b !== a).sort((p, q) => Math.hypot(p.x - a.x, p.z - a.z) - Math.hypot(q.x - a.x, q.z - a.z)).slice(0, 2);
+    for (const b of near) {
+      const key = [a.name, b.name].sort().join('|');
+      if (!seen.has(key)) { seen.add(key); out.push([a, b]); }
+    }
+  }
+  return out;
+})();
+export const MOUNTAIN = { x: -125 * MAP_SCALE, z: 150 * MAP_SCALE, r: 230, h: 88 };
 // small islands off the coast (reach them by gliding, swimming or a launch)
 export const ISLANDS = [
-  { name: 'Gull Isle', x: 440, z: 150, r: 26 },
-  { name: 'Coral Cay', x: -150, z: -445, r: 24 },
-  { name: 'Lone Rock', x: -455, z: -120, r: 22 },
+  { name: 'Gull Isle', x: 1320, z: 450, r: 34 },
+  { name: 'Coral Cay', x: -450, z: -1335, r: 30 },
+  { name: 'Lone Rock', x: -1365, z: -360, r: 28 },
 ];
 // a tunnel cut through the mountain (floor heights are filled in when the terrain is generated)
-export const TUNNELS = [{ name: 'Mountain Tunnel', ax: MOUNTAIN.x - 125, az: MOUNTAIN.z, bx: MOUNTAIN.x + 120, bz: MOUNTAIN.z, w: 6 }]; // runs along x (axis-aligned roof colliders)
+export const TUNNELS = [{ name: 'Mountain Tunnel', ax: MOUNTAIN.x - 290, az: MOUNTAIN.z, bx: MOUNTAIN.x + 280, bz: MOUNTAIN.z, w: 6 }]; // runs along x (axis-aligned roof colliders)
 
 // Biomes on the default (summer) island: snowy north, grassland in the middle, desert south.
 // Variant.js switches them off for the all-winter / all-desert islands.
@@ -77,15 +103,15 @@ export class Terrain {
   rawHeight(x, z) {
     const nz = this.noise;
     const d = Math.hypot(x, z);
-    const coast = ISLAND_RADIUS + nz.fbm(x * 0.0045 + 11.3, z * 0.0045 - 4.1, 3) * 40;
-    const mask = 1 - smoothstep(0.8, 1.03, d / coast);
-    const hills = (nz.fbm(x * 0.0085, z * 0.0085, 4) * 0.5 + 0.5) * 15;
+    const coast = ISLAND_RADIUS + nz.fbm(x * 0.0017 + 11.3, z * 0.0017 - 4.1, 3) * 110;
+    const mask = 1 - smoothstep(0.86, 1.02, d / coast);
+    const hills = (nz.fbm(x * 0.0042, z * 0.0042, 4) * 0.5 + 0.5) * 16 + (nz.fbm(x * 0.011 + 3, z * 0.011, 3) * 0.5 + 0.5) * 4;
     const detail = nz.fbm(x * 0.05, z * 0.05, 3) * 1.1;
     const md = Math.hypot(x - MOUNTAIN.x, z - MOUNTAIN.z) / MOUNTAIN.r;
     let mt = 0;
     if (md < 1) {
       const fall = 1 - smoothstep(0, 1, md);
-      mt = Math.pow(fall, 1.2) * MOUNTAIN.h * (0.78 + 0.34 * nz.ridged(x * 0.013, z * 0.013, 3)) + nz.fbm(x * 0.06, z * 0.06, 2) * 1.2 * fall;
+      mt = Math.pow(fall, 1.2) * MOUNTAIN.h * (0.78 + 0.34 * nz.ridged(x * 0.006, z * 0.006, 3)) + nz.fbm(x * 0.06, z * 0.06, 2) * 1.2 * fall;
     }
     let h = lerp(-7.5, 3.2 + hills + detail + mt, mask);
     for (const is of ISLANDS) {
@@ -117,8 +143,9 @@ export class Terrain {
       }
       t.y = Math.max(3.2, (t.y + sum / cnt) / 2);
       if (t.kind === 'lake') t.y = 3.4;
-      for (let j = 0; j < n; j++) {
-        for (let i = 0; i < n; i++) {
+      const [i0, i1, j0, j1] = this._box(t.x, t.z, t.r * 1.6);
+      for (let j = j0; j <= j1; j++) {
+        for (let i = i0; i <= i1; i++) {
           const x = -WORLD_HALF + i * CELL, z = -WORLD_HALF + j * CELL;
           const d = Math.hypot(x - t.x, z - t.z);
           if (d > t.r * 1.6) continue;
@@ -133,8 +160,10 @@ export class Terrain {
     for (const t of TUNNELS) {
       t.ay = Math.max(3.2, this.rawHeight(t.ax, t.az)); t.by = Math.max(3.2, this.rawHeight(t.bx, t.bz));
       const dx = t.bx - t.ax, dz = t.bz - t.az, L = Math.hypot(dx, dz);
-      for (let j = 0; j < n; j++) {
-        for (let i = 0; i < n; i++) {
+      const [i0, i1] = this._box((t.ax + t.bx) / 2, t.az, L / 2 + 10);
+      const [, , j0, j1] = this._box(t.ax, t.az, t.w + 10);
+      for (let j = j0; j <= j1; j++) {
+        for (let i = i0; i <= i1; i++) {
           const x = -WORLD_HALF + i * CELL, z = -WORLD_HALF + j * CELL;
           const u = ((x - t.ax) * dx + (z - t.az) * dz) / (L * L);
           if (u < -0.02 || u > 1.02) continue;
@@ -152,24 +181,25 @@ export class Terrain {
         const k = j * n + i;
         const x = -WORLD_HALF + i * CELL, z = -WORLD_HALF + j * CELL;
         const y = h[k];
+        if (y < -3) { this.variation[k] = 0.5; this.grass[k] = 0; continue; } // sea floor
         const ny = this._gridNormalY(i, j);
         const variation = clamp(this.noise.fbm(x * 0.03 + 50, z * 0.03 - 20, 3) * 0.8 + 0.5, 0, 1);
         this.variation[k] = variation;
         let g = smoothstep(2.0, 3.0, y) * smoothstep(0.72, 0.86, ny) * (1 - smoothstep(26, 32, y));
         for (const t of TOWNS) {
-          const d = Math.hypot(x - t.x, z - t.z);
-          g *= t.kind === 'lake' ? 1 : smoothstep(t.r * 0.72, t.r * 0.95, d);
+          if (t.kind === 'lake' || Math.abs(x - t.x) > t.r || Math.abs(z - t.z) > t.r) continue;
+          g *= smoothstep(t.r * 0.72, t.r * 0.95, Math.hypot(x - t.x, z - t.z));
         }
         // dirt paths from the central town to the others (wobbly)
         let pth = 0;
-        const hub = TOWNS[0];
-        for (let ti = 1; ti < TOWNS.length; ti++) {
-          const t = TOWNS[ti];
+        for (let ti = 0; ti < ROADS.length; ti++) {
+          const [hub, t] = ROADS[ti];
           const ax = hub.x, az = hub.z, bx = t.x - ax, bz = t.z - az;
           const L = Math.hypot(bx, bz);
           const u = ((x - ax) * bx + (z - az) * bz) / (L * L);
           if (u < 0 || u > 1) continue;
           const side = ((x - ax) * -bz + (z - az) * bx) / L;
+          if (Math.abs(side) > 30) continue;
           const wob = this.noise.noise(u * 4 + ti * 7, ti) * 9 * Math.sin(u * Math.PI);
           const dd = Math.abs(side - wob);
           pth = Math.max(pth, 1 - smoothstep(1.1, 2.3, dd));
@@ -183,6 +213,12 @@ export class Terrain {
         this.grass[k] = g;
       }
     }
+  }
+
+  // grid index range covering a square of half-size `r` around (x, z)
+  _box(x, z, r) {
+    const n = this.n, c = (v) => Math.max(0, Math.min(n - 1, v));
+    return [c(Math.floor((x - r + WORLD_HALF) / CELL)), c(Math.ceil((x + r + WORLD_HALF) / CELL)), c(Math.floor((z - r + WORLD_HALF) / CELL)), c(Math.ceil((z + r + WORLD_HALF) / CELL))];
   }
 
   _h(i, j) {
@@ -241,6 +277,7 @@ export class Terrain {
     out.lerp(P.dirt, (1 - smoothstep(0.15, 0.6, g)) * 0.35 * smoothstep(2.5, 3.5, y));
     // towns: warm dirt plaza
     for (const t of TOWNS) {
+      if (Math.abs(x - t.x) > t.r || Math.abs(z - t.z) > t.r) continue;
       const d = Math.hypot(x - t.x, z - t.z);
       out.lerp(P.dirt, (1 - smoothstep(t.r * 0.55, t.r * 0.9, d)) * 0.85);
     }
@@ -263,7 +300,6 @@ export class Terrain {
 
   buildMesh() {
     const n = this.n;
-    const geo = new THREE.BufferGeometry();
     const pos = new Float32Array(n * n * 3);
     const nor = new Float32Array(n * n * 3);
     const col = new Float32Array(n * n * 3);
@@ -282,30 +318,15 @@ export class Terrain {
         col[k * 3] = c.r; col[k * 3 + 1] = c.g; col[k * 3 + 2] = c.b;
       }
     }
-    const idx = new Uint32Array((n - 1) * (n - 1) * 6);
-    let p = 0;
-    for (let j = 0; j < n - 1; j++) {
-      for (let i = 0; i < n - 1; i++) {
-        const a = j * n + i, b = a + 1, cc = a + n, d = cc + 1;
-        idx[p++] = a; idx[p++] = cc; idx[p++] = b;
-        idx[p++] = b; idx[p++] = cc; idx[p++] = d;
-      }
-    }
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    geo.setIndex(new THREE.BufferAttribute(idx, 1));
-    geo.computeBoundingSphere();
     // town mask as a vertex attribute (1 = paved plaza)
     const town = new Float32Array(n * n);
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       const x = -WORLD_HALF + i * CELL, z = -WORLD_HALF + j * CELL;
       let w = 0;
-      for (const t of TOWNS) w = Math.max(w, 1 - smoothstep(t.r * 0.32, t.r * 0.6, Math.hypot(x - t.x, z - t.z)));
+      for (const t of TOWNS) if (Math.abs(x - t.x) < t.r * 0.6 && Math.abs(z - t.z) < t.r * 0.6) w = Math.max(w, 1 - smoothstep(t.r * 0.32, t.r * 0.6, Math.hypot(x - t.x, z - t.z)));
       town[j * n + i] = w;
     }
-    geo.setAttribute('aTown', new THREE.BufferAttribute(town, 1));
-    geo.setAttribute('aShade', new THREE.BufferAttribute(new Float32Array(n * n), 1));
+    this._full = { pos, nor, col, town, shade: new Float32Array(n * n) };
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
     mat.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, SHADOW);
@@ -343,24 +364,76 @@ export class Terrain {
             diffuseColor.rgb = mix(diffuseColor.rgb, stone, vTown * smoothstep(0.1, 0.5, vTown));
           }`);
     };
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.receiveShadow = true;
-    mesh.castShadow = true;
-    mesh.name = 'terrain';
-    this.mesh = mesh;
-    return mesh;
+    // The island is ~3 km across, so the ground is split into chunks: the camera only draws the
+    // ones in view, and chunks that are all deep sea (under the water plane) are skipped.
+    const group = new THREE.Group();
+    group.name = 'terrain';
+    this.chunks = [];
+    const CH = 96;
+    for (let j0 = 0; j0 < n - 1; j0 += CH) {
+      for (let i0 = 0; i0 < n - 1; i0 += CH) {
+        const i1 = Math.min(n - 1, i0 + CH), j1 = Math.min(n - 1, j0 + CH);
+        let top = -Infinity;
+        for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) top = Math.max(top, this.heights[j * n + i]);
+        if (top < -6.8) continue;
+        const w = i1 - i0 + 1, hgt = j1 - j0 + 1;
+        const cg = new THREE.BufferGeometry();
+        const cpos = new Float32Array(w * hgt * 3), cnor = new Float32Array(w * hgt * 3);
+        for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+          const k = j * n + i, q = (j - j0) * w + (i - i0);
+          for (let a = 0; a < 3; a++) { cpos[q * 3 + a] = pos[k * 3 + a]; cnor[q * 3 + a] = nor[k * 3 + a]; }
+        }
+        const cidx = new Uint16Array((w - 1) * (hgt - 1) * 6);
+        let p = 0;
+        for (let j = 0; j < hgt - 1; j++) for (let i = 0; i < w - 1; i++) {
+          const a = j * w + i, b = a + 1, cc = a + w, d = cc + 1;
+          cidx[p++] = a; cidx[p++] = cc; cidx[p++] = b;
+          cidx[p++] = b; cidx[p++] = cc; cidx[p++] = d;
+        }
+        cg.setAttribute('position', new THREE.BufferAttribute(cpos, 3));
+        cg.setAttribute('normal', new THREE.BufferAttribute(cnor, 3));
+        cg.setAttribute('color', new THREE.BufferAttribute(new Float32Array(w * hgt * 3), 3));
+        cg.setAttribute('aTown', new THREE.BufferAttribute(new Float32Array(w * hgt), 1));
+        cg.setAttribute('aShade', new THREE.BufferAttribute(new Float32Array(w * hgt), 1));
+        cg.setIndex(new THREE.BufferAttribute(cidx, 1));
+        cg.computeBoundingSphere();
+        cg.computeBoundingBox();
+        const mesh = new THREE.Mesh(cg, mat);
+        mesh.receiveShadow = true;
+        mesh.castShadow = true;
+        mesh.name = 'terrain';
+        group.add(mesh);
+        this.chunks.push({ geo: cg, i0, j0, w, h: hgt });
+      }
+    }
+    this._fillChunks();
+    this.mesh = group;
+    return group;
+  }
+
+  // copy the per-vertex colour / plaza / baked-shadow values into the chunk geometries
+  _fillChunks() {
+    const n = this.n, F = this._full;
+    for (const c of this.chunks) {
+      const col = c.geo.attributes.color.array, town = c.geo.attributes.aTown.array, sh = c.geo.attributes.aShade.array;
+      for (let j = 0; j < c.h; j++) for (let i = 0; i < c.w; i++) {
+        const k = (c.j0 + j) * n + (c.i0 + i), q = j * c.w + i;
+        col[q * 3] = F.col[k * 3]; col[q * 3 + 1] = F.col[k * 3 + 1]; col[q * 3 + 2] = F.col[k * 3 + 2];
+        town[q] = F.town[k]; sh[q] = F.shade[k];
+      }
+      c.geo.attributes.color.needsUpdate = c.geo.attributes.aTown.needsUpdate = c.geo.attributes.aShade.needsUpdate = true;
+    }
   }
 
   applyBake(shade, ao) {
-    const g = this.mesh.geometry;
-    g.attributes.aShade.array.set(shade);
-    g.attributes.aShade.needsUpdate = true;
-    const col = g.attributes.color;
+    const F = this._full;
+    F.shade.set(shade);
     for (let k = 0; k < shade.length; k++) {
       const f = 1 - ao[k];
-      col.array[k * 3] *= f; col.array[k * 3 + 1] *= f; col.array[k * 3 + 2] *= f;
+      F.col[k * 3] *= f; F.col[k * 3 + 1] *= f; F.col[k * 3 + 2] *= f;
     }
-    col.needsUpdate = true;
+    this._fillChunks();
+    this._full = null; // the chunks hold their own copies
   }
 
   // RGBA half-float texture: R = height, G = grass density, B = color variation.
@@ -382,7 +455,21 @@ export class Terrain {
   }
 
   // Top-down colored image for the minimap.
-  buildMinimapCanvas(size = 256) {
+  // Drawn once at grid resolution, then scaled up (smoothly) to the size asked for; cached per size.
+  buildMinimapCanvas(out = 256) {
+    this._mapCache ||= new Map();
+    if (this._mapCache.has(out)) return this._mapCache.get(out);
+    const base = this._mapBase ||= this._drawMapBase(Math.min(out, this.n));
+    const big = document.createElement('canvas');
+    big.width = big.height = out;
+    const bctx = big.getContext('2d');
+    bctx.imageSmoothingEnabled = true; bctx.imageSmoothingQuality = 'high';
+    bctx.drawImage(base, 0, 0, out, out);
+    this._mapCache.set(out, big);
+    return big;
+  }
+
+  _drawMapBase(size) {
     const cv = document.createElement('canvas');
     cv.width = cv.height = size;
     const ctx = cv.getContext('2d');

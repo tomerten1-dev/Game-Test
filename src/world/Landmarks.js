@@ -5,12 +5,12 @@ import { mulberry32 } from '../core/noise.js';
 // Named spots between the towns: small landmarks (a camp, a windmill, a water tower…), the offshore
 // islands and the roof of the mountain tunnel. Each landmark gets a chest spot and a map label.
 const SMALL = [
-  { name: 'Camp Cod', props: [['kk/tent', 2.6, 0, 0], ['kk/tent', 2.4, 4.5, 2], ['kk/barrel', 1.1, -2.5, 2], ['kk/sack', 0.8, 2, -2.5]] },
-  { name: 'Old Windmill', props: [['kk/windmill_green', 10, 0, 0], ['kk/wheelbarrow', 1.1, 5, 3], ['kk/sack', 0.8, 4, -3]] },
-  { name: 'Water Tower', props: [['kk/city_watertower', 11, 0, 0], ['kk/crate_A_big', 1.3, 5, 1], ['kk/crate_A_big', 1.3, 5.5, 2.6]] },
-  { name: 'Lumber Camp', props: [['kk/resource_lumber', 1.4, 0, 0], ['kk/resource_lumber', 1.4, 3, 2], ['kk/tent', 2.5, -4, 3], ['kk/weaponrack', 1.6, 2, -3]] },
-  { name: 'Flag Hill', props: [['kk/flag_red', 4, 0, 0], ['kk/flag_blue', 4, 3.5, 1], ['kk/barrel', 1.1, -2, -2]] },
-  { name: 'Lookout Ruin', props: [['kk/tower_A_red', 9, 0, 0], ['kk/crate_A_big', 1.3, 4, 3]] },
+  { name: 'Camp Cod', more: ['Camp Trout', 'Camp Perch'], props: [['kk/tent', 2.6, 0, 0], ['kk/tent', 2.4, 4.5, 2], ['kk/barrel', 1.1, -2.5, 2], ['kk/sack', 0.8, 2, -2.5]] },
+  { name: 'Old Windmill', more: ['Twin Mills', 'Creaky Mill'], props: [['kk/windmill_green', 10, 0, 0], ['kk/wheelbarrow', 1.1, 5, 3], ['kk/sack', 0.8, 4, -3]] },
+  { name: 'Water Tower', more: ['Rusty Tank', 'High Tank'], props: [['kk/city_watertower', 11, 0, 0], ['kk/crate_A_big', 1.3, 5, 1], ['kk/crate_A_big', 1.3, 5.5, 2.6]] },
+  { name: 'Lumber Camp', more: ['Sawdust Yard', 'Timber Post'], props: [['kk/resource_lumber', 1.4, 0, 0], ['kk/resource_lumber', 1.4, 3, 2], ['kk/tent', 2.5, -4, 3], ['kk/weaponrack', 1.6, 2, -3]] },
+  { name: 'Flag Hill', more: ['Banner Knoll', 'Pennant Point'], props: [['kk/flag_red', 4, 0, 0], ['kk/flag_blue', 4, 3.5, 1], ['kk/barrel', 1.1, -2, -2]] },
+  { name: 'Lookout Ruin', more: ['Watch Ruin', 'Broken Keep'], props: [['kk/tower_A_red', 9, 0, 0], ['kk/crate_A_big', 1.3, 4, 3]] },
 ];
 
 export class Landmarks {
@@ -49,7 +49,10 @@ export class Landmarks {
 
   _small() {
     const r = mulberry32(7331);
-    for (const L of SMALL) {
+    // each kind of landmark shows up three times across the big island, each with its own name
+    const jobs = [];
+    for (let pass = 0; pass < 3; pass++) for (const L of SMALL) jobs.push({ ...L, name: pass ? L.more[pass - 1] : L.name });
+    for (const L of jobs) {
       for (let i = 0; i < 400; i++) {
         const a = r() * Math.PI * 2, d = (60 + r() * 250) * MAP_SCALE;
         const x = Math.cos(a) * d, z = Math.sin(a) * d;

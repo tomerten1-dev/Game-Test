@@ -9,6 +9,7 @@ import { Water } from './Water.js';
 import { Lighting } from './Lighting.js';
 import { Foliage } from './Foliage.js';
 import { Towns } from './Towns.js';
+import { updateStreamed, cullScene } from './Streamed.js';
 import { Colliders, rayBox, rayCylinder, raySphere, rayRamp, rampSurfaceY } from './Colliders.js';
 
 export const GRAVITY = 24;
@@ -44,7 +45,7 @@ export class World {
     this.lighting = new Lighting(scene);
     this.heightTex = this.terrain.buildDataTexture();
     this.water = new Water(scene, this.heightTex);
-    this.clouds = new Clouds(scene, 26, models);
+    this.clouds = new Clouds(scene, 70, models);
     this.towns = new Towns(scene, this.terrain, this.colliders, models);
     this.traversal = new Traversal(scene, this.terrain, this.colliders, this.towns);
     this.landmarks = new Landmarks(scene, this.terrain, this.colliders, this.towns, models);
@@ -62,6 +63,8 @@ export class World {
     this.clouds.update(dt);
     this.water.update(dt, t);
     this.foliage.update(dt, t, focus, camera.position);
+    updateStreamed(camera.position);
+    cullScene(this.scene, camera.position, t);
     this.lighting.follow(focus);
   }
 

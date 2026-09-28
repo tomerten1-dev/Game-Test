@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { TOWNS, MOUNTAIN, MAP_SCALE } from './Terrain.js';
+import { TOWNS, MOUNTAIN, MAP_SCALE, GROW } from './Terrain.js';
 import { mulberry32 } from '../core/noise.js';
 
 // Ways to get around the island (Fortnite-style):
@@ -50,7 +50,7 @@ export class Traversal {
   // Wooden lookout towers on hills: ladder up one side, zipline from the top down the slope.
   _towers(r) {
     const spots = [];
-    for (let i = 0; i < 900 && spots.length < 4; i++) {
+    for (let i = 0; i < 900 * GROW && spots.length < 4 * 3; i++) {
       const a = r() * Math.PI * 2, d = (50 + r() * 230) * MAP_SCALE;
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
       const h = this.terrain.heightAt(x, z);
@@ -158,14 +158,14 @@ export class Traversal {
   // Hot air balloons that slowly rise and sink over the fields.
   _balloons(r) {
     const cols = [['#ff5a4f', '#ffd23f'], ['#3d8dff', '#ffffff'], ['#5bd43b', '#ffe94d']];
-    for (let i = 0, tries = 0; i < 3 && tries < 600; tries++) {
+    for (let i = 0, tries = 0; i < 6 && tries < 1200; tries++) {
       const a = r() * Math.PI * 2, d = (60 + r() * 200) * MAP_SCALE;
       const x = Math.cos(a) * d, z = Math.sin(a) * d, h = this.terrain.heightAt(x, z);
       if (h < 3 || h > 30 || this.terrain.normalAt(x, z).y < 0.95 || !this._clearOf(x, z, 10)) continue;
       if (this.balloons.some((b) => Math.hypot(b.x - x, b.z - z) < 80)) continue;
       const g = new THREE.Group();
       g.position.set(x, h, z);
-      const [c1, c2] = cols[i];
+      const [c1, c2] = cols[i % cols.length];
       const env = new THREE.Mesh(new THREE.SphereGeometry(4.2, 16, 12), new THREE.MeshStandardMaterial({ color: c1, roughness: 0.6 }));
       env.scale.y = 1.2; env.position.y = 10.5; env.castShadow = true; g.add(env);
       const band = new THREE.Mesh(new THREE.SphereGeometry(4.25, 16, 3, 0, Math.PI * 2, Math.PI * 0.45, Math.PI * 0.12), new THREE.MeshStandardMaterial({ color: c2, roughness: 0.6 }));

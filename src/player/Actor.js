@@ -31,7 +31,7 @@ function fallDamageFor(speed, g = 24) {
   return 250;
 }
 const JUMP_VEL = 8.2;
-const GLIDE_HEIGHT = 35;
+const GLIDE_HEIGHT = 60; // the glider opens on its own this high above the ground
 const REDEPLOY_HEIGHT = 14;
 const OVERSHIELD = 50; // Zero Build mode
 
@@ -744,12 +744,13 @@ export class Actor {
       if (this.vel.y < 2) { this.launching = false; this.setState('glide'); }
       if (this.onGround) { this.launching = false; this.land(); }
     } else if (this.state === 'skydive') {
-      const hs = 17;
+      // skydiving from the high bus: steer ~24 m/s sideways (about 400 m from the bus line in all)
+      const hs = 24;
       this.vel.x = damp(this.vel.x, it.mx * hs, 2.2, dt);
       this.vel.z = damp(this.vel.z, it.mz * hs, 2.2, dt);
       // look straight down to dive faster
       const down = Math.max(0, Math.min(1, -(this.aimPitch || 0) / 1.2));
-      const dive = (Math.hypot(it.mx, it.mz) > 0.1 ? -30 : -24) - down * 14;
+      const dive = (Math.hypot(it.mx, it.mz) > 0.1 ? -21 : -26) - down * 18;
       this.vel.y = damp(this.vel.y, dive, 1.5, dt);
       world.moveBody(this, dt, 0);
       const hag = this.heightAboveGround();
@@ -769,7 +770,7 @@ export class Actor {
       if (this.onGround) this.land();
       else if (it.jumpPress) { this.setState('glide'); }
     } else if (this.state === 'glide') {
-      const hs = 12;
+      const hs = 14;
       this.vel.x = damp(this.vel.x, it.mx * hs, 2.5, dt);
       this.vel.z = damp(this.vel.z, it.mz * hs, 2.5, dt);
       this.vel.y = damp(this.vel.y, -6.5, 3, dt);
@@ -788,16 +789,7 @@ export class Actor {
     this.game.sound?.play('fall', this.isPlayer ? null : this.pos);
     if (this.isPlayer) { this.game.hud.hurt(); this.game.effects.damageNumber(this.chest(new THREE.Vector3()), dmg, false, false); }
     if (this.health <= 0) {
-      // outside ranked (Arena), a fall that would finish you leaves you on 1 HP with no shield
-      // and a short "splat" where you can't shoot or build
-      if (this.game.mode !== 'arena') {
-        this.health = 1; this.shield = 0; this.overshield = 0;
-        this.splatT = 1.1;
-        this.vel.x = this.vel.z = 0;
-        this.character.setPose(this.character.q ? 'LayToIdle' : 'Hit_A', null, 0.05, 1.2);
-        if (this.isPlayer) this.game.hud?.toast?.('Splat! 1 HP left');
-        return;
-      }
+      // like Fortnite, a big enough fall eliminates you
       this.health = 0; this.deathCause = 'fall'; this.die(null);
     }
   }

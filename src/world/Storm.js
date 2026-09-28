@@ -1,23 +1,24 @@
 import * as THREE from 'three';
 
-// 12 zones like Fortnite: 1 damage a second for the early circles, 12 a second by circle 6 and 20 by circle 8;
+// 12 zones sized for the ~2.3 km island: the first circle waits 3 minutes (Fortnite: 3:20) and closes to
+// 1.6 km across, and a full match lasts about 22 minutes. 1 damage a second early, 12 by circle 6, 20 by circle 8;
 // the last four circles move instead of just shrinking.
 export const STORM_PHASES = [
-  { wait: 90, shrink: 60, radius: 290, dmg: 1 },
-  { wait: 60, shrink: 45, radius: 210, dmg: 1 },
-  { wait: 45, shrink: 36, radius: 145, dmg: 2 },
-  { wait: 35, shrink: 30, radius: 95, dmg: 5 },
-  { wait: 30, shrink: 25, radius: 62, dmg: 8 },
-  { wait: 25, shrink: 22, radius: 44, dmg: 12 },
-  { wait: 22, shrink: 20, radius: 30, dmg: 15 },
-  { wait: 20, shrink: 18, radius: 20, dmg: 20 },
-  { wait: 18, shrink: 16, radius: 13, dmg: 20 },
-  { wait: 16, shrink: 15, radius: 8, dmg: 20 },
-  { wait: 14, shrink: 14, radius: 4, dmg: 20 },
+  { wait: 180, shrink: 165, radius: 800, dmg: 1 },
+  { wait: 110, shrink: 110, radius: 560, dmg: 1 },
+  { wait: 80, shrink: 80, radius: 380, dmg: 2 },
+  { wait: 65, shrink: 62, radius: 250, dmg: 5 },
+  { wait: 55, shrink: 50, radius: 160, dmg: 8 },
+  { wait: 45, shrink: 40, radius: 100, dmg: 12 },
+  { wait: 36, shrink: 32, radius: 62, dmg: 15 },
+  { wait: 30, shrink: 26, radius: 40, dmg: 20 },
+  { wait: 24, shrink: 22, radius: 25, dmg: 20 },
+  { wait: 20, shrink: 18, radius: 14, dmg: 20 },
+  { wait: 16, shrink: 14, radius: 6, dmg: 20 },
   { wait: 12, shrink: 20, radius: 0, dmg: 20 },
 ];
 export const MOVING_FROM = STORM_PHASES.length - 4;
-const START_RADIUS = 580;
+const START_RADIUS = 1750;
 
 const vert = /* glsl */ `
 varying vec2 vUv;
@@ -38,7 +39,7 @@ void main() {
   float s = sin(around * 0.22 + vWorld.y * 0.18 - uTime * 1.6);
   float s2 = sin(around * 0.07 - vWorld.y * 0.05 + uTime * 0.7);
   float stripe = smoothstep(0.55, 0.95, s) * 0.55 + smoothstep(0.2, 1.0, s2) * 0.25;
-  float h = clamp((vWorld.y + 10.0) / 185.0, 0.0, 1.0);
+  float h = clamp((vWorld.y + 10.0) / 420.0, 0.0, 1.0);
   float fade = pow(1.0 - h, 1.6);
   vec3 base = vec3(0.45, 0.12, 0.85);
   vec3 hi = vec3(0.95, 0.55, 1.0);
@@ -53,8 +54,8 @@ void main() {
 export class Storm {
   constructor(scene, terrain) {
     this.terrain = terrain;
-    const geo = new THREE.CylinderGeometry(1, 1, 190, 96, 1, true);
-    geo.translate(0, 80, 0);
+    const geo = new THREE.CylinderGeometry(1, 1, 430, 128, 1, true);
+    geo.translate(0, 200, 0); // taller than the Storm Bus flies
     this.uniforms = { uTime: { value: 0 }, uRadius: { value: START_RADIUS } };
     this.mesh = new THREE.Mesh(geo, new THREE.ShaderMaterial({
       vertexShader: vert, fragmentShader: frag, uniforms: this.uniforms,

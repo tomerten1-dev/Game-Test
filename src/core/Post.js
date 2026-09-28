@@ -69,8 +69,16 @@ export class Post {
   setSize(w, h) { this.composer?.setSize(w, h); }
 
   render(dt) {
+    // High up (Storm Bus, skydiving) the haze thins out so you can see the island below, like Fortnite.
+    const fog = this.scene.fog, cam = this.camera;
+    const k = Math.max(0, Math.min(1, (cam.position.y - 50) / 250));
+    const near = fog?.near, far = fog?.far;
+    if (fog && k > 0) { fog.near += k * 300; fog.far += k * 1000; }
+    const cf = 1100 + k * 800;
+    if (Math.abs(cam.far - cf) > 5) { cam.far = cf; cam.updateProjectionMatrix(); }
     if (this.enabled && this.composer) this.composer.render(dt);
     else this.renderer.render(this.scene, this.camera);
+    if (fog && k > 0) { fog.near = near; fog.far = far; }
   }
 
   dispose() {

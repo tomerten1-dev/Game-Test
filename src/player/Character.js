@@ -131,6 +131,7 @@ export class Character {
     type = KK_TO_Q[type] || type;
     const src = assets.types[type] || assets.types.Knight;
     this.root = new THREE.Group();
+    this.root.userData.noCull = true; // actors manage their own visibility
     const model = SkeletonUtils.clone(src.scene);
     model.scale.setScalar(src.scale);
     model.position.y = src.footOffset;

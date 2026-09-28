@@ -96,7 +96,7 @@ export class Water {
           diffuseColor.rgb = mix(wcol, vec3(1.0), clamp(foam, 0.0, 1.0));
           diffuseColor.a = mix(0.55, 0.93, dk) + foam * 0.4;`);
     };
-    const geo = new THREE.PlaneGeometry(1400, 1400, 140, 140);
+    const geo = new THREE.PlaneGeometry(WORLD_HALF * 2 + 300, WORLD_HALF * 2 + 300, 200, 200);
     geo.rotateX(-Math.PI / 2);
     this.mesh = new THREE.Mesh(geo, mat);
     this.mesh.receiveShadow = true;
@@ -104,7 +104,7 @@ export class Water {
     this.mesh.name = 'water';
     scene.add(this.mesh);
     // far ocean out to the horizon
-    const far = new THREE.Mesh(new THREE.RingGeometry(690, 2600, 64, 1), new THREE.MeshStandardMaterial({ color: '#1560c9', roughness: 0.1, metalness: 0.05, envMapIntensity: 1.3 }));
+    const far = new THREE.Mesh(new THREE.RingGeometry(WORLD_HALF + 140, WORLD_HALF + 5000, 64, 1), new THREE.MeshStandardMaterial({ color: '#1560c9', roughness: 0.1, metalness: 0.05, envMapIntensity: 1.3 }));
     far.rotation.x = -Math.PI / 2;
     far.position.y = -0.05;
     scene.add(far);

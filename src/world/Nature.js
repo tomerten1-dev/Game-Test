@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { StreamedInstancedMesh } from './Streamed.js';
 import { addWind } from '../effects/Shaders.js';
 import { TOWNS } from './Terrain.js';
 import { VARIANT_KEY } from './Variant.js';
@@ -92,9 +93,9 @@ export class Nature {
 
   _detailMeshes(name, cap) {
     const mats = this._mats(name);
-    const bark = new THREE.InstancedMesh(this._part(name, /Trunk|Bark/).geometry, mats.bark, cap);
+    const bark = new StreamedInstancedMesh(this._part(name, /Trunk|Bark/).geometry, mats.bark, cap);
     const leafPart = this._part(name, /Leaves/);
-    const leaves = leafPart && mats.leaves ? new THREE.InstancedMesh(leafPart.geometry, mats.leaves, cap) : null;
+    const leaves = leafPart && mats.leaves ? new StreamedInstancedMesh(leafPart.geometry, mats.leaves, cap) : null;
     if (leaves) leaves.customDepthMaterial = mats.depth;
     for (const im of [bark, leaves]) {
       if (!im) continue;
@@ -219,8 +220,8 @@ export class Nature {
     for (const [name, list] of Object.entries(place)) {
       const mats = this._mats(name);
       const leafPart = this._part(name, /Leaves/);
-      const bark = new THREE.InstancedMesh(this._part(name, /Trunk|Bark/).geometry, mats.bark, list.length);
-      const leaves = leafPart && mats.leaves ? new THREE.InstancedMesh(leafPart.geometry, mats.leaves, list.length) : null;
+      const bark = new StreamedInstancedMesh(this._part(name, /Trunk|Bark/).geometry, mats.bark, list.length);
+      const leaves = leafPart && mats.leaves ? new StreamedInstancedMesh(leafPart.geometry, mats.leaves, list.length) : null;
       if (leaves) leaves.customDepthMaterial = mats.depth;
       list.forEach((pl, i) => {
         m.compose(p.set(pl.x, pl.y, pl.z), q.setFromAxisAngle(up, pl.yaw), s.setScalar(pl.sc));
@@ -245,8 +246,8 @@ export class Nature {
     const bush = this.models.get(bushName);
     if (bush) {
       const leafGeo = this._geo(bushName, 'Leaves_NormalTree'), flowerGeo = this._geo(bushName, 'Flowers');
-      const leafIM = new THREE.InstancedMesh(leafGeo, this.bushLeafMat, counts.bushes);
-      const flowerIM = new THREE.InstancedMesh(flowerGeo, this.flowerMat, counts.bushes);
+      const leafIM = new StreamedInstancedMesh(leafGeo, this.bushLeafMat, counts.bushes, 220);
+      const flowerIM = new StreamedInstancedMesh(flowerGeo, this.flowerMat, counts.bushes, 160);
       leafIM.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(counts.bushes * 3), 3);
       let nl = 0, nf = 0;
       const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
@@ -269,7 +270,7 @@ export class Nature {
     for (const name of clovers) {
       const geo = this._geo(name, 'Leaves');
       const n = Math.round(counts.clovers / clovers.length);
-      const im = new THREE.InstancedMesh(geo, this.cloverMat, n);
+      const im = new StreamedInstancedMesh(geo, this.cloverMat, n, 140);
       const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
       const c = new THREE.Color();
       let k = 0;

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { StreamedInstancedMesh } from './Streamed.js';
 import { Destructibles } from './Destructible.js';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { addWind, WIND } from '../effects/Shaders.js';
@@ -126,9 +127,9 @@ export class Foliage {
     const pineMat = canopyMat.clone();
     addWind(canopyMat, { amount: 0.05, pivot: -1.3, speed: 1.3 });
     addWind(pineMat, { amount: 0.035, pivot: 0.0, speed: 1.1 });
-    const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
-    const rounds = new THREE.InstancedMesh(roundCanopyGeo(r), canopyMat, count);
-    const pines = new THREE.InstancedMesh(pineCanopyGeo(), pineMat, count);
+    const trunks = new StreamedInstancedMesh(trunkGeo, trunkMat, count);
+    const rounds = new StreamedInstancedMesh(roundCanopyGeo(r), canopyMat, count);
+    const pines = new StreamedInstancedMesh(pineCanopyGeo(), pineMat, count);
     let nT = 0, nR = 0, nP = 0, nK = 0;
     const pendingPines = [];
     const kkPines = { 'kk/tree_single_A': [], 'kk/tree_single_B': [] };
@@ -240,7 +241,7 @@ export class Foliage {
     geo = jitter(geo, 0.35, r);
     geo.computeVertexNormals();
     const mat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.95, flatShading: true });
-    const im = new THREE.InstancedMesh(geo, mat, count);
+    const im = new StreamedInstancedMesh(geo, mat, count, 420); // rocks
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
     const e = new THREE.Euler();
     const col = new THREE.Color();
@@ -319,7 +320,7 @@ export class Foliage {
     geo.computeVertexNormals();
     const mat = new THREE.MeshStandardMaterial({ color: green, roughness: 0.8, flatShading: true });
     const max = Math.round(110 * AREA_SCALE);
-    const im = new THREE.InstancedMesh(geo, mat, max);
+    const im = new StreamedInstancedMesh(geo, mat, max, 320); // cacti
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
     const col = new THREE.Color();
     let n = 0;
@@ -402,7 +403,7 @@ export class Foliage {
     gradientY(geo, new THREE.Color(0.5, 0.55, 0.5), new THREE.Color(1.15, 1.2, 1.05));
     const mat = new THREE.MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.9 });
     addWind(mat, { amount: 0.06, pivot: -0.6, speed: 1.6 });
-    const im = new THREE.InstancedMesh(geo, mat, count);
+    const im = new StreamedInstancedMesh(geo, mat, count, 260); // bushes
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
     const col = new THREE.Color();
     let n = 0;

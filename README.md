@@ -61,7 +61,8 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
   - The Pump is based on the Sentinel: 12 pellets, 92 common → 114 legendary, 4 shells, 1.75× headshots.
   - Rarity steps follow Fortnite, about +5.5% damage per rarity.
   - Fall damage follows Fortnite's heights: none below ~12.5 m (3⅓ walls), 49 at 5 walls, 100 at 6 walls. Rolling doesn't reduce it.
-  - Storm damage climbs 1 → 1 → 2 → 5 → 8 → 12 → 15 → 20. The first circle waits 90 s so there's time to loot.
+  - Storm damage climbs 1 → 1 → 2 → 5 → 8 → 12 → 15 → 20. The first circle waits 3 minutes (Fortnite: 3:20) and closes to 1.6 km across; a full match lasts about 22 minutes.
+  - The island is Fortnite-sized: about 2.3 km of land across (~4–5 km²) with 22 named towns. The Storm Bus flies at 320 m and 72 m/s, and you can skydive and glide roughly 400 m out from its path.
 - **Fortnite-style look (Chapter 5+):**
   - Heavy condensed uppercase type (Anton, a free stand-in for Burbank; Barlow Condensed for numbers). Both are bundled, so nothing loads from Google Fonts.
   - Straight health and shield bars, square quick-bar slots with rarity glow, and a square minimap.
@@ -83,7 +84,7 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 - **Movement (Chapter 6–7 style):**
   - **Wall Scramble** (jump into a wall in front of you) and Wall Kick (a wall beside you).
   - **Ledge Jump** (sprint off an edge for extra distance) and **Roll Landing** (hold or tap Jump as you land: keep your speed, +16 stamina, less fall damage).
-  - Outside Ranked a deadly fall leaves you on **1 HP** with a short splat.
+  - A big enough fall eliminates you, like in Fortnite.
   - **Shoulder-bash** doors by sprinting, sliding or rolling into them.
   - **Auto-run** (=), sprint-by-default and toggle-sprint settings.
   - Slides keep going downhill.
@@ -170,7 +171,7 @@ Every key above can be changed in **Settings → Key bindings** (movement, jump,
 
 ## Seasons
 
-**The island** is about 780 m of land across (1.3× bigger than before) with **three biomes** on the default Summer island: snowy pine forests in the north (Windy Farms, Pebble City), grassland in the middle and a cactus desert in the south (Salty Pier). There are three **offshore islands** (Gull Isle, Coral Cay, Lone Rock) with chests, six small **named landmarks** between the towns (Camp Cod, Old Windmill, Water Tower, Lumber Camp, Flag Hill, Lookout Ruin), each with a chest, and a lantern-lit **Mountain Tunnel** running under the mountain. Landmark names show on the map when you zoom in.
+**The island** is about 2.3 km of land across (Fortnite-sized, ~4–5 km²) with 22 named towns and **three biomes** on the default Summer island: snowy pine forests in the north (Windy Farms, Pebble City), grassland in the middle and a cactus desert in the south (Salty Pier). There are three **offshore islands** (Gull Isle, Coral Cay, Lone Rock) with chests, eighteen small **named landmarks** between the towns (three each of camps, windmills, water towers, lumber camps, flag hills and ruins, like Camp Cod, Old Windmill, Water Tower, Lumber Camp, Flag Hill and Lookout Ruin), each with a chest, and a lantern-lit **Mountain Tunnel** running under the mountain. Landmark names show on the map when you zoom in.
 
 **Settings → Island season** picks the island: *Summer*, *Winter* (snow, frosted trees, falling snow, pale sky) or *Desert* (sand, dry scrub, saguaro cacti, warm sky). *Auto* uses Winter from December to February and Summer otherwise. The island is generated on load, so the change applies after the reload button.
 
@@ -222,7 +223,7 @@ The start menu and pause screen have a **Graphics** selector:
 
 ## How a match works
 
-1. The Storm Bus flies across the island at 110 m. Jump when you like (it drops you at the end otherwise).
+1. The Storm Bus flies across the island at 320 m (you can see the whole island below). Jump when you like (it drops you at the end otherwise).
 2. Skydive and steer. The glider opens automatically about 35 m above the ground.
 3. Loot gold chests (weapon + shield potion / medkit + wood) and floor loot. Rarity colors: grey, green, blue, purple, gold. Rarer = more damage.
 4. The storm has 6 phases. Each waits, then shrinks toward a new circle (white ring on the minimap). Damage grows every phase.
@@ -248,7 +249,7 @@ public/models/        models: chars/ (KayKit heroes), kk/ (KayKit world), env/ (
 
 - **Look:** ACES Filmic tone mapping, sRGB output, hemisphere light + warm sun with soft PCF shadows (shadow camera follows the player), gradient sky shader with sun disk, drifting puffy clouds, matching distance fog, and sky-based environment reflections.
   (three.js r186 folded `PCFSoftShadowMap` into `PCFShadowMap`. Soft edges come from `shadow.radius`.)
-- **Terrain:** a 460 m height grid from fbm noise. `heightAt(x, z)` is bilinear, and everything (movement, grass, bullets, camera) uses it. Towns are flattened plateaus.
+- **Terrain:** a 3.1 km height grid (4 m cells) from fbm noise, drawn as chunks so only nearby ground is rendered. Trees, bushes, rocks and town props use streamed instancing (only instances near the camera are uploaded), and small props beyond the fog are hidden. `heightAt(x, z)` is bilinear, and everything (movement, grass, bullets, camera) uses it. Towns are flattened plateaus.
 - **Foliage:** instanced trees (round, pine, some autumn), rocks and bushes. Grass is one instanced draw call with a wind-sway vertex shader that samples a height texture and wraps around the player.
 - **Characters:** Quaternius outfit characters (Ranger and Peasant, male and female). Everyone, bosses included, uses these same rigs so no one looks out of place; the older KayKit hero skins map onto them with their own colour tint and hats sit on the head bone. Each player/bot is a `SkeletonUtils.clone` with a subtle color tint; the default outfit is the Trail Ranger. Animation runs on two layers: the legs play run / strafe / backpedal / jump while the upper body plays aim / shoot / reload. Crossfades take 0.2 s and running speed follows movement speed.
 - **Houses:** built from Medieval Village MegaKit pieces on the kit's 2 m grid (all houses share one instanced mesh per piece; a broken wall panel just hides its instances) in local space, then placed with a 90° rotation so every collider stays an axis-aligned box. Stairs and roofs use ramp colliders. Bots route through the house with a small portal graph (outside ↔ front door ↔ room A ↔ interior door ↔ room B, and room A ↔ stairs ↔ upstairs), walk around corners when the door is on the far side, and walk off roofs they land on.

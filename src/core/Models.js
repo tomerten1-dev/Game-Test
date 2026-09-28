@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { StreamedInstancedMesh } from '../world/Streamed.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
@@ -129,7 +130,7 @@ export class Models {
    * One InstancedMesh per part for many placements.
    * placements: [{ x, y, z, rot, rx?, rz?, scale (number | Vector3), colors?: { [partName]: Color } }]
    */
-  instanced(name, placements, { castShadow = true, receiveShadow = true, material } = {}) {
+  instanced(name, placements, { castShadow = true, receiveShadow = true, material, range = 360 } = {}) {
     const m = this.get(name);
     const group = new THREE.Group();
     const mat4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
@@ -138,7 +139,7 @@ export class Models {
       const tinted = placements.some((pl) => pl.colors && pl.colors[part.name]);
       let mat = material ? material(part) : part.material.clone();
       if (tinted) mat.color.set('#ffffff');
-      const im = new THREE.InstancedMesh(part.geometry, mat, placements.length);
+      const im = new StreamedInstancedMesh(part.geometry, mat, placements.length, range);
       placements.forEach((pl, i) => {
         q.setFromEuler(e.set(pl.rx || 0, pl.rot || 0, pl.rz || 0, 'YXZ'));
         if (typeof pl.scale === 'number' || pl.scale === undefined) s.setScalar(pl.scale ?? 1); else s.copy(pl.scale);

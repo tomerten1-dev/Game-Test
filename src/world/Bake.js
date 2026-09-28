@@ -42,9 +42,9 @@ export function bakeLighting(terrain, colliders, spheres, sunDir) {
         if (t >= 0) { s = 1; break; }
       }
       if (!s) {
-        for (let t = 3; t < 170; t += 3) {
+        for (let t = 4; t < 220; t += 4) {
           const y = oy + t * slope;
-          if (y > 62) break;
+          if (y > 100) break;
           if (terrain.heightAt(ox + dx * t, oz + dz * t) > y) { s = 1; break; }
         }
       }

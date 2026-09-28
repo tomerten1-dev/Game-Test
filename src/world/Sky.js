@@ -112,7 +112,7 @@ export class Clouds {
       this.templates.push(im);
       for (let i = 0; i < perTemplate; i++) {
         const ang = rand() * Math.PI * 2;
-        const dist = 60 + rand() * 420;
+        const dist = 60 + Math.sqrt(rand()) * 1500; // spread over the whole island
         this.items.push({
           im, index: i,
           x: Math.cos(ang) * dist, z: Math.sin(ang) * dist,
@@ -131,7 +131,7 @@ export class Clouds {
     const d = this.dummy;
     for (const c of this.items) {
       c.x += c.speed * dt;
-      if (c.x > 520) c.x = -520;
+      if (c.x > 1600) c.x = -1600;
       d.position.set(c.x, c.y, c.z);
       d.rotation.set(0, c.rot, 0);
       d.scale.setScalar(c.s);

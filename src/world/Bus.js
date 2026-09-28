@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { MAP_SCALE } from './Terrain.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 
-export const BUS_HEIGHT = 110;
-const SPEED = 26;
+// Fortnite's bus flies at ~75 m/s and crosses the island in well under a minute
+export const BUS_HEIGHT = 320;
+const SPEED = 72;
 
 // Painted side panel: blue body, white band with "STORM BUS" and a lightning bolt, yellow pinstripe.
 function liveryTexture() {
@@ -168,6 +169,7 @@ export class Bus {
   constructor(scene) {
     this.scene = scene;
     this.mesh = buildBusMesh();
+    this.mesh.userData.noCull = true; // seen from far below
     this.mesh.scale.setScalar(1.8);
     this.mesh.visible = false;
     scene.add(this.mesh);
@@ -229,7 +231,7 @@ export class Bus {
   _launchSurf() {
     const a = Math.random() * Math.PI * 2;
     const dx = -Math.cos(a), dz = -Math.sin(a); // heading in toward the middle
-    this.start.set(Math.cos(a) * 460, 5, Math.sin(a) * 460);
+    this.start.set(Math.cos(a) * 360 * MAP_SCALE, 5, Math.sin(a) * 360 * MAP_SCALE);
     this.end.set(Math.cos(a) * 290 * MAP_SCALE, 5, Math.sin(a) * 290 * MAP_SCALE);
     this.length = this.start.distanceTo(this.end);
     this.vel.set(dx * 14, 0, dz * 14);

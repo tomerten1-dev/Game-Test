@@ -150,7 +150,7 @@ export class Gadgets {
   _makeSpots() {
     const g = this.game, T = g.world.terrain, rnd = mulberry32(9191);
     this.spots = [];
-    for (let i = 0; i < 4000 && this.spots.length < 16; i++) {
+    for (let i = 0; i < 12000 && this.spots.length < 40; i++) {
       const x = (rnd() * 2 - 1) * (WORLD_HALF - 30), z = (rnd() * 2 - 1) * (WORLD_HALF - 30);
       const h = T.heightAt(x, z);
       if (h > -1 || h < -4) continue;

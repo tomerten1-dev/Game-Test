@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { part, merge, mat } from './geomUtils.js';
-import { TOWNS, MAP_SCALE } from './Terrain.js';
+import { TOWNS, MAP_SCALE, GROW } from './Terrain.js';
 import { Weapon } from '../weapons/Weapon.js';
 import { RARITIES, rollRarity, rollWeaponType } from '../weapons/WeaponDefs.js';
 import { itemGeometry } from '../weapons/WeaponModels.js';
@@ -147,7 +147,7 @@ export class Loot {
     // chest spots: next to houses, town centers, crate piles, plus random spots
     const spots = [...this.world.towns.chestSpots];
     const r = mulberry32(555);
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 20 * GROW; i++) {
       const a = r() * Math.PI * 2, d = (25 + r() * 250) * MAP_SCALE;
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
       if (this.world.heightAt(x, z) > 2.5 && this.world.terrain.normalAt(x, z).y > 0.85) spots.push({ x, z, rot: r() * 6 });
@@ -205,7 +205,7 @@ export class Loot {
     const trim = new THREE.MeshStandardMaterial({ color: '#e9e2c8', roughness: 0.6 });
     const spots = [];
     for (const h of this.world.towns.houses) spots.push({ x: h.x + (r() < 0.5 ? -1 : 1) * ((h.maxX - h.minX) / 2 + 1.6), z: h.z + (r() - 0.5) * 3 });
-    for (let i = 0; i < 45; i++) { const a = r() * Math.PI * 2, d = (20 + r() * 260) * MAP_SCALE; spots.push({ x: Math.cos(a) * d, z: Math.sin(a) * d }); }
+    for (let i = 0; i < 45 * GROW; i++) { const a = r() * Math.PI * 2, d = (20 + r() * 260) * MAP_SCALE; spots.push({ x: Math.cos(a) * d, z: Math.sin(a) * d }); }
     for (const sp of spots) {
       if (r() > 0.55) continue;
       const y = this.world.groundAt(sp.x, sp.z, 200, 0.5);

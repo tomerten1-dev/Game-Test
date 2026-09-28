@@ -302,7 +302,7 @@ export class Towns {
 
   _scatterCrates(crates) {
     const r = this.rand;
-    for (let i = 0; i < Math.round(18 * AREA_SCALE); i++) {
+    for (let i = 0; i < Math.round(9 * AREA_SCALE); i++) {
       const a = r() * Math.PI * 2, d = (25 + r() * 250) * MAP_SCALE;
       const x = Math.cos(a) * d, z = Math.sin(a) * d;
       const h = this.terrain.heightAt(x, z);
