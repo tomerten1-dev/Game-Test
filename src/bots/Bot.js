@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GRID } from '../world/Building.js';
 import { Actor, RUN_SPEED } from '../player/Actor.js';
 import { angleDiff, clamp } from '../core/noise.js';
+import { TOWNS } from '../world/Terrain.js';
 
 const THINK = 0.3;
 const SIGHT = 70;
@@ -226,6 +227,31 @@ export class Bot extends Actor {
     this.boxed = false;
   }
 
+  // No real progress for 6 s and nothing going on (no fight, heal or held spot): give up the chest /
+  // item / tree we were after for a while (it's out of reach) and get out of any box around us.
+  _watchdog() {
+    const g = this.game, w = this._wd;
+    if (!w) { this._wd = { x: this.pos.x, z: this.pos.z, t: g.time }; return; }
+    if (g.time - w.t < 6) return;
+    const moved = Math.hypot(this.pos.x - w.x, this.pos.z - w.z);
+    this._wd = { x: this.pos.x, z: this.pos.z, t: g.time };
+    const busy = (this.target && g.time - this.lastSeenT < 3) || this.useT > 0 || this.mode === 'hold' || this.mode === 'heal' || this.mode === 'upgrade' || (this.mode === 'harvest' && this.tree && Math.hypot(this.tree.x - this.pos.x, this.tree.z - this.pos.z) < 2);
+    if (moved > 2 || busy) return;
+    const skip = (this.skip ||= new Map()), until = g.time + 45;
+    if (this.lootChest) skip.set(this.lootChest, until);
+    if (this.pickup) skip.set(this.pickup, until);
+    if (this.tree) skip.set(`t${Math.round(this.tree.x)},${Math.round(this.tree.z)}`, until);
+    this.lootChest = this.pickup = this.tree = null;
+    const yaw = this.hasGoal ? Math.atan2(this.goal.x - this.pos.x, this.goal.z - this.pos.z) : Math.random() * Math.PI * 2;
+    let out = false;
+    for (let k = 0; k < 4 && !out; k++) if (this.game.building.wallAt(this, yaw + (k * Math.PI) / 2)) { this._leaveBox(yaw + (k * Math.PI) / 2); out = true; }
+    if (!out) { this.wantJump = true; this.escapeT = 1.2; this.escapeX = Math.sin(yaw + Math.PI); this.escapeZ = Math.cos(yaw + Math.PI); }
+    this.hasGoal = false;
+    this.mode = 'wander';
+  }
+
+  skipped(o) { const t = this.skip?.get(o); return t !== undefined && t > this.game.time; }
+
   setGoal(x, z, y = null) { this.goal.set(x, 0, z); this.goalY = y; this.hasGoal = true; }
 
   think() {
@@ -236,6 +262,7 @@ export class Bot extends Actor {
     }
     if (this.state !== 'ground') return;
     if (this.npc) { this._npcThink(); return; }
+    this._watchdog();
 
     // --- perception ---
     if (this.target && (!this.target.alive || this.target.state === 'bus')) this.target = null;
@@ -593,6 +620,15 @@ export class Bot extends Actor {
     // wander inside the safe area
     if (this.mode !== 'wander' || !this.hasGoal || Math.hypot(this.goal.x - this.pos.x, this.goal.z - this.pos.z) < 3) {
       this.mode = 'wander';
+      // with nothing to do, head somewhere worth going: the nearest town inside the safe zone we
+      // aren't standing in, else the middle of the circle (like players rotating)
+      if (storm) {
+        const c = storm.safeCenter(), rr = storm.safeRadius();
+        const town = TOWNS.filter((t) => Math.hypot(t.x - c.x, t.z - c.y) < rr * 0.85 && Math.hypot(t.x - this.pos.x, t.z - this.pos.z) > t.r + 10)
+          .sort((a, b) => Math.hypot(a.x - this.pos.x, a.z - this.pos.z) - Math.hypot(b.x - this.pos.x, b.z - this.pos.z))[0];
+        const to = town ? { x: town.x + (Math.random() - 0.5) * town.r, z: town.z + (Math.random() - 0.5) * town.r } : { x: c.x + (Math.random() - 0.5) * rr * 0.4, z: c.y + (Math.random() - 0.5) * rr * 0.4 };
+        if (g.world.heightAt(to.x, to.z) > 1) { this.setGoal(to.x, to.z); return; }
+      }
       for (let i = 0; i < 8; i++) {
         let x, z;
         if (storm) {
@@ -689,6 +725,7 @@ export class Bot extends Actor {
     for (const c of cols) {
       if (!c.tree && !c.crate) continue;
       if (!c.obj && !c.breakable) continue; // only things that break give materials
+      if (this.skipped(`t${Math.round(c.kind === 'circle' ? c.x : (c.minX + c.maxX) / 2)},${Math.round(c.kind === 'circle' ? c.z : (c.minZ + c.maxZ) / 2)}`)) continue;
       if (c.kind !== 'circle' && c.kind !== 'box') continue;
       const cx = c.kind === 'circle' ? c.x : (c.minX + c.maxX) / 2, cz = c.kind === 'circle' ? c.z : (c.minZ + c.maxZ) / 2;
       const d = Math.hypot(cx - this.pos.x, cz - this.pos.z);
