@@ -720,7 +720,22 @@ export class HUD {
       s.style.setProperty('--slotbg', !it ? 'transparent' : i === 0 && !it.isGun && !it.isConsumable ? '#3a8fe0' : col);
       s.classList.toggle('low', !!it?.isGun && it.def.ammoType !== 'none' && it.mag > 1 && it.ammo <= Math.ceil(it.mag * 0.25));
     });
-    for (const k of ['wood', 'stone', 'metal']) this.set('mat' + k, this.el.mats[k], String(who.mats[k]));
+    for (const k of ['wood', 'stone', 'metal']) {
+      this.set('mat' + k, this.el.mats[k], String(who.mats[k]));
+      // Fortnite: "+N" pops up next to the counter when you gain materials
+      const prev = this._matPrev?.[k];
+      if (who === p && prev !== undefined && who.mats[k] > prev) {
+        const box = this.el.mats[k].parentElement;
+        let pop = box.querySelector('.mat-gain');
+        if (!pop) { pop = document.createElement('span'); pop.className = 'mat-gain'; box.appendChild(pop); }
+        const recent = pop.classList.contains('show') && performance.now() - (pop._t || 0) < 900;
+        pop._n = (recent ? pop._n : 0) + (who.mats[k] - prev);
+        pop._t = performance.now();
+        pop.textContent = `+${pop._n}`;
+        pop.classList.remove('show'); void pop.offsetWidth; pop.classList.add('show');
+      }
+      (this._matPrev ||= {})[k] = who === p ? who.mats[k] : undefined;
+    }
     // ammo by type next to the materials, and special items (keycard) beside the quick bar
     const ammoSig = Object.keys(AMMO).map((t) => who.ammoFor(t)).join(',');
     if (this.cache.ammoTypes !== ammoSig) {

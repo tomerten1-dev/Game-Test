@@ -339,7 +339,13 @@ export class Combat {
       let amount = 7 + Math.floor(Math.random() * 4);
       // weak point: hitting the glowing spot doubles the harvest and moves it
       if (actor.isPlayer && c?.kind === 'circle') {
-        const crit = this.weak?.c === c && _end.distanceTo(this.weak.pos) < 0.6;
+        // a hit on the weak point: your aim line passes through it (it sits on the visible surface,
+        // not on the round hitbox the swing hits)
+        let crit = false;
+        if (this.weak?.c === c) {
+          const wp = this.weak.pos, t = (wp.x - origin.x) * dir.x + (wp.y - origin.y) * dir.y + (wp.z - origin.z) * dir.z;
+          crit = t > 0 && t < reach + 1.5 && Math.hypot(origin.x + dir.x * t - wp.x, origin.y + dir.y * t - wp.y, origin.z + dir.z * t - wp.z) < 0.45;
+        }
         if (crit) { amount *= 2; g.sound.play('hit'); g.effects.hitSparks(this.weak.pos, '#6cd8ff'); }
         if (c.obj) {
           // trees and rocks lose HP; the last hit knocks them down for a bonus
@@ -395,7 +401,8 @@ export class Combat {
     // and out, so their live slots can't be ray-tested directly)
     const tmp = (this._rayMesh ||= new THREE.Mesh());
     tmp.matrixAutoUpdate = false;
-    for (const h of handles) {
+    // trees: the trunk only (the first shape), never the leaves
+    for (const h of c.obj.kind === 'tree' ? handles.slice(0, 1) : handles) {
       if (!h.mat || !h.im.geometry) continue;
       tmp.geometry = h.im.geometry; tmp.material = h.im.material;
       if (!tmp.geometry.boundingSphere) tmp.geometry.computeBoundingSphere();
